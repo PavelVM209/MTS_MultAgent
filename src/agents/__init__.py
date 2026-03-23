@@ -10,3 +10,13 @@ This module contains all specialized agents for the multi-agent system:
 """
 
 __version__ = "0.1.0"
+
+from .jira_agent import JiraAgent
+from .excel_agent import ExcelAgent
+from .context_analyzer import ContextAnalyzer
+
+__all__ = [
+    "JiraAgent",
+    "ExcelAgent", 
+    "ContextAnalyzer"
+]
