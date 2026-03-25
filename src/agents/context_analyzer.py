@@ -1,123 +1,62 @@
 """
-Context Analyzer Agent for MTS MultAgent System
+LLM-Driven Context Analyzer Agent for MTS MultAgent System
 
-This agent handles text analysis and context extraction:
-- Analyzing meeting protocols and text documents
-- Extracting key information and entities
-- NLP processing for semantic understanding
-- Context summarization and key points extraction
-- Sentiment analysis and topic modeling
+This agent provides 100% LLM-driven context analysis with:
+- Zero hardcoded patterns - all intelligence through LLM
+- Iterative self-improvement until 85%+ quality
+- Intelligent query generation for Excel integration
+- Semantic insights and relationship mapping
+- Adaptive convergence detection
 """
 
 import asyncio
-import re
+import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
-from collections import Counter
-import structlog
-
-try:
-    import spacy
-    SPACY_AVAILABLE = True
-except ImportError:
-    SPACY_AVAILABLE = False
-
-try:
-    from nltk.tokenize import sent_tokenize, word_tokenize
-    from nltk.corpus import stopwords
-    from nltk import FreqDist
-    NLTK_AVAILABLE = True
-except ImportError:
-    NLTK_AVAILABLE = False
+from typing import Any, Dict, List, Optional
 
 from src.core.base_agent import BaseAgent, AgentResult
-from src.core.models import ContextTask, ContextResult, ExtractedEntity, TextSummary
-
-logger = structlog.get_logger()
+from src.core.models import (
+    ContextTask, LLMContextResult, ExtractedEntity, TextSummary, 
+    IntelligentQuery, ExcelColumnInfo
+)
+from src.core.llm_client import LLMClient, get_llm_client, LLMRequest
+from src.core.iterative_engine import IterativeEngine, get_iterative_engine
+from src.core.quality_metrics import QualityEvaluator, get_quality_evaluator
 
 
 class ContextAnalyzer(BaseAgent):
     """
-    Agent for analyzing text context and extracting key information.
+    LLM-driven Context Analyzer with Zero hardcoded logic.
     
-    Handles natural language processing, entity extraction,
-    and context analysis from meeting protocols and documents.
+    Features:
+    - 100% LLM-based entity extraction and analysis
+    - Iterative improvement until convergence
+    - Intelligent query generation
+    - Semantic relationship mapping
     """
     
     def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize ContextAnalyzer with configuration.
-        
-        Args:
-            config: Configuration dictionary containing NLP settings
-        """
+        """Initialize LLM-driven ContextAnalyzer."""
         super().__init__(config, "ContextAnalyzer")
         
-        # Validate required configuration
-        required_keys = ["context.languages", "context.min_relevance_score"]
-        if not self.validate_config(required_keys):
-            raise ValueError("Missing required ContextAnalyzer configuration")
+        # Initialize LLM components
+        self.llm_client = get_llm_client()
+        self.iterative_engine = get_iterative_engine()
+        self.quality_evaluator = get_quality_evaluator()
         
-        self.languages = self.get_config_value("context.languages", ["ru", "en"])
-        self.min_relevance_score = self.get_config_value("context.min_relevance_score", 0.3)
-        self.max_summary_length = self.get_config_value("context.max_summary_length", 500)
+        # Configuration
+        self.max_iterations = self.get_config_value("context.max_iterations", 5)
+        self.quality_threshold = self.get_config_value("context.quality_threshold", 85.0)
         
-        # Initialize NLP models
-        self.nlp_models = {}
-        self.stop_words = {}
-        
-        asyncio.create_task(self._initialize_nlp_models())
-    
-    async def _initialize_nlp_models(self):
-        """Initialize NLP models asynchronously."""
-        try:
-            if SPACY_AVAILABLE:
-                # Load spacy models for supported languages
-                for lang in self.languages:
-                    try:
-                        if lang == "ru":
-                            self.nlp_models[lang] = spacy.load("ru_core_news_sm")
-                        elif lang == "en":
-                            self.nlp_models[lang] = spacy.load("en_core_web_sm")
-                        self.logger.info(f"Loaded spaCy model for {lang}")
-                    except OSError:
-                        self.logger.warning(f"spaCy model not available for {lang}")
-            
-            if NLTK_AVAILABLE:
-                # Load NLTK stop words
-                for lang in self.languages:
-                    try:
-                        if lang == "ru":
-                            self.stop_words[lang] = set(stopwords.words('russian'))
-                        elif lang == "en":
-                            self.stop_words[lang] = set(stopwords.words('english'))
-                    except OSError:
-                        self.logger.warning(f"NLTK stop words not available for {lang}")
-                        self.stop_words[lang] = set()
-                        
-        except Exception as e:
-            self.logger.error(f"Failed to initialize NLP models: {str(e)}")
+        self.logger.info("LLM-driven ContextAnalyzer initialized")
     
     async def validate(self, task: Dict[str, Any]) -> bool:
-        """
-        Validate ContextAnalyzer task parameters.
-        
-        Args:
-            task: Task dictionary with ContextTask parameters
-            
-        Returns:
-            True if valid, False otherwise
-        """
+        """Validate ContextAnalyzer task parameters."""
         try:
             context_task = ContextTask(**task)
             
-            # Additional validation
             if not context_task.text_content and not context_task.meeting_protocols:
                 self.logger.error("Either text_content or meeting_protocols is required")
-                return False
-            
-            if context_task.search_keywords and not isinstance(context_task.search_keywords, list):
-                self.logger.error("search_keywords must be a list")
                 return False
             
             return True
@@ -128,80 +67,70 @@ class ContextAnalyzer(BaseAgent):
     
     async def execute(self, task: Dict[str, Any]) -> AgentResult:
         """
-        Execute context analysis task.
-        
-        Args:
-            task: Task dictionary containing context analysis parameters
-            
-        Returns:
-            AgentResult with analyzed context
+        Execute LLM-driven context analysis with iterative improvement.
         """
         context_task = ContextTask(**task)
         
         try:
             # Combine all text sources
-            all_text = self._combine_text_sources(context_task)
+            combined_text = self._combine_text_sources(context_task)
             
-            if not all_text.strip():
+            if not combined_text.strip():
                 raise ValueError("No text content to analyze")
             
-            # Detect language
-            detected_language = await self._detect_language(all_text)
+            # Perform LLM-driven analysis with iterative improvement
+            initial_result = await self._initial_llm_analysis(combined_text, context_task)
             
-            # Extract entities
-            entities = await self._extract_entities(all_text, detected_language)
-            
-            # Extract key phrases
-            key_phrases = await self._extract_key_phrases(all_text, detected_language)
-            
-            # Find relevant context based on keywords
-            relevant_context = await self._find_relevant_context(
-                all_text, 
-                context_task.search_keywords, 
-                detected_language
+            # Validate and improve iteratively
+            final_result = await self.iterative_engine.improve_until_convergence(
+                initial_data=initial_result,
+                improve_function=self._improve_context_analysis,
+                expected_context=combined_text,
+                task_requirements=[
+                    "Extract comprehensive entities and relationships",
+                    "Generate intelligent queries for Excel data extraction",
+                    "Provide semantic insights and context understanding",
+                    "Create actionable summary with key points"
+                ]
             )
             
-            # Generate summary
-            summary = await self._generate_summary(all_text, detected_language)
-            
-            # Calculate relevance scores
-            relevance_scores = await self._calculate_relevance_scores(
-                all_text,
-                context_task.search_keywords,
-                detected_language
-            )
-            
-            # Create result
-            result = ContextResult(
-                entities=entities,
-                key_phrases=key_phrases,
-                relevant_context=relevant_context,
-                summary=summary,
-                language=detected_language,
-                relevance_scores=relevance_scores,
-                analysis_timestamp=datetime.now(),
-                metadata={
-                    "text_length": len(all_text),
-                    "nlp_tools_used": self._get_available_tools(),
-                    "processing_time": datetime.now().isoformat()
-                }
+            # Convert to LLMContextResult
+            context_result = LLMContextResult(
+                entities=final_result.data.get("entities", []),
+                key_phrases=final_result.data.get("key_phrases", []),
+                relevant_context=final_result.data.get("relevant_context", []),
+                summary=final_result.data.get("summary"),
+                language=final_result.data.get("language", "unknown"),
+                relevance_scores=final_result.data.get("relevance_scores", {}),
+                metadata=final_result.data.get("metadata", {}),
+                intelligent_queries=final_result.data.get("intelligent_queries", []),
+                semantic_insights=final_result.data.get("semantic_insights", []),
+                data_relationships=final_result.data.get("data_relationships", {}),
+                quality_metrics=getattr(final_result, 'quality_metrics', None),
+                iteration_result=final_result
             )
             
             self.logger.info(
-                "Context analysis completed",
-                entities=len(entities),
-                key_phrases=len(key_phrases),
-                language=detected_language
+                "LLM-driven context analysis completed",
+                quality_score=final_result.quality_score,
+                iterations=final_result.iteration,
+                entities=len(context_result.entities),
+                queries_generated=len(context_result.intelligent_queries)
             )
             
             return AgentResult(
                 success=True,
-                data=result.dict(),
-                agent_name=self.name
+                data=context_result.dict(),
+                agent_name=self.name,
+                metadata={
+                    "quality_score": final_result.quality_score,
+                    "iterations": final_result.iteration,
+                    "converged": final_result.convergence_detected
+                }
             )
             
         except Exception as e:
-            self.logger.error("Context analysis failed", error=str(e), exc_info=True)
+            self.logger.error("LLM-driven context analysis failed", error=str(e), exc_info=True)
             return AgentResult(
                 success=False,
                 error=f"Context analysis failed: {str(e)}",
@@ -209,442 +138,331 @@ class ContextAnalyzer(BaseAgent):
             )
     
     def _combine_text_sources(self, task: ContextTask) -> str:
-        """
-        Combine text from various sources.
-        
-        Args:
-            task: ContextTask with text sources
-            
-        Returns:
-            Combined text string
-        """
+        """Combine text from various sources into unified content."""
         text_parts = []
         
         # Add main text content
         if task.text_content:
-            text_parts.append(task.text_content)
+            text_parts.append(f"## Основной контекст\n{task.text_content}")
         
         # Add meeting protocols
         if task.meeting_protocols:
-            for protocol in task.meeting_protocols:
+            text_parts.append("## Протоколы совещаний")
+            for i, protocol in enumerate(task.meeting_protocols, 1):
                 if isinstance(protocol, dict):
-                    # Handle protocol object
+                    title = protocol.get("title", f"Протокол {i}")
                     content = protocol.get("content", "")
-                    title = protocol.get("title", "")
-                    if title and content:
-                        text_parts.append(f"## {title}\n{content}")
-                    elif content:
-                        text_parts.append(content)
+                    text_parts.append(f"### {title}\n{content}")
                 else:
-                    # Handle string protocol
-                    text_parts.append(str(protocol))
+                    text_parts.append(f"### Протокол {i}\n{protocol}")
         
         # Add additional documents
         if task.additional_documents:
-            for doc in task.additional_documents:
+            text_parts.append("## Дополнительные документы")
+            for i, doc in enumerate(task.additional_documents, 1):
                 if isinstance(doc, dict):
                     content = doc.get("content", "")
                     if content:
-                        text_parts.append(content)
+                        text_parts.append(f"### Документ {i}\n{content}")
                 else:
-                    text_parts.append(str(doc))
+                    text_parts.append(f"### Документ {i}\n{doc}")
         
         return "\n\n".join(text_parts)
     
-    async def _detect_language(self, text: str) -> str:
+    async def _initial_llm_analysis(self, text: str, task: ContextTask) -> Dict[str, Any]:
         """
-        Detect the language of the text.
-        
-        Args:
-            text: Text to analyze
-            
-        Returns:
-            Language code (e.g., 'ru', 'en')
+        Perform initial LLM-driven analysis without hardcoded patterns.
         """
-        # Simple language detection based on character patterns
-        russian_chars = len(re.findall(r'[а-яё]', text.lower()))
-        english_chars = len(re.findall(r'[a-z]', text.lower()))
-        total_chars = russian_chars + english_chars
+        prompt = f"""
+        Проанализируй текстовый контекст и извлеки всю релевантную информацию.
         
-        if total_chars == 0:
-            return "en"  # Default to English
+        ИСХОДНЫЙ ДАННЫЕ:
+        {text}
         
-        russian_ratio = russian_chars / total_chars
+        ЗАДАЧА ОПИСАНИЕ:
+        {task.task_description}
         
-        if russian_ratio > 0.3:
-            return "ru"
-        else:
-            return "en"
-    
-    async def _extract_entities(self, text: str, language: str) -> List[ExtractedEntity]:
+        КЛЮЧЕВЫЕ СЛОВА ДЛЯ ПОИСКА:
+        {', '.join(task.search_keywords) if task.search_keywords else 'Не указаны'}
+        
+        ВЕРНИ РЕЗУЛЬТАТ В ФОРМАТЕ JSON:
+        {{
+            "entities": [
+                {{
+                    "text": "текст сущности",
+                    "label": "тип сущности",
+                    "start": позиция_в_тексте,
+                    "end": позиция_конца,
+                    "confidence": 0.95,
+                    "context": "контекст вокруг сущности"
+                }}
+            ],
+            "key_phrases": ["ключевая фраза 1", "ключевая фраза 2"],
+            "relevant_context": ["релевантный отрывок 1", "релевантный отрывок 2"],
+            "summary": {{
+                "summary": "краткое содержание",
+                "bullet_points": ["• ключевой пункт 1", "• ключевой пункт 2"],
+                "key_topics": ["тема 1", "тема 2"],
+                "word_count": количество_слов
+            }},
+            "language": "ru",
+            "relevance_scores": {{"ключевое слово": очки_релевантности}},
+            "semantic_insights": ["семантический инсайт 1", "семантический инсайт 2"],
+            "data_relationships": {{
+                "сущность1": ["связанная сущность 1", "связанная сущность 2"]
+            }}
+        }}
+        
+        ТРЕБОВАНИЯ:
+        - Извлеки ВСЕ релевантные сущности без ограничений по типам
+        - Генерируй семантические осмысленные связи между данными
+        - Создай глубокий анализ контекста, а не поверхностный
+        - Используй естественный язык в summary и insights
         """
-        Extract named entities from text.
-        
-        Args:
-            text: Text to analyze
-            language: Language code
-            
-        Returns:
-            List of extracted entities
-        """
-        entities = []
         
         try:
-            # Use spaCy if available
-            if SPACY_AVAILABLE and language in self.nlp_models:
-                doc = self.nlp_models[language](text)
-                
-                for ent in doc.ents:
-                    entity = ExtractedEntity(
-                        text=ent.text,
-                        label=ent.label_,
-                        start=ent.start_char,
-                        end=ent.end_char,
-                        confidence=1.0,  # spaCy doesn't provide confidence by default
-                        context=text[max(0, ent.start_char-50):ent.end_char+50]
-                    )
-                    entities.append(entity)
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=4000,
+                cache_key=f"context_analysis_{hash(text)}"
+            ))
             
-            # Fallback to regex-based extraction
-            if not entities:
-                entities = await self._extract_entities_regex(text)
+            # Parse JSON response
+            result_data = json.loads(response.content)
+            
+            # Add metadata
+            result_data["metadata"] = {
+                "analysis_method": "_llm_driven",
+                "processing_time": datetime.now().isoformat(),
+                "text_length": len(text),
+                "llm_provider": response.provider.value
+            }
+            
+            return result_data
             
         except Exception as e:
-            self.logger.error(f"Entity extraction failed: {str(e)}")
-            # Fallback to simple extraction
-            entities = await self._extract_entities_regex(text)
-        
-        return entities
+            self.logger.error(f"Initial LLM analysis failed: {e}")
+            # Return minimal structure for fallback
+            return {
+                "entities": [],
+                "key_phrases": [],
+                "relevant_context": [],
+                "summary": TextSummary(summary="", bullet_points=[], key_topics=[], word_count=0),
+                "language": "unknown",
+                "relevance_scores": {},
+                "semantic_insights": [],
+                "data_relationships": {},
+                "metadata": {"error": str(e)}
+            }
     
-    async def _extract_entities_regex(self, text: str) -> List[ExtractedEntity]:
+    async def _improve_context_analysis(
+        self, 
+        current_data: Dict[str, Any], 
+        improvements_suggestions: str
+    ) -> Dict[str, Any]:
         """
-        Extract entities using regex patterns (fallback method).
-        
-        Args:
-            text: Text to analyze
-            
-        Returns:
-            List of extracted entities
+        Improve context analysis based on LLM-generated suggestions.
         """
-        entities = []
+        # Reconstruct original text from metadata or use a placeholder
+        original_text = current_data.get("metadata", {}).get("original_text", "")
         
-        # Common patterns for Russian and English
-        patterns = {
-            "PERSON": r'\b([А-Я][а-я]+ [А-Я][а-я]+(?: [А-Я][а-я]+)?)\b|\b([A-Z][a-z]+ [A-Z][a-z]+(?: [A-Z][a-z]+)?)\b',
-            "ORG": r'\b([А-Я][а-я]+ [А-Я][а-я]+\s*(?:ООО|АО|ЗАО|ОАО|ИП|Ltd|Inc|Corp|LLC))\b',
-            "DATE": r'\b(\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})\b',
-            "PHONE": r'\b(\+?\d{1,3}[-\s]?\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2})\b',
-            "EMAIL": r'\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b'
-        }
+        prompt = f"""
+        Улучши анализ контекста на основе обратной связи.
         
-        for label, pattern in patterns.items():
-            matches = re.finditer(pattern, text)
-            for match in matches:
-                entity = ExtractedEntity(
-                    text=match.group(),
-                    label=label,
-                    start=match.start(),
-                    end=match.end(),
-                    confidence=0.7,  # Lower confidence for regex-based extraction
-                    context=text[max(0, match.start()-30):match.end()+30]
-                )
-                entities.append(entity)
+        ТЕКУЩИЙ РЕЗУЛЬТАТ АНАЛИЗА:
+        {json.dumps(current_data, ensure_ascii=False, indent=2)}
         
-        return entities
-    
-    async def _extract_key_phrases(self, text: str, language: str) -> List[str]:
+        ПРЕДЛОЖЕНИЯ ПО УЛУЧШЕНИЮ:
+        {improvements_suggestions}
+        
+        ОРИГИНАЛЬНЫЙ ТЕКСТ:
+        {original_text}
+        
+        ВЕРНИ УЛУЧШЕННЫЙ РЕЗУЛЬТАТ В ТОМ ЖЕ JSON ФОРМАТЕ.
+        
+        ФОКУС НА УЛУЧШЕНИЯХ:
+        - Добавь пропущенные сущности и связи
+        - Улучши качество семантического анализа
+        - Расширь релевантные контекстные отрывки
+        - Углуби инсайты и выводы
         """
-        Extract key phrases from text.
         
-        Args:
-            text: Text to analyze
-            language: Language code
-            
-        Returns:
-            List of key phrases
-        """
         try:
-            # Use NLTK if available
-            if NLTK_AVAILABLE:
-                return await self._extract_key_phrases_nltk(text, language)
-            else:
-                return await self._extract_key_phrases_simple(text, language)
-                
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.2,
+                max_tokens=4000,
+                cache_key=f"context_improvement_{hash(str(current_data) + improvements_suggestions)}"
+            ))
+            
+            improved_data = json.loads(response.content)
+            
+            # Preserve metadata and add improvement info
+            improved_data["metadata"] = {
+                **current_data.get("metadata", {}),
+                "improved": True,
+                "improvement_timestamp": datetime.now().isoformat()
+            }
+            
+            return improved_data
+            
         except Exception as e:
-            self.logger.error(f"Key phrase extraction failed: {str(e)}")
-            return await self._extract_key_phrases_simple(text, language)
+            self.logger.error(f"Context analysis improvement failed: {e}")
+            return current_data  # Return original if improvement fails
     
-    async def _extract_key_phrases_nltk(self, text: str, language: str) -> List[str]:
-        """Extract key phrases using NLTK."""
-        # Tokenize and filter stop words
-        tokens = word_tokenize(text.lower(), language=language)
-        stop_words = self.stop_words.get(language, set())
+    async def generate_intelligent_queries(
+        self, 
+        context_result: LLMContextResult, 
+        excel_structure: List[ExcelColumnInfo]
+    ) -> List[IntelligentQuery]:
+        """
+        Generate intelligent queries for Excel data extraction based on context analysis.
+        """
+        structured_context = self._context_to_structured_format(context_result)
+        excel_info = [{"column": col.column_name, "type": col.data_type, "meaning": col.semantic_meaning} 
+                     for col in excel_structure]
         
-        # Filter tokens
-        filtered_tokens = [
-            token for token in tokens 
-            if token.isalpha() and len(token) > 2 and token not in stop_words
+        prompt = f"""
+        На основе анализа контекста и структуры Excel данных сгенерируй интеллектуальные запросы для извлечения данных.
+        
+        АНАЛИЗ КОНТЕКСТА:
+        {structured_context}
+        
+        СТРУКТУРА EXCEL:
+        {json.dumps(excel_info, ensure_ascii=False, indent=2)}
+        
+        СГЕНЕРИРУЙ ЗАПРОСЫ В ФОРМАТЕ JSON МАССИВА:
+        [
+            {{
+                "query_description": "описание запроса на естественном языке",
+                "sql_equivalent": "SQL эквивалент если применимо",
+                "target_columns": ["колонка1", "колонка2"],
+                "expected_output_format": "table",
+                "confidence_score": 0.85
+            }}
         ]
         
-        # Calculate frequency distribution
-        freq_dist = FreqDist(filtered_tokens)
-        
-        # Extract most common words
-        common_words = [word for word, count in freq_dist.most_common(20)]
-        
-        # Generate key phrases (2-3 word combinations)
-        key_phrases = []
-        sentences = sent_tokenize(text, language=language)
-        
-        for sentence in sentences:
-            words = word_tokenize(sentence.lower(), language=language)
-            for i in range(len(words) - 1):
-                # Check 2-word phrases
-                if words[i] in common_words and words[i+1] in common_words:
-                    phrase = f"{words[i]} {words[i+1]}"
-                    if phrase not in key_phrases:
-                        key_phrases.append(phrase)
-                
-                # Check 3-word phrases
-                if i < len(words) - 2:
-                    if (words[i] in common_words and 
-                        words[i+1] in common_words and 
-                        words[i+2] in common_words):
-                        phrase = f"{words[i]} {words[i+1]} {words[i+2]}"
-                        if phrase not in key_phrases:
-                            key_phrases.append(phrase)
-        
-        return key_phrases[:15]  # Return top 15 phrases
-    
-    async def _extract_key_phrases_simple(self, text: str, language: str) -> List[str]:
-        """Extract key phrases using simple methods."""
-        # Split into words and filter
-        words = re.findall(r'\b[a-zA-Zа-яёА-ЯЁ]{3,}\b', text.lower())
-        
-        # Count word frequencies
-        word_freq = Counter(words)
-        common_words = [word for word, count in word_freq.most_common(20)]
-        
-        # Find phrases containing common words
-        key_phrases = []
-        sentences = re.split(r'[.!?]+', text)
-        
-        for sentence in sentences:
-            sentence_words = re.findall(r'\b[a-zA-Zа-яёА-ЯЁ]{3,}\b', sentence.lower())
-            for i in range(len(sentence_words) - 1):
-                if (sentence_words[i] in common_words and 
-                    sentence_words[i+1] in common_words):
-                    phrase = f"{sentence_words[i]} {sentence_words[i+1]}"
-                    if phrase not in key_phrases:
-                        key_phrases.append(phrase)
-        
-        return key_phrases[:15]
-    
-    async def _find_relevant_context(
-        self, 
-        text: str, 
-        keywords: Optional[List[str]], 
-        language: str
-    ) -> List[str]:
+        ТРЕБОВАНИЯ К ЗАПРОСАМ:
+        - Запросы должны напрямую соответствовать задачам из анализа контекста
+- Используй конкретные названия колонок из Excel
+        - Создавай запросы для извлечения релевантных метрик и данных
+        - Обеспечь логическую связь между контекстом и данными Excel
+        - Генерируй 3-5 наиболее релевантных запросов
         """
-        Find relevant text sections based on keywords.
         
-        Args:
-            text: Text to search in
-            keywords: List of keywords to search for
-            language: Language code
-            
-        Returns:
-            List of relevant text sections
-        """
-        if not keywords:
-            return []
-        
-        relevant_sections = []
-        sentences = re.split(r'[.!?]+', text)
-        
-        for keyword in keywords:
-            keyword_lower = keyword.lower()
-            
-            for sentence in sentences:
-                if keyword_lower in sentence.lower():
-                    # Add surrounding sentences for context
-                    sentence_index = sentences.index(sentence)
-                    start_idx = max(0, sentence_index - 1)
-                    end_idx = min(len(sentences), sentence_index + 2)
-                    
-                    context_section = '. '.join(sentences[start_idx:end_idx]).strip()
-                    if context_section and context_section not in relevant_sections:
-                        relevant_sections.append(context_section)
-        
-        return relevant_sections[:10]  # Return top 10 relevant sections
-    
-    async def _generate_summary(self, text: str, language: str) -> TextSummary:
-        """
-        Generate a summary of the text.
-        
-        Args:
-            text: Text to summarize
-            language: Language code
-            
-        Returns:
-            TextSummary object
-        """
         try:
-            # Extract sentences
-            sentences = re.split(r'[.!?]+', text)
-            sentences = [s.strip() for s in sentences if s.strip()]
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=2000,
+                cache_key=f"queries_generation_{hash(structured_context + str(excel_info))}"
+            ))
             
-            if not sentences:
-                return TextSummary(
-                    summary="",
-                    bullet_points=[],
-                    key_topics=[],
-                    word_count=0
-                )
+            queries_data = json.loads(response.content)
             
-            # Simple extractive summarization
-            # Score sentences based on length and keyword frequency
-            scored_sentences = []
-            
-            for i, sentence in enumerate(sentences):
-                # Score based on position, length, and keyword prominence
-                position_score = 1.0 - (i / len(sentences))  # Earlier sentences get higher scores
-                length_score = min(len(sentence.split()) / 20, 1.0)  # Prefer medium-length sentences
-                
-                # Count common words
-                words = sentence.lower().split()
-                word_freq = Counter(words)
-                content_score = sum(word_freq[word] for word in word_freq if len(word) > 3) / len(words) if words else 0
-                
-                total_score = position_score * 0.3 + length_score * 0.3 + content_score * 0.4
-                scored_sentences.append((sentence, total_score))
-            
-            # Sort by score and select top sentences
-            scored_sentences.sort(key=lambda x: x[1], reverse=True)
-            top_sentences = [s[0] for s in scored_sentences[:5]]
-            
-            # Generate summary
-            summary = '. '.join(top_sentences[:3])  # Top 3 sentences for summary
-            if len(summary) > self.max_summary_length:
-                summary = summary[:self.max_summary_length] + "..."
-            
-            # Generate bullet points from key sentences
-            bullet_points = [f"• {s}" for s in top_sentences[:5]]
-            
-            # Extract key topics
-            key_phrases = await self._extract_key_phrases(text, language)
-            key_topics = key_phrases[:10]
-            
-            return TextSummary(
-                summary=summary,
-                bullet_points=bullet_points,
-                key_topics=key_topics,
-                word_count=len(text.split())
-            )
+            return [IntelligentQuery(**query) for query in queries_data]
             
         except Exception as e:
-            self.logger.error(f"Summary generation failed: {str(e)}")
-            return TextSummary(
-                summary="Summary generation failed",
-                bullet_points=[],
-                key_topics=[],
-                word_count=len(text.split())
-            )
+            self.logger.error(f"Intelligent queries generation failed: {e}")
+            return []
     
-    async def _calculate_relevance_scores(
+    async def analyze_excel_context_alignment(
         self, 
-        text: str, 
-        keywords: Optional[List[str]], 
-        language: str
-    ) -> Dict[str, float]:
+        context_result: LLMContextResult, 
+        excel_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
-        Calculate relevance scores for keywords.
-        
-        Args:
-            text: Text to analyze
-            keywords: List of keywords to score
-            language: Language code
-            
-        Returns:
-            Dictionary with keyword relevance scores
+        Analyze alignment between context analysis and Excel data.
         """
-        scores = {}
+        prompt = f"""
+        Проанализируй соответствие между контекстным анализом и данными Excel.
         
-        if not keywords:
-            return scores
+        РЕЗУЛЬТАТЫ АНАЛИЗА КОНТЕКСТА:
+        {self._context_to_structured_format(context_result)}
         
-        text_lower = text.lower()
-        total_words = len(text_lower.split())
+        ДАННЫЕ EXCEL:
+        {json.dumps(excel_data, ensure_ascii=False, indent=2)[:3000]}
         
-        for keyword in keywords:
-            keyword_lower = keyword.lower()
-            
-            # Count keyword occurrences
-            exact_matches = text_lower.count(keyword_lower)
-            
-            # Calculate relevance score based on frequency
-            if total_words > 0:
-                frequency_score = exact_matches / total_words
-            else:
-                frequency_score = 0
-            
-            # Boost score based on keyword prominence (appears in titles, first sentences)
-            prominence_score = 0
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                if keyword_lower in line.lower():
-                    if i == 0:  # First line (likely title)
-                        prominence_score += 0.3
-                    elif i < 3:  # First few lines
-                        prominence_score += 0.1
-            
-            # Combine scores
-            final_score = (frequency_score * 0.7) + (prominence_score * 0.3)
-            scores[keyword] = round(final_score, 4)
+        ВЕРНИ АНАЛИЗ В ФОРМАТЕ JSON:
+        {{
+            "alignment_score": 85.5,
+            "aligned_entities": ["сущность1", "сущность2"],
+            "misaligned_elements": [{"context_item": "элемент1", "issue": "не найден в данных"}],
+            "data_validation": {{
+                "completeness": 80.0,
+                "accuracy": 85.0,
+                "relevance": 90.0
+            }},
+            "recommendations": ["рекомендация1", "рекомендация2"]
+        }}
+        """
         
-        return scores
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=1500,
+                cache_key=f"context_alignment_{hash(str(context_result) + str(excel_data)[:1000])}"
+            ))
+            
+            return json.loads(response.content)
+            
+        except Exception as e:
+            self.logger.error(f"Context alignment analysis failed: {e}")
+            return {"error": str(e)}
     
-    def _get_available_tools(self) -> List[str]:
-        """
-        Get list of available NLP tools.
-        
-        Returns:
-            List of available tool names
-        """
-        tools = []
-        if SPACY_AVAILABLE:
-            tools.append("spacy")
-        if NLTK_AVAILABLE:
-            tools.append("nltk")
-        tools.append("regex")  # Always available
-        
-        return tools
+    def _context_to_structured_format(self, context_result: LLMContextResult) -> str:
+        """Convert context result to structured format for LLM processing."""
+        structured = {
+            "summary": context_result.summary.summary if context_result.summary else "",
+            "key_topics": context_result.summary.key_topics if context_result.summary else [],
+            "entities": [{"text": e.text, "label": e.label, "confidence": e.confidence} 
+                        for e in context_result.entities],
+            "semantic_insights": context_result.semantic_insights,
+            "data_relationships": context_result.data_relationships
+        }
+        return json.dumps(structured, ensure_ascii=False, indent=2)
     
     async def health_check(self) -> Dict[str, Any]:
-        """
-        Perform health check for ContextAnalyzer agent.
-        
-        Returns:
-            Health check result
-        """
+        """Perform health check for LLM-driven ContextAnalyzer."""
         base_health = await super().health_check()
         
         try:
-            # Test NLP functionality
-            test_text = "This is a test text for processing."
-            test_result = await self._detect_language(test_text)
-            nlp_health = {"status": "healthy", "language_detection": True}
+            # Test LLM functionality
+            test_text = "Тестовый текст для проверки LLM анализа контекста."
+            test_result = await self._initial_llm_analysis(test_text, ContextTask(
+                task_description="Тестовая задача",
+                text_content=test_text
+            ))
+            
+            llm_health = {
+                "status": "healthy",
+                "llm_client_available": bool(self.llm_client),
+                "iterative_engine_available": bool(self.iterative_engine),
+                "quality_evaluator_available": bool(self.quality_evaluator),
+                "test_analysis_successful": bool(test_result.get("entities"))
+            }
         except Exception as e:
-            nlp_health = {"status": "error", "language_detection": False, "error": str(e)}
+            llm_health = {"status": "error", "error": str(e)}
         
         base_health.update({
-            "context_configured": bool(self.languages),
-            "nlp_tools_available": self._get_available_tools(),
-            "spacy_available": SPACY_AVAILABLE,
-            "nltk_available": NLTK_AVAILABLE,
-            "supported_languages": self.languages,
-            "nlp_health": nlp_health
+            "analysis_type": "llm_driven",
+            "hardcoded_patterns": "none",
+            "llm_health": llm_health,
+            "supported_features": [
+                "llm_entity_extraction",
+                "iterative_improvement", 
+                "intelligent_queries",
+                "semantic_analysis",
+                "context_alignment"
+            ]
         })
         
         return base_health
+
+
+# Factory function for dependency injection
+def create_context_analyzer(config: Dict[str, Any]) -> ContextAnalyzer:
+    """Factory function to create ContextAnalyzer instance."""
+    return ContextAnalyzer(config)

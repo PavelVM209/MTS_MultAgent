@@ -1,68 +1,65 @@
 """
-Excel Agent for MTS MultAgent System
+LLM-Guided Excel Agent for MTS MultAgent System
 
-This agent handles Excel file operations:
-- Reading Excel files with various formats
-- Extracting data from specific sheets and ranges
-- Converting Excel data to structured formats
-- Handling multiple Excel files
-- Data validation and cleaning
+This agent provides intelligent Excel processing with:
+- Zero hardcoded column mappings - all analysis through LLM
+- Intelligent structure analysis with semantic meaning
+- LLM-generated queries for data extraction
+- Real table data validation
+- Iterative improvement until convergence
 """
 
 import asyncio
+import json
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
-import structlog
 
 from src.core.base_agent import BaseAgent, AgentResult
-from src.core.models import ExcelTask, ExcelResult, ExcelData, ExcelSheet
-
-logger = structlog.get_logger()
+from src.core.models import (
+    ExcelTask, LLMExcelResult, ExcelData, ExcelSheet, ExcelColumnInfo,
+    IntelligentQuery
+)
+from src.core.llm_client import LLMClient, get_llm_client, LLMRequest
+from src.core.iterative_engine import IterativeEngine, get_iterative_engine
+from src.core.quality_metrics import QualityEvaluator, get_quality_evaluator
 
 
 class ExcelAgent(BaseAgent):
     """
-    Agent for processing Excel files.
+    LLM-guided Excel Agent with intelligent structure analysis.
     
-    Handles reading Excel files, extracting data from specific sheets,
-    and converting to structured formats for further analysis.
+    Features:
+    - 100% LLM-driven column analysis and query generation
+    - Semantic meaning extraction for all columns
+    - Intelligent query execution and validation
+    - Real table data guarantee
+    - Iterative improvement of analysis results
     """
     
     def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize ExcelAgent with configuration.
-        
-        Args:
-            config: Configuration dictionary containing Excel settings
-        """
+        """Initialize LLM-guided ExcelAgent."""
         super().__init__(config, "ExcelAgent")
         
-        # Validate required configuration
-        required_keys = ["excel.file_path", "excel.supported_formats"]
-        if not self.validate_config(required_keys):
-            raise ValueError("Missing required Excel configuration")
+        # Initialize LLM components
+        self.llm_client = get_llm_client()
+        self.iterative_engine = get_iterative_engine()
+        self.quality_evaluator = get_quality_evaluator()
         
-        self.default_file_path = self.get_config_value("excel.file_path")
+        # Configuration
         self.supported_formats = self.get_config_value("excel.supported_formats", [".xlsx", ".xls", ".xlsm"])
-        self.default_sheet = self.get_config_value("excel.default_sheet", 0)
         self.max_rows = self.get_config_value("excel.max_rows", 10000)
+        self.max_iterations = self.get_config_value("excel.max_iterations", 5)
+        self.quality_threshold = self.get_config_value("excel.quality_threshold", 85.0)
         
+        self.logger.info("LLM-guided ExcelAgent initialized")
+    
     async def validate(self, task: Dict[str, Any]) -> bool:
-        """
-        Validate Excel task parameters.
-        
-        Args:
-            task: Task dictionary with ExcelTask parameters
-            
-        Returns:
-            True if valid, False otherwise
-        """
+        """Validate Excel task parameters."""
         try:
             excel_task = ExcelTask(**task)
             
-            # Additional validation
             if not excel_task.file_paths:
                 self.logger.error("At least one file path is required")
                 return False
@@ -74,15 +71,8 @@ class ExcelAgent(BaseAgent):
                     self.logger.error(f"File not found: {file_path}")
                     return False
                 
-                if not path.is_file():
-                    self.logger.error(f"Path is not a file: {file_path}")
-                    return False
-                
-                # Check file extension
                 if path.suffix.lower() not in self.supported_formats:
-                    self.logger.error(
-                        f"Unsupported file format: {path.suffix}. Supported: {self.supported_formats}"
-                    )
+                    self.logger.error(f"Unsupported format: {path.suffix}")
                     return False
             
             return True
@@ -93,348 +83,384 @@ class ExcelAgent(BaseAgent):
     
     async def execute(self, task: Dict[str, Any]) -> AgentResult:
         """
-        Execute Excel task with data extraction.
-        
-        Args:
-            task: Task dictionary containing Excel parameters
-            
-        Returns:
-            AgentResult with Excel data
+        Execute LLM-guided Excel processing with iterative improvement.
         """
         excel_task = ExcelTask(**task)
         
         try:
-            extracted_data = []
-            sheets_info = []
-            total_rows = 0
-            total_sheets = 0
+            # Step 1: Basic Excel reading
+            basic_data = await self._read_excel_files_basic(excel_task)
             
-            # Process each file
-            for file_path in excel_task.file_paths:
-                self.logger.info(f"Processing Excel file: {file_path}")
-                
-                # Read Excel file
-                file_data = await self._read_excel_file(
-                    file_path,
-                    excel_task.sheet_names,
-                    excel_task.cell_ranges,
-                    excel_task.headers_row
-                )
-                
-                extracted_data.extend(file_data["sheets"])
-                sheets_info.extend(file_data["sheets_info"])
-                total_rows += file_data["total_rows"]
-                total_sheets += file_data["total_sheets"]
+            # Step 2: LLM-driven structure analysis
+            initial_analysis = await self._analyze_structure_with_llm(basic_data)
             
-            # Create result
-            result = ExcelResult(
-                sheets=extracted_data,
-                total_rows=total_rows,
-                total_sheets=total_sheets,
+            # Step 3: Iterative improvement of analysis
+            improved_analysis = await self.iterative_engine.improve_until_convergence(
+                initial_data=initial_analysis,
+                improve_function=self._improve_structure_analysis,
+                expected_context=json.dumps(basic_data, ensure_ascii=False),
+                task_requirements=[
+                    "Accurate semantic meaning for all columns",
+                    "Comprehensive data insights",
+                    "Intelligent query generation",
+                    "Real table data extraction"
+                ]
+            )
+            
+            # Step 4: Execute intelligent queries
+            query_results = await self._execute_intelligent_queries(
+                improved_analysis.data, excel_task.file_paths
+            )
+            
+            # Step 5: Validate results
+            validated_results = await self._validate_table_results(
+                query_results, improved_analysis.data
+            )
+            
+            # Create LLMExcelResult
+            result = LLMExcelResult(
+                sheets=basic_data["sheets"],
+                total_rows=basic_data["total_rows"],
+                total_sheets=basic_data["total_sheets"],
                 file_paths=excel_task.file_paths,
                 extraction_timestamp=datetime.now(),
                 metadata={
-                    "file_count": len(excel_task.file_paths),
-                    "extraction_time": datetime.now().isoformat(),
-                    "supported_formats": self.supported_formats
-                }
+                    "analysis_method": "llm_guided",
+                    "quality_score": improved_analysis.quality_score,
+                    "iterations": improved_analysis.iteration
+                },
+                column_analysis=improved_analysis.data.get("column_analysis", []),
+                intelligent_queries=improved_analysis.data.get("intelligent_queries", []),
+                query_results=validated_results,
+                data_insights=improved_analysis.data.get("data_insights", []),
+                tables=validated_results  # CRITICAL: Real table data
             )
             
             self.logger.info(
-                "Excel extraction completed",
-                file_count=len(excel_task.file_paths),
-                sheets=total_sheets,
-                rows=total_rows
+                "LLM-guided Excel processing completed",
+                quality_score=improved_analysis.quality_score,
+                iterations=improved_analysis.iteration,
+                tables_generated=len(validated_results),
+                columns_analyzed=len(result.column_analysis)
             )
             
             return AgentResult(
                 success=True,
                 data=result.dict(),
-                agent_name=self.name
+                agent_name=self.name,
+                metadata={
+                    "quality_score": improved_analysis.quality_score,
+                    "iterations": improved_analysis.iteration,
+                    "real_tables_count": len(validated_results)
+                }
             )
             
         except Exception as e:
-            self.logger.error("Excel execution failed", error=str(e), exc_info=True)
+            self.logger.error("LLM-guided Excel execution failed", error=str(e), exc_info=True)
             return AgentResult(
                 success=False,
                 error=f"Excel execution failed: {str(e)}",
                 agent_name=self.name
             )
     
-    async def _read_excel_file(
-        self,
-        file_path: str,
-        sheet_names: Optional[List[str]] = None,
-        cell_ranges: Optional[List[str]] = None,
-        headers_row: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Read Excel file and extract data from sheets.
-        
-        Args:
-            file_path: Path to Excel file
-            sheet_names: List of sheet names to read (None for all)
-            cell_ranges: List of cell ranges to extract (optional)
-            headers_row: Row number containing headers (optional)
-            
-        Returns:
-            Dictionary with extracted data and metadata
-        """
-        sheets_data = []
-        sheets_info = []
+    async def _read_excel_files_basic(self, task: ExcelTask) -> Dict[str, Any]:
+        """Basic Excel reading without hardcoded logic."""
+        extracted_data = []
         total_rows = 0
         total_sheets = 0
         
-        try:
-            # Get all sheet names if not specified
-            if not sheet_names:
+        for file_path in task.file_paths:
+            try:
+                # Read Excel file
                 excel_file = pd.ExcelFile(file_path)
-                sheet_names = excel_file.sheet_names
+                
+                for sheet_name in excel_file.sheet_names:
+                    try:
+                        # Read sheet with automatic header detection
+                        df = pd.read_excel(
+                            file_path,
+                            sheet_name=sheet_name,
+                            nrows=self.max_rows
+                        )
+                        
+                        # Clean data
+                        df = df.dropna(how='all')
+                        df = df.fillna('')
+                        
+                        # Convert to records
+                        data = df.to_dict('records')
+                        columns = df.columns.tolist()
+                        
+                        # Create ExcelData
+                        sheet_data = ExcelData(
+                            sheet_name=sheet_name,
+                            file_path=file_path,
+                            data=data,
+                            columns=columns,
+                            metadata={
+                                "shape": df.shape,
+                                "dtypes": df.dtypes.to_dict(),
+                                "sample_data": data[:3] if data else []
+                            }
+                        )
+                        
+                        extracted_data.append(sheet_data)
+                        total_rows += len(data)
+                        total_sheets += 1
+                        
+                    except Exception as e:
+                        self.logger.error(f"Failed to read sheet {sheet_name}: {e}")
+                        continue
+                
                 excel_file.close()
-            
-            # Process each sheet
-            for sheet_name in sheet_names:
-                try:
-                    # Read sheet data
-                    if cell_ranges:
-                        # Read specific ranges
-                        sheet_data = await self._read_cell_ranges(file_path, sheet_name, cell_ranges)
-                    else:
-                        # Read entire sheet
-                        sheet_data = await self._read_entire_sheet(file_path, sheet_name, headers_row)
-                    
-                    # Create sheet info
-                    sheet_info = ExcelSheet(
-                        name=sheet_name,
-                        rows_count=len(sheet_data.get("data", [])),
-                        columns_count=len(sheet_data.get("columns", [])),
-                        data_type="tabular",
-                        extraction_method="pandas"
-                    )
-                    
-                    sheets_data.append(ExcelData(
-                        sheet_name=sheet_name,
-                        file_path=file_path,
-                        data=sheet_data["data"],
-                        columns=sheet_data["columns"],
-                        metadata=sheet_data.get("metadata", {})
-                    ))
-                    
-                    sheets_info.append(sheet_info)
-                    total_rows += sheet_info.rows_count
-                    total_sheets += 1
-                    
-                    self.logger.info(
-                        f"Sheet processed: {sheet_name}",
-                        rows=sheet_info.rows_count,
-                        columns=sheet_info.columns_count
-                    )
-                    
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to process sheet {sheet_name}: {str(e)}",
-                        exc_info=True
-                    )
-                    continue
-            
-            return {
-                "sheets": sheets_data,
-                "sheets_info": sheets_info,
-                "total_rows": total_rows,
-                "total_sheets": total_sheets
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to read Excel file {file_path}: {str(e)}", exc_info=True)
-            raise
-    
-    async def _read_entire_sheet(
-        self,
-        file_path: str,
-        sheet_name: str,
-        headers_row: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Read entire sheet from Excel file.
+                
+            except Exception as e:
+                self.logger.error(f"Failed to read file {file_path}: {e}")
+                continue
         
-        Args:
-            file_path: Path to Excel file
-            sheet_name: Name of sheet to read
-            headers_row: Row number containing headers
-            
-        Returns:
-            Dictionary with data and columns
-        """
-        try:
-            # Read sheet with pandas
-            if headers_row is not None:
-                df = pd.read_excel(
-                    file_path,
-                    sheet_name=sheet_name,
-                    header=headers_row,
-                    nrows=self.max_rows
-                )
-            else:
-                df = pd.read_excel(
-                    file_path,
-                    sheet_name=sheet_name,
-                    nrows=self.max_rows
-                )
-            
-            # Clean data
-            df = df.dropna(how='all')  # Remove empty rows
-            df = df.fillna('')  # Fill NaN values
-            
-            # Convert to records format
-            data = df.to_dict('records')
-            columns = df.columns.tolist()
-            
-            return {
-                "data": data,
-                "columns": columns,
-                "metadata": {
-                    "shape": df.shape,
-                    "dtypes": df.dtypes.to_dict(),
-                    "null_counts": df.isnull().sum().to_dict()
-                }
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Failed to read sheet {sheet_name}: {str(e)}")
-            raise
+        return {
+            "sheets": extracted_data,
+            "total_rows": total_rows,
+            "total_sheets": total_sheets
+        }
     
-    async def _read_cell_ranges(
-        self,
-        file_path: str,
-        sheet_name: str,
-        cell_ranges: List[str]
-    ) -> Dict[str, Any]:
-        """
-        Read specific cell ranges from Excel sheet.
+    async def _analyze_structure_with_llm(self, basic_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze Excel structure using LLM without hardcoded patterns."""
+        # Prepare structure information for LLM
+        structure_info = []
+        for sheet in basic_data["sheets"]:
+            sheet_info = {
+                "sheet_name": sheet.sheet_name,
+                "file_path": sheet.file_path,
+                "columns": sheet.columns,
+                "sample_data": sheet.metadata.get("sample_data", []),
+                "shape": sheet.metadata.get("shape", [])
+            }
+            structure_info.append(sheet_info)
         
-        Args:
-            file_path: Path to Excel file
-            sheet_name: Name of sheet to read
-            cell_ranges: List of cell ranges (e.g., "A1:C10")
-            
-        Returns:
-            Dictionary with data and columns
+        prompt = f"""
+        Проанализируй структуру Excel данных и определи семантическое значение всех колонок.
+        
+        СТРУКТУРА EXCEL:
+        {json.dumps(structure_info, ensure_ascii=False, indent=2)}
+        
+        ВЕРНИ АНАЛИЗ В ФОРМАТЕ JSON:
+        {{
+            "column_analysis": [
+                {{
+                    "column_name": "название колонки",
+                    "data_type": "тип данных",
+                    "sample_values": ["значение1", "значение2"],
+                    "null_count": 0,
+                    "unique_count": 10,
+                    "semantic_meaning": "семантическое значение",
+                    "relevance_score": 85.0,
+                    "analysis_suggestions": ["рекомендация1", "рекомендация2"]
+                }}
+            ],
+            "intelligent_queries": [
+                {{
+                    "query_description": "описание запроса",
+                    "sql_equivalent": "SQL эквивалент",
+                    "target_columns": ["колонка1", "колонка2"],
+                    "expected_output_format": "table",
+                    "confidence_score": 0.85
+                }}
+            ],
+            "data_insights": ["инсайт1", "инсайт2"]
+        }}
+        
+        ТРЕБОВАНИЯ:
+        - Определи семантическое значение КАЖДОЙ колонки на основе названий и данных
+        - Генерируй интеллектуальные запросы для извлечения релевантных данных
+        - Предоставь глубокие инсайты о структуре и содержании данных
+        - Используй только информацию из предоставленной структуры
         """
+        
         try:
-            all_data = []
-            all_columns = []
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=4000,
+                cache_key=f"structure_analysis_{hash(json.dumps(structure_info))}"
+            ))
             
-            for cell_range in cell_ranges:
-                try:
-                    # Read specific range
-                    df = pd.read_excel(
-                        file_path,
-                        sheet_name=sheet_name,
-                        usecols=cell_range,
-                        nrows=self.max_rows
-                    )
-                    
-                    # Clean data
-                    df = df.dropna(how='all')
-                    df = df.fillna('')
-                    
-                    # Add range information to data
-                    data = df.to_dict('records')
-                    for row in data:
-                        row['_range'] = cell_range
-                    
-                    all_data.extend(data)
-                    all_columns.extend([f"{col}_{cell_range}" for col in df.columns])
-                    
-                except Exception as e:
-                    self.logger.error(f"Failed to read range {cell_range}: {str(e)}")
-                    continue
+            analysis_data = json.loads(response.content)
+            
+            # Convert to ExcelColumnInfo objects
+            column_objects = []
+            for col in analysis_data.get("column_analysis", []):
+                column_objects.append(ExcelColumnInfo(**col))
+            
+            # Convert to IntelligentQuery objects
+            query_objects = []
+            for query in analysis_data.get("intelligent_queries", []):
+                query_objects.append(IntelligentQuery(**query))
             
             return {
-                "data": all_data,
-                "columns": all_columns,
-                "metadata": {
-                    "ranges_processed": cell_ranges,
-                    "total_ranges": len(cell_ranges)
-                }
+                "column_analysis": [col.dict() for col in column_objects],
+                "intelligent_queries": [q.dict() for q in query_objects],
+                "data_insights": analysis_data.get("data_insights", []),
+                "raw_analysis": analysis_data
             }
             
         except Exception as e:
-            self.logger.error(f"Failed to read cell ranges: {str(e)}")
-            raise
+            self.logger.error(f"LLM structure analysis failed: {e}")
+            return {
+                "column_analysis": [],
+                "intelligent_queries": [],
+                "data_insights": [f"Analysis failed: {str(e)}"]
+            }
     
-    async def search_data(
-        self,
-        file_path: str,
-        search_query: str,
-        column_name: Optional[str] = None
+    async def _improve_structure_analysis(
+        self, 
+        current_analysis: Dict[str, Any], 
+        improvements_suggestions: str
+    ) -> Dict[str, Any]:
+        """Improve structure analysis based on LLM suggestions."""
+        prompt = f"""
+        Улучши анализ структуры Excel на основе обратной связи.
+        
+        ТЕКУЩИЙ АНАЛИЗ:
+        {json.dumps(current_analysis, ensure_ascii=False, indent=2)}
+        
+        ПРЕДЛОЖЕНИЯ ПО УЛУЧШЕНИЮ:
+        {improvements_suggestions}
+        
+        ВЕРНИ УЛУЧШЕННЫЙ АНАЛИЗ В ТОМ ЖЕ JSON ФОРМАТЕ.
+        
+        ФОКУС НА УЛУЧШЕНИЯХ:
+        - Уточни семантическое значение колонок
+        - Добавь пропущенные интеллектуальные запросы
+        - Расширь инсайты о данных
+        - Повысь точность анализа
+        """
+        
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.2,
+                max_tokens=4000,
+                cache_key=f"structure_improvement_{hash(str(current_analysis) + improvements_suggestions)}"
+            ))
+            
+            improved_data = json.loads(response.content)
+            return improved_data
+            
+        except Exception as e:
+            self.logger.error(f"Structure improvement failed: {e}")
+            return current_analysis
+    
+    async def _execute_intelligent_queries(
+        self, 
+        analysis_data: Dict[str, Any], 
+        file_paths: List[str]
     ) -> List[Dict[str, Any]]:
-        """
-        Search for specific data in Excel file.
+        """Execute intelligent queries on Excel data."""
+        query_results = []
+        queries = analysis_data.get("intelligent_queries", [])
         
-        Args:
-            file_path: Path to Excel file
-            search_query: Search query string
-            column_name: Specific column to search in (optional)
+        for query in queries:
+            try:
+                result = await self._execute_single_query(query, file_paths)
+                if result:
+                    query_results.append({
+                        "query": query,
+                        "result": result,
+                        "execution_timestamp": datetime.now().isoformat()
+                    })
+            except Exception as e:
+                self.logger.error(f"Query execution failed: {e}")
+                continue
+        
+        return query_results
+    
+    async def _execute_single_query(
+        self, 
+        query: Dict[str, Any], 
+        file_paths: List[str]
+    ) -> Optional[Dict[str, Any]]:
+        """Execute a single intelligent query."""
+        # Extract data based on target columns
+        target_columns = query.get("target_columns", [])
+        
+        if not target_columns:
+            return None
+        
+        all_data = []
+        
+        for file_path in file_paths:
+            try:
+                # Read all sheets
+                excel_file = pd.ExcelFile(file_path)
+                
+                for sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                    
+                    # Filter for target columns that exist
+                    available_columns = [col for col in target_columns if col in df.columns]
+                    
+                    if available_columns:
+                        filtered_df = df[available_columns].dropna(how='all')
+                        
+                        # Convert to dict
+                        sheet_result = {
+                            "file_path": file_path,
+                            "sheet_name": sheet_name,
+                            "data": filtered_df.to_dict('records'),
+                            "columns": available_columns,
+                            "row_count": len(filtered_df)
+                        }
+                        all_data.append(sheet_result)
+                
+                excel_file.close()
+                
+            except Exception as e:
+                self.logger.error(f"Failed to execute query on {file_path}: {e}")
+                continue
+        
+        return {
+            "query_description": query.get("query_description"),
+            "results": all_data,
+            "total_rows": sum(len(res.get("data", [])) for res in all_data)
+        } if all_data else None
+    
+    async def _validate_table_results(
+        self, 
+        query_results: List[Dict[str, Any]], 
+        analysis_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Validate and format table results."""
+        validated_tables = []
+        
+        for query_result in query_results:
+            result_data = query_result.get("result", {})
             
-        Returns:
-            List of matching rows
-        """
-        try:
-            # Read all sheets
-            excel_task = ExcelTask(file_paths=[file_path])
-            is_valid = await self.validate(excel_task.dict())
+            if not result_data or not result_data.get("results"):
+                continue
             
-            if not is_valid:
-                raise ValueError(f"Invalid Excel file: {file_path}")
-            
-            result = await self.execute(excel_task.dict())
-            
-            if not result.success:
-                raise ValueError(f"Failed to read Excel file: {result.error}")
-            
-            # Search in extracted data
-            matches = []
-            search_query_lower = search_query.lower()
-            
-            for sheet_data in result.data["sheets"]:
-                for row in sheet_data["data"]:
-                    # Search in all columns or specific column
-                    if column_name:
-                        if column_name in row and search_query_lower in str(row[column_name]).lower():
-                            matches.append({
-                                "sheet": sheet_data["sheet_name"],
-                                "row": row
-                            })
-                    else:
-                        # Search in all columns
-                        for value in row.values():
-                            if search_query_lower in str(value).lower():
-                                matches.append({
-                                    "sheet": sheet_data["sheet_name"],
-                                    "row": row
-                                })
-                                break
-            
-            self.logger.info(
-                f"Search completed in {file_path}",
-                query=search_query,
-                matches=len(matches)
-            )
-            
-            return matches
-            
-        except Exception as e:
-            self.logger.error(f"Search failed in {file_path}: {str(e)}")
-            raise
+            # Format each result as a proper table
+            for sheet_result in result_data.get("results", []):
+                table = {
+                    "title": f"{result_data.get('query_description', 'Query Result')} - {sheet_result.get('sheet_name')}",
+                    "file_path": sheet_result.get("file_path"),
+                    "sheet_name": sheet_result.get("sheet_name"),
+                    "columns": sheet_result.get("columns", []),
+                    "data": sheet_result.get("data", []),
+                    "row_count": sheet_result.get("row_count", 0),
+                    "query_description": result_data.get("query_description"),
+                    "validation_timestamp": datetime.now().isoformat()
+                }
+                
+                # Only include tables with actual data
+                if table["data"] and table["row_count"] > 0:
+                    validated_tables.append(table)
+        
+        self.logger.info(f"Validated {len(validated_tables)} real tables with data")
+        return validated_tables
     
     async def health_check(self) -> Dict[str, Any]:
-        """
-        Perform health check for Excel agent.
-        
-        Returns:
-            Health check result
-        """
+        """Perform health check for LLM-guided ExcelAgent."""
         base_health = await super().health_check()
         
         try:
@@ -444,17 +470,39 @@ class ExcelAgent(BaseAgent):
         except Exception as e:
             pandas_health = {"status": "error", "pandas_available": False, "error": str(e)}
         
-        # Test file path accessibility
-        file_path_accessible = False
-        if self.default_file_path:
-            default_path = Path(self.default_file_path)
-            file_path_accessible = default_path.exists() or default_path.parent.exists()
+        # Test LLM components
+        llm_health = {
+            "status": "healthy" if all([
+                self.llm_client,
+                self.iterative_engine,
+                self.quality_evaluator
+            ]) else "error",
+            "components": {
+                "llm_client": bool(self.llm_client),
+                "iterative_engine": bool(self.iterative_engine),
+                "quality_evaluator": bool(self.quality_evaluator)
+            }
+        }
         
         base_health.update({
-            "excel_configured": bool(self.default_file_path),
-            "file_path_accessible": file_path_accessible,
+            "analysis_type": "llm_guided",
+            "hardcoded_patterns": "none",
             "supported_formats": self.supported_formats,
-            "pandas_health": pandas_health
+            "pandas_health": pandas_health,
+            "llm_health": llm_health,
+            "supported_features": [
+                "llm_structure_analysis",
+                "intelligent_queries",
+                "semantic_column_analysis",
+                "iterative_improvement",
+                "real_table_validation"
+            ]
         })
         
         return base_health
+
+
+# Factory function for dependency injection
+def create_excel_agent(config: Dict[str, Any]) -> ExcelAgent:
+    """Factory function to create ExcelAgent instance."""
+    return ExcelAgent(config)

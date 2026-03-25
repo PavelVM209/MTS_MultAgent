@@ -1,112 +1,132 @@
-# Tech Context - MTS_MultAgent
+# Tech Context - MTS_MultAgent LLM-Driven Architecture
 
-## Технологический стек
+## 🧠 НОВЫЙ ТЕХНОЛОГИЧЕСКИЙ СТЕК - LLM-CENTRIC
 
 ### Основные технологии
-- **Python 3.8+**: Основной язык разработки (проверено на 3.8 и выше)
-- **asyncio**: Асинхронное программирование
+- **Python 3.11+**: Основной язык разработки (LLM-оптимизированный)
+- **asyncio**: Асинхронное программирование для параллельных LLM запросов
 - **aiohttp**: HTTP клиент для API запросов
-- **pandas**: Обработка данных
-- **openpyxl**: Работа с Excel файлами
+- **pandas**: Обработка данных Excel
+- **openpyxl**: Работа с Excel файлами больших размеров (2-3 ГБ)
 - **click**: CLI интерфейс
 - **python-dotenv**: Управление переменными окружения
-- **pydantic**: Валидация данных
+- **pydantic**: Валидация данных с LLM-моделями
 - **FastAPI**: Веб-интерфейс (второй этап)
 
-### Зависимости для разработки
-- **pytest**: Тестирование
-- **black**: Форматирование кода
-- **mypy**: Статическая типизация
-- **pre-commit**: Git hooks
+### 🚀 LLM Integration Stack
+- **OpenAI API**: Primary LLM provider
+- **Local LLM Support**: Ollama, Llama 2, и другие
+- **LangChain**: LLM orchestration и prompt management
+- **Vector Databases**: ChromaDB для кэширования LLM ответов
+- **Prompt Templates**: Jinja2 для динамических промптов
+- **Rate Limiting**: Управление LLM API запросами
+
+### Итеративные алгоритмы
+- **Quality Convergence**: Алгоритмы сходимости итераций
+- **Adaptive Strategies**: Динамическая корректировка стратегий
+- **Bayesian Optimization**: Оптимизация гиперпараметров LLM
+- **Reinforcement Learning**: Обучение на основе обратной связи
 
 ## Настройка разработки
 
 ### Требования к окружению
 ```bash
-# Проверка доступных версий Python
+# Проверка доступных версий Python - требуется 3.11+ для LLM оптимизации
 python --version
 python3 --version
-which python
-which python3
-# Требуется Python 3.8+
 
 # Виртуальное окружение (ОБЯЗАТЕЛЬНО)
-# Выберите подходящую команду для вашей системы:
+python3.11 -m venv venv_py311  # Рекомендуемая версия
+source venv_py311/bin/activate
 
-# Если доступен python как python (версия 3.8+)
-python -m venv venv
-
-# Если доступен только python3
-python3 -m venv venv
-
-# Если у вас несколько версий Python
-python3.8 -m venv venv  # Для Python 3.8
-python3.9 -m venv venv  # Для Python 3.9
-python3.10 -m venv venv # Для Python 3.10
-
-# Для конкретного пути (как в вашем примере с macOS)
-/Library/Frameworks/Python.framework/Versions/3.8/bin/python3 -m venv venv
-
-# Активация
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate  # Windows
-
-# Проверка активации - должно появиться (venv) в начале строки
-(venv) $ python --version
-(venv) $ which python  # Должен показывать путь к venv/bin/python
+# Проверка активации
+(venv_py311) $ python --version
+# Python 3.11.x
 ```
 
-### ⚠️ ВАЖНО: Обязательное использование виртуального окружения
+### ⚠️ КРИТИЧЕСКИ ВАЖНО: LLM окружение
 
-**Почему это критически важно:**
-- Изоляция зависимостей проекта от системных
-- Предотвращение конфликтов версий
-- Гарантия воспроизводимости окружения
-- Безопасность системного Python
+**Особенности для LLM разработки:**
+- **Python 3.11+**: Оптимизация производительности для LLM
+- **Дополнительная память**: Минимум 4GB RAM для LLM операций
+- **网络稳定性**: Стабильное соединение для LLM API
+- **GPU поддержка**: Опционально для локальных LLM
 
-**Проверка активации:**
-```bash
-# Должно быть видно (venv) в начале строки
-(venv) $ python --version
-(venv) $ which python
-# /path/to/project/venv/bin/python
-
-# Если активации нет, повторите:
-source venv/bin/activate
-```
-
-### Установка зависимостей
-```bash
-pip install -r requirements.txt
-```
-
-### Структура requirements.txt
-```
+### Обновленная структура requirements.txt
+```txt
 # Core dependencies
 aiohttp>=3.8.0
 pandas>=1.5.0
 openpyxl>=3.0.0
 click>=8.0.0
 python-dotenv>=0.19.0
-pydantic>=1.10.0
+pydantic>=2.0.0  # Версия 2+ для LLM моделей
+
+# LLM Integration
+openai>=1.0.0
+langchain>=0.1.0
+langchain-openai>=0.0.5
+chromadb>=0.4.0
+tiktoken>=0.5.0
+jinja2>=3.1.0
+
+# Итеративные алгоритмы
+numpy>=1.24.0
+scipy>=1.10.0
+scikit-learn>=1.3.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Big Data обработки
+dask>=2023.1.0
+modin[pandas]>=0.20.0  # Для больших Excel файлов
+memory-profiler>=0.60.0
 
 # Web interface (Phase 2)
-fastapi>=0.85.0
-uvicorn>=0.18.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
 
-# Development
-pytest>=7.0.0
-pytest-asyncio>=0.20.0
-black>=22.0.0
-mypy>=0.991
-pre-commit>=2.20.0
+# Development с LLM тестами
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+black>=23.0.0
+mypy>=1.5.0
+pre-commit>=3.3.0
 ```
 
-## Конфигурация
+## 🧠 LLM Конфигурация
 
 ### Переменные окружения
 ```bash
-# Jira Configuration
+# LLM Configuration
+OPENAI_API_KEY="your-openai-api-key"
+OPENAI_MODEL="gpt-4-turbo-preview"
+OPENAI_TEMPERATURE=0.1
+OPENAI_MAX_TOKENS=4000
+OPENAI_TIMEOUT=60
+
+# Local LLM Support
+LOCAL_LLM_ENABLED=false
+LOCAL_LLM_MODEL="llama2"
+LOCAL_LLM_BASE_URL="http://localhost:11434"
+
+# Vector Database
+CHROMA_PERSIST_DIRECTORY="./chroma_db"
+CHROMA_COLLECTION_NAME="mts_analysis"
+
+# Итеративное улучшение
+MAX_ITERATIONS=5
+QUALITY_THRESHOLD=85.0
+CONVERGENCE_MIN_IMPROVEMENT=5.0
+
+# Caching и Performance
+CACHE_ENABLED=true
+CACHE_TTL=3600
+LLM_REQUEST_TIMEOUT=60
+MAX_CONCURRENT_LLM_REQUESTS=3
+
+# Jira Configuration (без изменений)
 JIRA_BASE_URL="https://your-company.atlassian.net"
 JIRA_ACCESS_TOKEN="your-jira-token"
 JIRA_USERNAME="your-email@company.com"
@@ -121,173 +141,407 @@ ROOT_PAGE_ID_TO_ADD_NEW_PAGES=897438835
 PROJECT_NAME="Stroki.Clone.S3.Integration.Api"
 WEB_REQUEST_TIMEOUT_IN_SECONDS=30
 
-# Excel Configuration
-EXCEL_FILE_PATH="path/to/excel/files"
-EXCEL_SHEET_NAME="Sheet1"
-
-# Logging
+# Logging для LLM
 LOG_LEVEL="INFO"
+LLM_LOG_LEVEL="DEBUG"
 LOG_FILE="logs/mts_agent.log"
+PROMPT_LOG_FILE="logs/prompts.log"
 ```
 
-### Файл .env.example
-```bash
-# Copy this to .env and fill with your values
-cp .env.example .env
-```
+## 🔄 LLM API интеграции
 
-## API интеграции
-
-### Jira API
-- **Test Server**: `https://test.jira-clst.mts.ru/rest/scriptrunner/latest/custom`
-- **Production Server**: `https://jira.mts.ru/`
-- **Endpoint**: `/rest/api/3/search`
-- **Authentication**: Basic Auth + Token
-- **Rate Limit**: 1000 requests/hour
-- **Timeout**: 30 seconds
-
+### OpenAI API Configuration
 ```python
-# Пример запроса
-headers = {
-    "Authorization": f"Basic {base64_token}",
-    "Content-Type": "application/json"
+# LLM Client Configuration
+class LLMConfig:
+    api_key: str
+    model: str = "gpt-4-turbo-preview"
+    temperature: float = 0.1
+    max_tokens: int = 4000
+    timeout: int = 60
+    max_retries: int = 3
+    rate_limit: int = 100  # requests per minute
+
+# Prompt Templates
+PROMPT_TEMPLATES = {
+    "context_analysis": """
+    Ты - эксперт бизнес-аналитик с глубоким пониманием корпоративных данных.
+    
+    ЗАДАЧА: {task_description}
+    КОНТЕКСТ JIRA: {jira_context}
+    ДОСТУПНЫЕ КОЛОНКИ EXCEL: {excel_columns}
+    
+    Проанализируй и сгенерируй точные запросы для извлечения релевантных данных.
+    """,
+    
+    "quality_evaluation": """
+    Оцени качество анализа по шкале 0-100%:
+    
+    ИСХОДНЫЙ КОНТЕКСТ: {original_context}
+    ПОЛУЧЕННЫЕ ДАННЫЕ: {result_data}
+    
+    Оцени: relevance, completeness, accuracy, overall_quality
+    """,
+    
+    "improvement_suggestions": """
+    Проанализируй результаты и предложи улучшения:
+    
+    ТЕКУЩИЕ РЕЗУЛЬТАТЫ: {current_results}
+    ОЖИДАЕМЫЕ ДАННЫЕ: {expected_data}
+    ПРЕДЫДУЩИЙ ФИДБЕК: {previous_feedback}
+    
+    Сгенерируй улучшенные запросы для следующей итерации.
+    """
 }
-
-# Test URL
-JIRA_TEST_URL = "https://test.jira-clst.mts.ru/rest/scriptrunner/latest/custom"
-# Production URL  
-JIRA_PROD_URL = "https://jira.mts.ru/"
 ```
 
-### Confluence API
-- **Test Server**: `https://test.cnfl-clst.mts.ru/rest/scriptrunner/latest/custom`
-- **Production Server**: `https://confluence.mts.ru/`
-- **Endpoint**: `/rest/api/content`
-- **Authentication**: Basic Auth + Token
-- **Rate Limit**: 1000 requests/hour
-- **Timeout**: 30 seconds
-
+### Local LLM Support
 ```python
-# Пример создания страницы
-payload = {
-    "type": "page",
-    "title": "Analysis Report",
-    "space": {"key": "SPACE"},
-    "body": {"storage": {"value": content, "representation": "storage"}}
-}
-
-# Test URL
-CONFLUENCE_TEST_URL = "https://test.cnfl-clst.mts.ru/rest/scriptrunner/latest/custom"
-# Production URL
-CONFLUENCE_PROD_URL = "https://confluence.mts.ru/"
+# Local LLM Configuration (Ollama)
+class LocalLLMConfig:
+    enabled: bool = False
+    model: str = "llama2"
+    base_url: str = "http://localhost:11434"
+    timeout: int = 120
+    temperature: float = 0.1
+    
+# Fallback Strategy
+class LLMFallbackConfig:
+    primary_provider: str = "openai"
+    fallback_provider: str = "local"
+    failover_threshold: int = 3  # consecutive failures
+    auto_switch: bool = True
 ```
 
-## Архитектурные ограничения
+## 🔄 Архитектурные паттерны для LLM
 
-### Производительность
-- **Максимальный размер Excel файла**: 100MB
-- **Количество concurrent запросов**: 10
-- **Memory limit**: 1GB per process
-- **Timeout для API**: 30 секунд
-
-### Безопасность
-- **Токены**: Хранятся только в переменных окружения
-- **HTTPS**: Обязательное использование
-- **No hardcoded credentials**: Запрет на хранение в коде
-- **Sanitization**: Очистка входных данных
-
-### Доступность
-- **Python 3.8+**: Минимальная версия (проверено на 3.8 и выше)
-- **Linux/Mac/Windows**: Кроссплатформенность
-- **Docker**: Контейнеризация опционально
-
-## Паттерны использования инструментов
-
-### Виртуальное окружение
-```bash
-# Активация перед работой
-source venv/bin/activate
-
-# Деактивация после работы
-deactivate
-```
-
-### Запуск приложения
-```bash
-# CLI режим
-python -m src.cli.main --task "project analysis"
-
-# Web режим (Phase 2)
-uvicorn src.api.main:app --reload --port 8000
-```
-
-### Тестирование
-```bash
-# Все тесты
-pytest
-
-# С覆盖率
-pytest --cov=src
-
-# Асинхронные тесты
-pytest -k "async" --asyncio-mode=auto
-```
-
-### Логирование
+### Итеративный цикл улучшения
 ```python
-# Структурированное логирование
-import structlog
-logger = structlog.get_logger()
-
-logger.info("Agent execution started", 
-           agent="JiraAgent", 
-           task_id="123",
-           project="MyProject")
+class IterativeImprovementPattern:
+    """Базовый паттерн для итеративного улучшения через LLM"""
+    
+    async def improve_until_convergence(
+        self,
+        initial_input: Any,
+        quality_threshold: float = 85.0,
+        max_iterations: int = 5
+    ) -> IterationResult:
+        
+        current_iteration = 0
+        best_result = None
+        best_quality = 0.0
+        
+        while current_iteration < max_iterations:
+            # LLM анализ и улучшение
+            improved_result = await self.llm_improve(
+                initial_input, 
+                previous_result=best_result,
+                iteration=current_iteration
+            )
+            
+            # LLM оценка качества
+            quality_score = await self.llm_evaluate_quality(
+                improved_result, 
+                initial_input
+            )
+            
+            # Проверка сходимости
+            if quality_score >= quality_threshold:
+                break
+            
+            # Сохранение лучшего результата
+            if quality_score > best_quality:
+                best_quality = quality_score
+                best_result = improved_result
+            
+            current_iteration += 1
+        
+        return IterationResult(
+            final_result=best_result,
+            quality_score=best_quality,
+            iterations=current_iteration,
+            converged=quality_score >= quality_threshold
+        )
 ```
 
-## Мониторинг и отладка
+### LLM Caching Strategy
+```python
+class LLMCacheManager:
+    """Интеллектуальное кэширование LLM запросов"""
+    
+    def __init__(self):
+        self.vector_db = ChromaDB()
+        self.cache_ttl = 3600  # 1 hour
+        
+    async def get_cached_response(
+        self, 
+        prompt: str, 
+        context_hash: str
+    ) -> Optional[str]:
+        """Получение кэшированного LLM ответа"""
+        
+    async def cache_response(
+        self, 
+        prompt: str, 
+        response: str, 
+        context_hash: str
+    ) -> None:
+        """Кэширование LLM ответа"""
+        
+    async def find_similar_prompts(
+        self, 
+        prompt: str, 
+        similarity_threshold: float = 0.85
+    ) -> List[str]:
+        """Поиск похожих промптов в кэше"""
+```
 
-### Логи
-- **Уровень**: INFO по умолчанию
-- **Формат**: JSON structured logs
-- **Rotation**: Ежедневная ротация
-- **Местоположение**: `logs/`
+### Quality Convergence Algorithm
+```python
+class QualityConvergenceDetector:
+    """Алгоритм определения сходимости качества"""
+    
+    def __init__(self, min_improvement: float = 5.0, window_size: int = 3):
+        self.min_improvement = min_improvement
+        self.window_size = window_size
+        self.quality_history = []
+        
+    def has_converged(self, current_quality: float) -> bool:
+        """Определение сходимости на основе истории качества"""
+        self.quality_history.append(current_quality)
+        
+        if len(self.quality_history) < self.window_size:
+            return False
+        
+        recent_qualities = self.quality_history[-self.window_size:]
+        improvements = [
+            recent_qualities[i] - recent_qualities[i-1]
+            for i in range(1, len(recent_qualities))
+        ]
+        
+        avg_improvement = sum(improvements) / len(improvements)
+        return avg_improvement < self.min_improvement
+```
 
-### Метрики
-- **Performance**: Время выполнения агентов
-- **Success Rate**: Успешность операций
-- **Error Tracking**: Мониторинг ошибок
-- **Resource Usage**: Память и CPU
+## 🚀 Performance оптимизация для LLM
 
-### Отладка
+### Параллельные LLM запросы
+```python
+import asyncio
+from asyncio import Semaphore
+
+class ConcurrentLLMProcessor:
+    def __init__(self, max_concurrent: int = 3):
+        self.semaphore = Semaphore(max_concurrent)
+        
+    async def process_batch_requests(
+        self, 
+        requests: List[LLMRequest]
+    ) -> List[LLMResponse]:
+        """Параллельная обработка LLM запросов"""
+        
+        async def process_single_request(request):
+            async with self.semaphore:
+                return await self.llm_client.complete(request.prompt)
+        
+        tasks = [process_single_request(req) for req in requests]
+        return await asyncio.gather(*tasks)
+```
+
+### Memory оптимизация для больших Excel файлов
+```python
+class MemoryOptimizedExcelProcessor:
+    def __init__(self, chunk_size: int = 10000):
+        self.chunk_size = chunk_size
+        
+    async def process_large_excel(
+        self, 
+        file_path: str, 
+        llm_processor: LLMProcessor
+    ) -> Iterator[ChunkResult]:
+        """Построчная обработка больших Excel файлов"""
+        
+        for chunk in pd.read_excel(file_path, chunksize=self.chunk_size):
+            # LLM анализ чанка
+            chunk_analysis = await llm_processor.analyze_chunk(chunk)
+            yield ChunkResult(data=chunk, analysis=chunk_analysis)
+            
+            # Очистка памяти
+            del chunk
+            gc.collect()
+```
+
+## 🔄 Мониторинг и отладка LLM
+
+### LLM-специфичные метрики
+```python
+class LLMMetrics:
+    """Метрики для мониторинга LLM производительности"""
+    
+    def __init__(self):
+        self.request_count = 0
+        self.token_usage = 0
+        self.response_times = []
+        self.error_rates = {}
+        self.quality_scores = []
+        
+    def track_request(
+        self, 
+        tokens_used: int, 
+        response_time: float, 
+        quality_score: float
+    ):
+        """Трекинг LLM запроса"""
+        self.request_count += 1
+        self.token_usage += tokens_used
+        self.response_times.append(response_time)
+        self.quality_scores.append(quality_score)
+        
+    def get_performance_stats(self) -> Dict[str, float]:
+        """Получение статистики производительности"""
+        return {
+            "avg_response_time": sum(self.response_times) / len(self.response_times),
+            "avg_quality_score": sum(self.quality_scores) / len(self.quality_scores),
+            "total_tokens": self.token_usage,
+            "tokens_per_request": self.token_usage / self.request_count
+        }
+```
+
+### LLM Logging
+```python
+class LLMPromptLogger:
+    """Логирование промптов и ответов для анализа"""
+    
+    def __init__(self, log_file: str = "logs/prompts.log"):
+        self.log_file = log_file
+        
+    async def log_interaction(
+        self, 
+        prompt: str, 
+        response: str, 
+        metadata: Dict[str, Any]
+    ):
+        """Логирование LLM взаимодействия"""
+        
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "prompt": prompt,
+            "response": response,
+            "metadata": metadata,
+            "prompt_tokens": len(prompt.split()),
+            "response_tokens": len(response.split())
+        }
+        
+        async with aiofiles.open(self.log_file, "a") as f:
+            await f.write(json.dumps(log_entry) + "\n")
+```
+
+## 🧪 Тестирование LLM-систем
+
+### LLM-интеграционные тесты
+```python
+class LLMIntegrationTests:
+    """Тесты для LLM-интеграции"""
+    
+    async def test_iterative_improvement_convergence(self):
+        """Тест сходимости итеративного улучшения"""
+        
+    async def test_quality_evaluation_consistency(self):
+        """Тест консистентности оценки качества"""
+        
+    async def test_prompt_robustness(self):
+        """Тест устойчивости к variation в промптах"""
+        
+    async def test_fallback_mechanism(self):
+        """Тест механизма fallback при недоступности LLM"""
+```
+
+### Mock LLM для тестирования
+```python
+class MockLLMClient:
+    """Mock LLM клиент для тестирования"""
+    
+    def __init__(self, response_delay: float = 0.1):
+        self.response_delay = response_delay
+        self.predetermined_responses = {}
+        
+    async def complete(self, prompt: str) -> str:
+        """Mock LLM completion с детерминированными ответами"""
+        await asyncio.sleep(self.response_delay)
+        
+        prompt_hash = hash(prompt)
+        if prompt_hash in self.predetermined_responses:
+            return self.predetermined_responses[prompt_hash]
+            
+        # Генерация осмысленного mock ответа
+        return self._generate_mock_response(prompt)
+```
+
+## 🚀 Развертывание LLM-систем
+
+### Production LLM конфигурация
 ```bash
-# Включение debug режима
-export LOG_LEVEL=DEBUG
-python -m src.cli.main --debug --task "test"
+# Production оптимизации
+export OPENAI_MODEL="gpt-4-turbo-preview"
+export OPENAI_TEMPERATURE=0.0  # Для консистентности
+export MAX_CONCURRENT_LLM_REQUESTS=5
+export CACHE_ENABLED=true
+export CACHE_TTL=7200  # 2 часа
 
-# Profiling
-python -m cProfile -o profile.stats src/cli/main.py
+# Мониторинг
+export PROMETHEUS_ENABLED=true
+export LLM_METRICS_EXPORT=true
+export QUALITY_TRACKING=true
 ```
 
-## Развертывание
-
-### Локальное развертывание
-```bash
-# Клонирование и настройка
-git clone <repo>
-cd MTS_MultAgent
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your credentials
-```
-
-### Docker развертывание (опционально)
+### Docker для LLM-систем
 ```dockerfile
-FROM python:3.9-slim
+FROM python:3.11-slim
+
+# GPU поддержка для локальных LLM
+RUN apt-get update && apt-get install -y \
+    nvidia-cuda-toolkit \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-CMD ["python", "-m", "src.cli.main"]
+EXPOSE 8000
+
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### Kubernetes конфигурация
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mts-multagent-llm
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mts-multagent-llm
+  template:
+    spec:
+      containers:
+      - name: mts-multagent
+        image: mts-multagent:latest
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mts-secrets
+              key: openai-api-key
+```
+
+Новая архитектура обеспечивает полную интеллектуализацию системы с итеративным улучшением результатов через LLM.

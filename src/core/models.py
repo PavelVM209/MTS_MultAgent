@@ -76,42 +76,74 @@ class JiraResult(BaseModel):
 # Context Analysis Models
 class ContextTask(BaseModel):
     """Task model for context analysis."""
-    jira_data: JiraResult = Field(..., description="Data from Jira")
+    text_content: Optional[str] = Field(None, description="Main text content")
     task_description: str = Field(..., description="Original task description")
-    search_patterns: List[str] = Field(default_factory=list, description="Patterns to search")
-    entities_to_extract: List[str] = Field(default_factory=list, description="Entities to extract")
+    search_keywords: List[str] = Field(default_factory=list, description="Keywords to search for")
+    meeting_protocols: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Meeting protocols")
+    additional_documents: Optional[List[Dict[str, str]]] = Field(default_factory=list, description="Additional documents")
 
 
 class ExtractedEntity(BaseModel):
     """Extracted entity model."""
-    type: str = Field(..., description="Entity type")
-    value: str = Field(..., description="Entity value")
+    text: str = Field(..., description="Entity text")
+    label: str = Field(..., description="Entity label/type")
+    start: int = Field(..., description="Start position in text")
+    end: int = Field(..., description="End position in text")
     confidence: float = Field(..., description="Confidence score")
     context: str = Field(..., description="Context where entity was found")
 
 
+class TextSummary(BaseModel):
+    """Text summary model."""
+    summary: str = Field(..., description="Generated summary")
+    bullet_points: List[str] = Field(default_factory=list, description="Key bullet points")
+    key_topics: List[str] = Field(default_factory=list, description="Key topics")
+    word_count: int = Field(default=0, description="Total word count")
+
+
 class ContextResult(BaseModel):
     """Result model for context analysis."""
-    relevant_context: str = Field(..., description="Most relevant context")
-    extracted_entities: List[ExtractedEntity] = Field(default_factory=list, description="Extracted entities")
-    search_queries_for_excel: List[str] = Field(default_factory=list, description="Queries for Excel")
-    confidence_score: float = Field(default=0.0, description="Overall confidence score")
-    summary: str = Field(default="", description="Analysis summary")
+    entities: List[ExtractedEntity] = Field(default_factory=list, description="Extracted entities")
+    key_phrases: List[str] = Field(default_factory=list, description="Key phrases")
+    relevant_context: List[str] = Field(default_factory=list, description="Relevant context sections")
+    summary: TextSummary = Field(..., description="Text summary")
+    language: str = Field(..., description="Detected language")
+    relevance_scores: Dict[str, float] = Field(default_factory=dict, description="Relevance scores")
+    analysis_timestamp: datetime = Field(..., description="Analysis timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 # Excel Models
 class ExcelTask(BaseModel):
     """Task model for Excel operations."""
     file_paths: List[str] = Field(..., description="Paths to Excel files")
-    search_queries: List[str] = Field(default_factory=list, description="Search queries")
     sheet_names: Optional[List[str]] = Field(None, description="Sheet names to process")
-    data_types: List[str] = Field(default=["numeric", "text", "date"], description="Data types to extract")
+    cell_ranges: Optional[List[str]] = Field(None, description="Cell ranges to extract")
+    headers_row: Optional[int] = Field(None, description="Row number containing headers")
 
     @validator('file_paths')
     def validate_file_paths(cls, v):
         if not v:
             raise ValueError('At least one file path must be provided')
         return v
+
+
+class ExcelData(BaseModel):
+    """Excel data model."""
+    sheet_name: str = Field(..., description="Sheet name")
+    file_path: str = Field(..., description="Source file path")
+    data: List[Dict[str, Any]] = Field(..., description="Row data")
+    columns: List[str] = Field(..., description="Column names")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+class ExcelSheet(BaseModel):
+    """Excel sheet information model."""
+    name: str = Field(..., description="Sheet name")
+    rows_count: int = Field(..., description="Number of rows")
+    columns_count: int = Field(..., description="Number of columns")
+    data_type: str = Field(default="tabular", description="Type of data")
+    extraction_method: str = Field(default="pandas", description="Extraction method used")
 
 
 class ExcelTable(BaseModel):
@@ -136,10 +168,12 @@ class ExcelMatch(BaseModel):
 
 class ExcelResult(BaseModel):
     """Result model for Excel operations."""
-    extracted_tables: List[ExcelTable] = Field(default_factory=list, description="Extracted tables")
-    matched_data: List[ExcelMatch] = Field(default_factory=list, description="Search matches")
-    summary_statistics: Dict[str, Any] = Field(default_factory=dict, description="Summary stats")
-    file_metadata: List[Dict[str, Any]] = Field(default_factory=list, description="File metadata")
+    sheets: List[ExcelData] = Field(default_factory=list, description="Extracted sheet data")
+    total_rows: int = Field(default=0, description="Total rows extracted")
+    total_sheets: int = Field(default=0, description="Total sheets processed")
+    file_paths: List[str] = Field(default_factory=list, description="Processed file paths")
+    extraction_timestamp: datetime = Field(..., description="Extraction timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 # Comparison Models
@@ -254,3 +288,106 @@ class ValidationResult(BaseModel):
     is_valid: bool = Field(..., description="Whether validation passed")
     errors: List[str] = Field(default_factory=list, description="Validation errors")
     warnings: List[str] = Field(default_factory=list, description="Validation warnings")
+
+
+# LLM-Enhanced Models for New Architecture
+
+class ExcelColumnInfo(BaseModel):
+    """Information about Excel column for LLM analysis."""
+    column_name: str = Field(..., description="Column name")
+    data_type: str = Field(..., description="Data type")
+    sample_values: List[Any] = Field(default_factory=list, description="Sample values")
+    null_count: int = Field(default=0, description="Number of null values")
+    unique_count: int = Field(default=0, description="Number of unique values")
+    semantic_meaning: Optional[str] = Field(None, description="LLM-derived semantic meaning")
+    relevance_score: float = Field(default=0.0, description="Relevance to analysis (0-100)")
+    analysis_suggestions: List[str] = Field(default_factory=list, description="Analysis suggestions")
+
+
+class IntelligentQuery(BaseModel):
+    """LLM-generated intelligent query for Excel data."""
+    query_description: str = Field(..., description="Natural language description")
+    sql_equivalent: Optional[str] = Field(None, description="SQL equivalent if applicable")
+    target_columns: List[str] = Field(default_factory=list, description="Target columns")
+    expected_output_format: str = Field(default="table", description="Expected output format")
+    confidence_score: float = Field(default=0.0, description="Confidence in query correctness")
+
+
+class LLMContextResult(BaseModel):
+    """Enhanced context result with LLM insights."""
+    entities: List[ExtractedEntity] = Field(default_factory=list, description="Extracted entities")
+    key_phrases: List[str] = Field(default_factory=list, description="Key phrases")
+    relevant_context: List[str] = Field(default_factory=list, description="Relevant context sections")
+    summary: TextSummary = Field(..., description="Text summary")
+    language: str = Field(..., description="Detected language")
+    relevance_scores: Dict[str, float] = Field(default_factory=dict, description="Relevance scores")
+    analysis_timestamp: datetime = Field(default_factory=datetime.now, description="Analysis timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    
+    # LLM-enhanced fields
+    intelligent_queries: List[IntelligentQuery] = Field(default_factory=list, description="Generated queries")
+    semantic_insights: List[str] = Field(default_factory=list, description="LLM semantic insights")
+    data_relationships: Dict[str, List[str]] = Field(default_factory=dict, description="Data relationships")
+    
+    # Iterative improvement fields
+    quality_metrics: Optional['QualityMetrics'] = Field(None, description="Quality evaluation")
+    iteration_result: Optional['IterationResult'] = Field(None, description="Iteration data")
+
+
+class LLMExcelResult(BaseModel):
+    """Enhanced Excel result with LLM insights."""
+    sheets: List[ExcelData] = Field(default_factory=list, description="Extracted sheet data")
+    total_rows: int = Field(default=0, description="Total rows extracted")
+    total_sheets: int = Field(default=0, description="Total sheets processed")
+    file_paths: List[str] = Field(default_factory=list, description="Processed file paths")
+    extraction_timestamp: datetime = Field(default_factory=datetime.now, description="Extraction timestamp")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    
+    # LLM-enhanced fields
+    column_analysis: List[ExcelColumnInfo] = Field(default_factory=list, description="Column analysis")
+    intelligent_queries: List[IntelligentQuery] = Field(default_factory=list, description="Generated queries")
+    query_results: List[Dict[str, Any]] = Field(default_factory=list, description="Query execution results")
+    data_insights: List[str] = Field(default_factory=list, description="Data insights")
+    
+    # Real table data - CRITICAL requirement
+    tables: List[Dict[str, Any]] = Field(default_factory=list, description="Real table results")
+
+
+class LLMComparisonResult(BaseModel):
+    """Enhanced comparison result with LLM insights."""
+    comparisons: List[ComparisonItem] = Field(default_factory=list, description="Comparison items")
+    discrepancies: List[Discrepancy] = Field(default_factory=list, description="Found discrepancies")
+    insights: List[str] = Field(default_factory=list, description="Generated insights")
+    recommendations: List[str] = Field(default_factory=list, description="Recommendations")
+    confidence_scores: Dict[str, float] = Field(default_factory=dict, description="Confidence scores")
+    summary_report: str = Field(default="", description="Summary report")
+    
+    # LLM-enhanced fields
+    intelligent_insights: List[str] = Field(default_factory=list, description="LLM-generated insights")
+    contextual_analysis: str = Field(default="", description="Contextual analysis")
+    predictive_recommendations: List[str] = Field(default_factory=list, description="Predictive recommendations")
+    
+    # Quality and iteration fields
+    quality_metrics: Optional['QualityMetrics'] = Field(None, description="Quality evaluation")
+    iteration_result: Optional['IterationResult'] = Field(None, description="Iteration data")
+
+
+class LLMWorkflowResult(BaseModel):
+    """Enhanced workflow result with LLM insights."""
+    success: bool = Field(..., description="Overall success")
+    jira_result: Optional[JiraResult] = Field(None, description="Jira operation result")
+    context_result: Optional[LLMContextResult] = Field(None, description="Context analysis result")
+    excel_result: Optional[LLMExcelResult] = Field(None, description="Excel operation result")
+    comparison_result: Optional[LLMComparisonResult] = Field(None, description="Comparison result")
+    confluence_result: Optional[ConfluenceResult] = Field(None, description="Confluence result")
+    execution_summary: Dict[str, Any] = Field(default_factory=dict, description="Execution summary")
+    errors: List[str] = Field(default_factory=list, description="Errors encountered")
+    
+    # Quality and performance metrics
+    overall_quality_score: float = Field(default=0.0, description="Overall quality score")
+    pipeline_efficiency: Dict[str, float] = Field(default_factory=dict, description="Pipeline efficiency metrics")
+    llm_performance: Dict[str, Any] = Field(default_factory=dict, description="LLM performance data")
+
+
+# Forward declarations for circular imports
+from .llm_client import QualityMetrics, IterationResult

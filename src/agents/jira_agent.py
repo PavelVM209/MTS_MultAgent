@@ -22,6 +22,9 @@ from src.core.base_agent import BaseAgent, AgentResult
 from src.core.models import (
     JiraTask, JiraResult, JiraIssue, JiraComment, JiraMeetingProtocol
 )
+from src.core.llm_client import LLMClient, get_llm_client, LLMRequest
+from src.core.iterative_engine import IterativeEngine, get_iterative_engine
+from src.core.quality_metrics import QualityEvaluator, get_quality_evaluator
 
 import structlog
 
@@ -67,6 +70,15 @@ class JiraAgent(BaseAgent):
         }
         
         self.session: Optional[aiohttp.ClientSession] = None
+        
+        # Initialize LLM components for intelligent enhancements
+        self.llm_client = get_llm_client()
+        self.iterative_engine = get_iterative_engine()
+        self.quality_evaluator = get_quality_evaluator()
+        
+        # Configuration for LLM features
+        self.enable_llm_enhancements = self.get_config_value("jira.enable_llm_enhancements", True)
+        self.max_iterations = self.get_config_value("jira.max_iterations", 3)
         
     async def validate(self, task: Dict[str, Any]) -> bool:
         """
@@ -574,6 +586,332 @@ class JiraAgent(BaseAgent):
             context_parts.append(f"Comment by {comment.author}: {comment.body}")
         
         return "\n\n".join(context_parts)
+    
+    async def enhance_search_with_llm(
+        self, 
+        keywords: List[str], 
+        project_context: Optional[str] = None
+    ) -> List[str]:
+        """
+        Enhance search keywords using LLM for better results.
+        
+        Args:
+            keywords: Original search keywords
+            project_context: Optional context about the project
+            
+        Returns:
+            Enhanced keywords list
+        """
+        if not self.enable_llm_enhancements:
+            return keywords
+        
+        prompt = f"""
+        Улучши поисковые ключевые слова для Jira поиска.
+        
+        ИСХОДНЫЕ КЛЮЧЕВЫЕ СЛОВА:
+        {', '.join(keywords)}
+        
+        КОНТЕКСТ ПРОЕКТА:
+        {project_context or 'Не указан'}
+        
+        ВЕРНИ УЛУЧШЕННЫЕ КЛЮЧЕВЫЕ СЛОВА В ФОРМАТЕ JSON МАССИВА:
+        ["ключевое1", "ключевое2", "ключевое3"]
+        
+        ТРЕБОВАНИЯ:
+        - Добавь синонимы и связанные термины
+        - Включи варианты написания (если применимо)
+        - Добавь технические термины связанные с проектом
+        - Ограничься 5-7 наиболее релевантными ключевыми словами
+        - Сохраняй язык оригинала (русский)
+        """
+        
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.2,
+                max_tokens=300,
+                cache_key=f"jira_keyword_enhancement_{hash(str(keywords) + str(project_context))}"
+            ))
+            
+            enhanced_keywords = json.loads(response.content)
+            self.logger.info(f"Enhanced {len(keywords)} keywords to {len(enhanced_keywords)}")
+            return enhanced_keywords
+            
+        except Exception as e:
+            self.logger.error(f"LLM keyword enhancement failed: {e}")
+            return keywords
+    
+    async def optimize_jql_query(self, jql: str, search_results_count: int) -> str:
+        """
+        Optimize JQL query based on results using LLM.
+        
+        Args:
+            jql: Original JQL query
+            search_results_count: Number of results from the query
+            
+        Returns:
+            Optimized JQL query
+        """
+        if not self.enable_llm_enhancements or search_results_count > 10:
+            return jql
+        
+        prompt = f"""
+        Оптимизируй JQL запрос для получения более релевантных результатов.
+        
+        ТЕКУЩИЙ JQL ЗАПРОС:
+        {jql}
+        
+        РЕЗУЛЬТАТОВ НАЙДЕНО:
+        {search_results_count} (слишком мало)
+        
+        ВЕРНИ ОПТИМИЗИРОВАННЫЙ JQL ЗАПРОС.
+        
+        ТРЕБОВАНИЯ:
+        - Расширь критерии поиска для получения большего количества результатов
+        - Используй более гибкие условия поиска
+        - Добавь альтернативные поля для поиска
+        - Сохрани основную логику фильтрации
+        - Верни только JQL запрос без дополнительного текста
+        """
+        
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.3,
+                max_tokens=500,
+                cache_key=f"jql_optimization_{hash(jql + str(search_results_count))}"
+            ))
+            
+            optimized_jql = response.content.strip()
+            
+            # Validate that it looks like a JQL query
+            if any(keyword in optimized_jql.upper() for keyword in ['PROJECT', 'ORDER BY', 'AND', 'OR']):
+                self.logger.info(f"Optimized JQL query: {optimized_jql}")
+                return optimized_jql
+            else:
+                self.logger.warning("LLM optimization didn't return valid JQL")
+                return jql
+                
+        except Exception as e:
+            self.logger.error(f"JQL optimization failed: {e}")
+            return jql
+    
+    async def intelligent_protocol_detection(
+        self, 
+        issues: List[JiraIssue]
+    ) -> List[JiraMeetingProtocol]:
+        """
+        Use LLM to intelligently detect meeting protocols from issues.
+        
+        Args:
+            issues: List of Jira issues to analyze
+            
+        Returns:
+            List of detected meeting protocols
+        """
+        if not self.enable_llm_enhancements:
+            return []
+        
+        protocols = []
+        
+        for issue in issues:
+            try:
+                # Get comments for the issue
+                comments = await self.extract_comments(issue.id)
+                
+                # Prepare data for LLM analysis
+                issue_data = {
+                    "summary": issue.summary,
+                    "description": issue.description,
+                    "comments": [comment.body for comment in comments],
+                    "issue_type": issue.issue_type,
+                    "labels": issue.labels
+                }
+                
+                protocol = await self._llm_detect_meeting_protocol(issue, issue_data, comments)
+                if protocol:
+                    protocols.append(protocol)
+                    
+            except Exception as e:
+                self.logger.error(f"Failed to analyze issue {issue.key} for protocol detection: {e}")
+                continue
+        
+        return protocols
+    
+    async def _llm_detect_meeting_protocol(
+        self, 
+        issue: JiraIssue, 
+        issue_data: Dict[str, Any], 
+        comments: List[JiraComment]
+    ) -> Optional[JiraMeetingProtocol]:
+        """
+        Use LLM to detect if issue is a meeting protocol.
+        
+        Args:
+            issue: Jira issue object
+            issue_data: Structured issue data
+            comments: Issue comments
+            
+        Returns:
+            Meeting protocol if detected, None otherwise
+        """
+        prompt = f"""
+        Проанализируй данные Jira задачи и определи, является ли она протоколом совещания.
+        
+        ДАННЫЕ ЗАДАЧИ:
+        {json.dumps(issue_data, ensure_ascii=False, indent=2)}
+        
+        ВЕРНИ РЕЗУЛЬТАТ В ФОРМАТЕ JSON:
+        {{
+            "is_meeting_protocol": true/false,
+            "confidence_score": 0.85,
+            "protocol_title": "заголовок протокола",
+            "attendees": ["участник1", "участник2"],
+            "action_items": ["действие1", "действие2"],
+            "key_decisions": ["решение1", "решение2"],
+            "date_discussed": "обсуждаемая дата или null"
+        }}
+        
+        ТРЕБОВАНИЯ:
+        - Используй семантический анализ для определения типа документа
+        - Извлекай конкретные данные если это протокол
+        - Оцени уверенность в определении (0.0 - 1.0)
+        - Используй только информацию из предоставленных данных
+        """
+        
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=1000,
+                cache_key=f"protocol_detection_{hash(str(issue_data))}"
+            ))
+            
+            result = json.loads(response.content)
+            
+            if result.get("is_meeting_protocol") and result.get("confidence_score", 0) > 0.7:
+                # Create meeting protocol
+                content_parts = [f"# {result.get('protocol_title', issue.summary)}"]
+                if issue.description:
+                    content_parts.append(issue.description)
+                
+                for comment in comments:
+                    content_parts.append(f"## {comment.author} ({comment.created}):")
+                    content_parts.append(comment.body)
+                
+                if result.get("key_decisions"):
+                    content_parts.append("## Ключевые решения:")
+                    for decision in result["key_decisions"]:
+                        content_parts.append(f"- {decision}")
+                
+                content = "\n\n".join(content_parts)
+                
+                return JiraMeetingProtocol(
+                    issue_id=issue.id,
+                    title=result.get("protocol_title", issue.summary),
+                    content=content,
+                    date=result.get("date_discussed") or issue.created,
+                    attendees=result.get("attendees", []),
+                    action_items=result.get("action_items", [])
+                )
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"LLM protocol detection failed: {e}")
+            return None
+    
+    async def enhance_context_extraction(
+        self, 
+        issues: List[JiraIssue], 
+        comments: List[JiraComment]
+    ) -> str:
+        """
+        Enhance context extraction using LLM analysis.
+        
+        Args:
+            issues: List of Jira issues
+            comments: List of comments
+            
+        Returns:
+            Enhanced context string
+        """
+        if not self.enable_llm_enhancements:
+            return self._extract_text_context(issues, comments)
+        
+        # Prepare structured data for LLM
+        structured_data = {
+            "issues": [
+                {
+                    "summary": issue.summary,
+                    "description": issue.description,
+                    "status": issue.status,
+                    "priority": issue.priority,
+                    "assignee": issue.assignee,
+                    "labels": issue.labels,
+                    "components": issue.components
+                }
+                for issue in issues[:10]  # Limit to avoid token limits
+            ],
+            "comments": [
+                {
+                    "author": comment.author,
+                    "body": comment.body,
+                    "created": comment.created.isoformat() if comment.created else None
+                }
+                for comment in comments[:20]  # Limit comments
+            ]
+        }
+        
+        prompt = f"""
+        Проанализируй данные из Jira и создай улучшенный контекст для дальнейшего анализа.
+        
+        ДАННЫЕ JIRA:
+        {json.dumps(structured_data, ensure_ascii=False, indent=2)}
+        
+        ВЕРНИ УЛУЧШЕННЫЙ КОНТЕКСТ В ФОРМАТЕ JSON:
+        {{
+            "enhanced_context": "структурированный контекст с ключевыми инсайтами",
+            "key_topics": ["тема1", "тема2"],
+            "actionable_items": ["действие1", "действие2"],
+            "stakeholders": ["заинтересованное1", "заинтересованное2"],
+            "timeline_summary": "сводка по времени и этапам"
+        }}
+        
+        ТРЕБОВАНИЯ:
+        - Синхронизируй информацию из разных источников
+        - Выдели ключевые темы и тренды
+        - Определи заинтересованных стороны
+        - Создай структурированный контекст для анализа
+        - Используй естественный язык для описания
+        """
+        
+        try:
+            response = await self.llm_client.complete(LLMRequest(
+                prompt=prompt,
+                temperature=0.2,
+                max_tokens=2000,
+                cache_key=f"context_enhancement_{hash(str(structured_data))}"
+            ))
+            
+            result = json.loads(response.content)
+            
+            # Combine enhanced context with structured summary
+            enhanced_parts = [
+                result.get("enhanced_context", ""),
+                "\n\n## Ключевые темы:",
+                "\n".join(f"- {topic}" for topic in result.get("key_topics", [])[:10]),
+                "\n\n## Заинтересованные стороны:",
+                "\n".join(f"- {stakeholder}" for stakeholder in result.get("stakeholders", [])[:10]),
+                "\n\n## Временная сводка:",
+                result.get("timeline_summary", "")
+            ]
+            
+            return "\n".join(filter(None, enhanced_parts))
+            
+        except Exception as e:
+            self.logger.error(f"Context enhancement failed: {e}")
+            return self._extract_text_context(issues, comments)
     
     async def health_check(self) -> Dict[str, Any]:
         """
