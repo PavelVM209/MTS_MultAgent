@@ -1,573 +1,562 @@
-# Agents Specification - MTS_MultAgent LLM-Driven Architecture
+# Agent Specifications - MTS MultAgent Scheduled Architecture
 
-## 🧠 НОВАЯ АРХИТЕКТУРА - ПОЛНОСТЬЮ LLM-CENTRIC
+## 🤖 **Phase 3 Scheduled Agent System**
 
-### Ключевые принципы:
-- **Zero hardcoded logic** - все решения через LLM
-- **Iterative self-improvement** - итеративное улучшение результатов
-- **Dynamic adaptation** - адаптация на основе анализа результатов
-- **Intelligent validation** - оценка качества через LLM
+**Status:** Architecture Complete, Implementation In Progress  
+**Total Agents:** 5 (4 specialized + 1 orchestrator)  
+**Execution Model:** Scheduled workflows with JSON persistence  
 
 ---
 
-## 🔄 ИТЕРАТИВНЫЙ ЦИКЛ УЛУЧШЕНИЯ
+## 🏗️ **ARCHITECTURE OVERVIEW**
 
+### **Agent Hierarchy:**
+```
+🤖 OrchestratorAgent (Master Coordinator)
+    ├── 📊 DailyJiraAnalyzer (Project & Task Analysis)
+    ├── 📄 DailyMeetingAnalyzer (Protocol & Meeting Analysis)  
+    ├── 📋 DailySummaryAgent (Data Consolidation)
+    └── 📈 WeeklyReporter (Analytics & Confluence)
+```
+
+### **Execution Schedule:**
+- **Daily 19:00 UTC+3:** Parallel: DailyJiraAnalyzer + DailyMeetingAnalyzer
+- **Daily 19:30 UTC+3:** Sequential: DailySummaryAgent + Quality Check
+- **Friday 19:00 UTC+3:** WeeklyReporter + Confluence Publication
+
+---
+
+## 🤖 **DETAILED AGENT SPECIFICATIONS**
+
+### **1. 📊 DailyJiraAnalyzer**
+
+**Purpose:** Ежедневный анализ задач Jira с отслеживанием прогресса сотрудников  
+
+**Execution:** Daily at 19:00 UTC+3  
+**Input Sources:** Jira API (multiple projects)  
+**Output:** JSON memory store + structured data  
+
+#### **Core Responsibilities:**
 ```python
-class IterativeResult(BaseModel):
-    iteration: int
-    quality_score: float
-    data: Dict[str, Any]
-    feedback: str
-    needs_refinement: bool
+class DailyJiraAnalyzer(BaseAgent):
+    """
+    Анализ Jira проектов с фокусом на employee analytics
+    """
+    
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # 1. Multi-project data collection
+        # 2. Employee task assignment tracking
+        # 3. Status change monitoring
+        # 4. Git commit integration
+        # 5. JSON memory store updates
+        pass
+    
+    async def analyze_multiple_projects(self, project_keys: List[str]) -> JSON:
+        """Анализ нескольких Jira проектов"""
+        pass
+    
+    async def track_employee_metrics(self, tasks: List[JiraTask]) -> JSON:
+        """Отслеживание метрик по сотрудникам"""
+        pass
+    
+    async def integrate_git_commits(self, employees: Dict) -> JSON:
+        """Интеграция данных из Git для employee analytics"""
+        pass
+```
 
-class QualityMetrics(BaseModel):
-    relevance_score: float  # 0-100% соответствие контексту
-    completeness_score: float  # 0-100% полнота анализа
-    accuracy_score: float  # 0-100% точность извлечения
-    overall_quality: float  # 0-100% интегральная оценка
+#### **Data Structure:**
+```json
+{
+  "date": "2026-03-25",
+  "timestamp": "2026-03-25T19:00:00",
+  "projects": {
+    "CSI": {
+      "total_tasks": 45,
+      "completed_tasks": 12,
+      "in_progress_tasks": 25,
+      "blocked_tasks": 8,
+      "employees": {
+        "ivanov": {
+          "username": "ivanov",
+          "full_name": "Иванов Иван",
+          "email": "ivanov@company.com",
+          "tasks": {
+            "total": 15,
+            "completed": 5,
+            "in_progress": 8,
+            "blocked": 2,
+            "task_list": [
+              {
+                "key": "CSI-123",
+                "summary": "API разработка",
+                "status": "In Progress",
+                "assignee": "ivanov",
+                "updated": "2026-03-25T14:30:00"
+              }
+            ]
+          },
+          "metrics": {
+            "completion_rate": 33.3,
+            "avg_task_duration": 5.2,
+            "status_changes_today": 3,
+            "git_commits_today": 2
+          }
+        }
+      }
+    }
+  },
+  "system_metrics": {
+    "jira_api_calls": 25,
+    "processing_time_seconds": 45,
+    "quality_score": 92.5
+  }
+}
+```
+
+#### **Configuration:**
+```yaml
+daily_jira_analyzer:
+  project_keys: ["CSI", "PROJ", "DEV"]
+  employee_identification: ["jira_username", "email", "full_name"]
+  tracked_metrics: ["tasks", "status_changes", "git_commits", "deadlines"]
+  git_integration_enabled: true
+  historical_analysis_days: 30
 ```
 
 ---
 
-## 1. JiraAgent (БЕЗ ИЗМЕНЕНИЙ)
+### **2. 📄 DailyMeetingAnalyzer**
 
-### Ответственность
-- Получение задач из Jira
-- Чтение протоколов совещаний
-- Поиск по проектным ключам
-- Извлечение комментариев и описаний
+**Purpose:** Ежедневный анализ протоколов совещаний для employee analytics  
 
-*Спецификация остается без изменений - работает стабильно*
+**Execution:** Daily at 19:00 UTC+3 (parallel with JiraAnalyzer)  
+**Input Sources:** File system (txt, docx, pdf)  
+**Output:** JSON memory store + meeting analytics  
+
+#### **Core Responsibilities:**
+```python
+class DailyMeetingAnalyzer(BaseAgent):
+    """
+    Анализ протоколов совещаний с фокусом на employee participation
+    """
+    
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # 1. Multi-format file parsing
+        # 2. Employee action extraction
+        # 3. Meeting participation tracking
+        # 4. Decision and commitment tracking
+        # 5. JSON memory store updates
+        pass
+    
+    async def parse_multiple_formats(self, files: List[Path]) -> JSON:
+        """Парсинг файлов txt, docx, pdf"""
+        pass
+    
+    async def extract_employee_actions(self, protocols: List) -> JSON:
+        """Извлечение действий сотрудников"""
+        pass
+```
+
+#### **Data Structure:**
+```json
+{
+  "date": "2026-03-25",
+  "processed_files": [
+    "/data/meetings/daily_standup_2026-03-25.txt"
+  ],
+  "meetings": [
+    {
+      "meeting_type": "daily_standup",
+      "date": "2026-03-25",
+      "participants": [
+        {
+          "name": "Иванов Иван",
+          "role": "Lead разработчик",
+          "participation": {
+            "spoke_minutes": 5,
+            "action_items": 2,
+            "decisions_made": 1
+          }
+        }
+      ],
+      "employee_actions": [
+        {
+          "employee": "Иванов Иван",
+          "action": "Завершить API разработку",
+          "deadline": "2026-03-26",
+          "priority": "high"
+        }
+      ]
+    }
+  ],
+  "daily_employee_summary": {
+    "ivanov": {
+      "meetings_attended": 2,
+      "action_items_assigned": 3,
+      "action_items_completed": 1,
+      "participation_score": 8.5
+    }
+  }
+}
+```
+
+#### **Configuration:**
+```yaml
+daily_meeting_analyzer:
+  protocols_path: "/data/meetings"
+  supported_formats: ["txt", "docx", "pdf"]
+  employee_identification: ["full_name", "email", "role"]
+  extract_actions: true
+  track_participation: true
+  deadline_extraction: true
+```
 
 ---
 
-## 2. 🧠 ContextAnalyzer (LLM-DRIVEN + SELF-EVALUATION)
+### **3. 📋 DailySummaryAgent**
 
-### 🔄 Ключевая инновация: Итеративное улучшение запросов
+**Purpose:** Консолидация данных за день и генерация human-readable отчетов  
 
-### Ответственность
-- **Интеллектуальный анализ контекста** через LLM без hardcoded паттернов
-- **Динамическое формирование запросов** к Excel на основе семантического анализа
-- **Самооценка результатов** и итеративное улучшение запросов
-- **LLM-driven валидация** качества анализа
+**Execution:** Daily at 19:30 UTC+3  
+**Input Sources:** JSON memory store (both analyzers)  
+**Output:** Human TXT reports + JSON consolidation  
 
-### 🧠 LLM-Centric Architecture
-
-#### Входные параметры
+#### **Core Responsibilities:**
 ```python
-class ContextTask(BaseModel):
-    jira_data: JiraResult
-    task_description: str
-    original_context: str
-    iteration_data: Optional[IterativeResult] = None  # Для итеративного улучшения
+class DailySummaryAgent(BaseAgent):
+    """
+    Консолидация данных и генерация human-readable отчетов
+    """
     
-class ExcelColumnInfo(BaseModel):
-    column_name: str
-    data_sample: List[str]
-    data_types: List[str]
-    semantic_meaning: str  # LLM interpretation
-
-class LLMQueryRequest(BaseModel):
-    context_description: str
-    available_columns: List[ExcelColumnInfo]
-    analysis_goals: List[str]
-    previous_feedback: Optional[str] = None
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # 1. Load JSON data from memory store
+        # 2. Consolidate employee metrics
+        # 3. Generate human-readable TXT report
+        # 4. Update JSON memory store
+        # 5. Save TXT reports for humans
+        pass
+    
+    async def consolidate_employee_data(self, jira_data: JSON, meeting_data: JSON) -> JSON:
+        """Консолидация данных по сотрудникам"""
+        pass
+    
+    async def generate_human_report(self, consolidated_data: JSON) -> str:
+        """Генерация human-readable TXT отчета"""
+        pass
 ```
 
-#### Выходные данные
-```python
-class ContextResult(BaseModel):
-    intelligent_queries: List[str]  # LLM-generated queries
-    column_mappings: Dict[str, str]  # Dynamic column mappings
-    extracted_entities: Dict[str, List[str]]
-    confidence_score: float
-    quality_metrics: QualityMetrics
-    iteration_result: IterativeResult
-    refined_strategy: Dict[str, Any]
+#### **Data Structure:**
+```json
+{
+  "date": "2026-03-25",
+  "consolidation_timestamp": "2026-03-25T19:30:00",
+  "employee_summary": {
+    "ivanov": {
+      "full_name": "Иванов Иван",
+      "daily_metrics": {
+        "tasks_total": 15,
+        "tasks_completed": 5,
+        "tasks_in_progress": 8,
+        "status_changes": 3,
+        "git_commits": 2,
+        "meetings_attended": 2,
+        "action_items_assigned": 3,
+        "action_items_completed": 1
+      },
+      "performance_score": 8.2,
+      "trend_analysis": "stable_improvement"
+    }
+  },
+  "project_summary": {
+    "CSI": {
+      "total_employees": 4,
+      "tasks_completed_today": 12,
+      "avg_performance_score": 8.0,
+      "blocked_items": 2
+    }
+  },
+  "system_health": {
+    "data_quality_score": 94.5,
+    "missing_data_flags": [],
+    "anomaly_detections": []
+  }
+}
 ```
 
-#### 🧠 LLM-Driven методы
+#### **Human TXT Report Format:**
+```txt
+# ЕЖЕДНЕВНЫЙ ОТЧЕТ ПО ПРОЕКТАМ И СОТРУДНИКАМ
+============================================
+Дата: 25.03.2026
+
+## 📊 СВОДКА ПО ПРОЕКТАМ
+
+### CSI CloudStorageIntegration
+- Всего задач: 45
+- Выполнено сегодня: 12
+- В работе: 25
+- Заблокировано: 8
+- Средний performance score: 8.0
+
+## 👥 АНАЛИТИКА ПО СОТРУДНИКАМ
+
+### Иванов Иванов (Lead разработчик)
+**Daily Performance Score: 8.2** 📈
+
+📋 Задачи:
+- Всего: 15 | Завершено: 5 | В работе: 8
+- Статус изменений за день: 3
+- Git коммиты: 2
+
+🤝 Совещания:
+- Посещено: 2 из 2
+- Action items: назначено 3, выполнено 1
+
+## 🔍 КЛЮЧЕВЫЕ НАБЛЮДЕНИЯ
+
+1. **Высокая активность** у Иванова - 8.2 performance score
+2. **Блокирующие задачи** требуют внимания (2Critical items)
+3. **Git активность** коррелирует с выполнением задач
+
+## ⚠️ ТРЕБУЕТ ВНИМАНИЯ
+
+- **Петров Пётр**: Низкое выполнение action items (0/2)
+- **CSI-156**: Заблокирована 3 дня, нужен escalation
+
+---
+*Сгенерировано: 2026-03-25 19:30*
+*Источник: Jira + Meeting Protocols*
+```
+
+---
+
+### **4. 📈 WeeklyReporter**
+
+**Purpose:** Комплексный недельный анализ с публикацией в Confluence  
+
+**Execution:** Friday 19:00 UTC+3  
+**Input Sources:** JSON memory store (7 days)  
+**Output:** Confluence pages + TXT reports + analytics  
+
+#### **Core Responsibilities:**
 ```python
-class ContextAnalyzer(BaseAgent):
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
-        self.llm_client = LLMClient(config["llm"])
-        self.max_iterations = config.get("max_iterations", 5)
-        self.quality_threshold = config.get("quality_threshold", 85.0)
+class WeeklyReporter(BaseAgent):
+    """
+    Недельный аналитический отчет с публикацией в Confluence
+    """
     
-    async def analyze_context_with_llm(self, task: ContextTask) -> ContextResult:
-        """Основной LLM-driven анализ контекста"""
-        
-    async def generate_intelligent_queries(self, request: LLMQueryRequest) -> List[str]:
-        """Генерация запросов через LLM без паттернов"""
-        prompt = f"""
-        Проанализируй бизнес-контекст и сгенерируй точные запросы к Excel данным.
-        
-        КОНТЕКСТ ЗАДАЧИ:
-        {request.context_description}
-        
-        ДОСТУПНЫЕ КОЛОНКИ:
-        {self._format_columns_for_llm(request.available_columns)}
-        
-        ЦЕЛИ АНАЛИЗА:
-        {', '.join(request.analysis_goals)}
-        
-        ПРЕДЫДУЩИЙ ФИДБЕК:
-        {request.previous_feedback or 'Нет'}
-        
-        СГЕНЕРИРУЙ:
-        1. Точные запросы для извлечения релевантных данных
-        2. Методологии фильтрации и агрегации
-        3. Критерии оценки качества результатов
-        
-        Формат: JSON with queries array
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_llm_queries_response(response)
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # 1. Load 7-day JSON data from memory
+        # 2. Generate comprehensive analytics
+        # 3. Create trend analysis
+        # 4. Generate human-readable reports
+        # 5. Publish to Confluence
+        # 6. Save local TXT backup
+        pass
     
-    async def analyze_excel_structure_semantically(self, excel_columns: List[str], sample_data: List[Dict]) -> List[ExcelColumnInfo]:
-        """LLM-анализ семантики колонок Excel"""
-        prompt = f"""
-        Проанализируй структуру Excel файла и определи семантику колонок.
-        
-        КОЛОНКИ:
-        {', '.join(excel_columns)}
-        
-        ОБРАЗЦЫ ДАННЫХ:
-        {self._format_sample_data(sample_data)}
-        
-        ОПРЕДИЛИ ДЛЯ КАЖДОЙ КОЛОНКИ:
-        1. Семантическое значение
-        2. Тип данных
-        3. Бизнес-сущность
-        4. Возможные использования для анализа
-        
-        Формат: JSON array with column analysis
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_column_analysis(response)
+    async def analyze_weekly_trends(self, daily_data: List[JSON]) -> JSON:
+        """Анализ трендов за неделю"""
+        pass
     
-    async def evaluate_result_quality(self, result_data: Dict, original_context: str) -> QualityMetrics:
-        """LLM-оценка качества результатов"""
-        prompt = f"""
-        Оцени качество извлеченных данных по отношению к исходному контексту.
-        
-        ИСХОДНЫЙ КОНТЕКСТ:
-        {original_context}
-        
-        ПОЛУЧЕННЫЕ ДАННЫЕ:
-        {self._format_result_data(result_data)}
-        
-        ОЦЕНИ:
-        1. Relevance Score (0-100%): Насколько данные соответствуют контексту
-        2. Completeness Score (0-100%): Полнота охвата аспектов контекста
-        3. Accuracy Score (0-100%): Точность извлечения
-        4. Overall Quality (0-100%): Общая оценка качества
-        
-        Формат: JSON с метриками
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_quality_metrics(response)
+    async def generate_employee_insights(self, employee_data: JSON) -> JSON:
+        """Генерация инсайтов по сотрудникам"""
+        pass
+```
+
+#### **Data Structure:**
+```json
+{
+  "week_start": "2026-03-25",
+  "week_end": "2026-03-31",
+  "analysis_timestamp": "2026-03-31T19:00:00",
+  "week_summary": {
+    "total_tasks_processed": 315,
+    "total_employees_analyzed": 8,
+    "avg_daily_performance": 8.1,
+    "completion_rate": 78.5,
+    "meeting_participation_rate": 92.3
+  },
+  "employee_weekly_performance": {
+    "ivanov": {
+      "tasks_completed": 35,
+      "avg_daily_score": 8.5,
+      "trend": "improving",
+      "top_achievements": [
+        "CSI-123 API разработка завершена",
+        "Git commits: 14 за неделю"
+      ],
+      "areas_for_improvement": [
+        "Время ответа на comments: 48h avg"
+      ]
+    }
+  },
+  "project_insights": {
+    "CSI": {
+      "week_velocity": 45,
+      "blockers_resolved": 8,
+      "new_blockers": 3,
+      "team_performance_trend": "stable"
+    }
+  },
+  "confluence_publication": {
+    "page_id": "987654321",
+    "url": "https://confluence.company.com/display/PROJECTS/Weekly-Report-2026-03-31"
+  }
+}
+```
+
+#### **Configuration:**
+```yaml
+weekly_reporter:
+  confluence_space_key: "PROJECTS"
+  parent_page_id: "897438835"
+  include_trend_analysis: true
+  include_employee_insights: true
+  include_predictions: false  # Future feature
+  backup_local_reports: true
+```
+
+---
+
+### **5. 🤖 OrchestratorAgent**
+
+**Purpose:** Центральная оркестрация всех scheduled операций  
+
+**Execution:** Continuous monitoring + scheduled triggers  
+**Input Sources:** System clock + configuration + health monitoring  
+**Output:** Coordinated execution + error handling + notifications  
+
+#### **Core Responsibilities:**
+```python
+class OrchestratorAgent(BaseAgent):
+    """
+    Мастер-координатор всей scheduled системы
+    """
     
-    async def iterative_improvement_loop(self, task: ContextTask, excel_structure: List[ExcelColumnInfo]) -> ContextResult:
-        """Итеративный цикл улучшения"""
-        current_iteration = 0
-        best_result = None
-        best_quality = 0.0
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # 1. Schedule management
+        # 2. Agent coordination
+        # 3. Quality control oversight
+        # 4. Error handling and recovery
+        # 5. Admin notifications
+        # 6. Health monitoring
+        pass
+    
+    async def execute_daily_workflow(self) -> JSON:
+        """Оркестрация ежедневного workflow"""
+        pass
+    
+    async def execute_weekly_workflow(self) -> JSON:
+        """Оркестрация недельного workflow"""
+        pass
+    
+    async def validate_workflow_quality(self, results: List[AgentResult]) -> bool:
+        """Валидация качества выполнения workflow"""
+        pass
+```
+
+#### **Orchestration Logic:**
+```python
+async def execute_daily_workflow(self):
+    try:
+        # 19:00 - Parallel execution
+        jira_task = asyncio.create_task(self.daily_jira_analyzer.execute({}))
+        meeting_task = asyncio.create_task(self.daily_meeting_analyzer.execute({}))
         
-        while current_iteration < self.max_iterations:
-            # Генерация запросов с учетом предыдущих итераций
-            query_request = LLMQueryRequest(
-                context_description=task.task_description,
-                available_columns=excel_structure,
-                analysis_goals=self._extract_analysis_goals(task),
-                previous_feedback=best_result.feedback if best_result else None
-            )
-            
-            queries = await self.generate_intelligent_queries(query_request)
-            
-            # Исполнение запросов через ExcelAgent
-            excel_result = await self._execute_queries_via_excel_agent(queries)
-            
-            # Оценка качества
-            quality = await self.evaluate_result_quality(excel_result, task.task_description)
-            
-            # Проверка условия остановки
-            if quality.overall_quality >= self.quality_threshold:
-                break
-            
-            # Сохранение лучшего результата
-            if quality.overall_quality > best_quality:
-                best_quality = quality.overall_quality
-                best_result = IterativeResult(
-                    iteration=current_iteration,
-                    quality_score=quality.overall_quality,
-                    data=excel_result,
-                    feedback=await self._generate_improvement_feedback(excel_result, task.task_description),
-                    needs_refinement=True
-                )
-            
-            current_iteration += 1
-        
-        return ContextResult(
-            intelligent_queries=queries,
-            column_mappings=self._create_dynamic_mappings(excel_structure, task),
-            extracted_entities=await self._extract_entities_with_llm(task),
-            confidence_score=best_quality,
-            quality_metrics=quality,
-            iteration_result=best_result,
-            refined_strategy=await self._generate_refined_strategy(best_result)
+        jira_result, meeting_result = await asyncio.gather(
+            jira_task, meeting_task, return_exceptions=True
         )
+        
+        # 19:30 - Sequential execution
+        if isinstance(jira_result, Exception) or isinstance(meeting_result, Exception):
+            await self.handle_execution_errors([jira_result, meeting_result])
+            return
+            
+        # Quality check for individual agents
+        jira_quality = await self.quality_controller.validate_agent_result(jira_result)
+        meeting_quality = await self.quality_controller.validate_agent_result(meeting_result)
+        
+        if jira_quality.score < 90 or meeting_quality.score < 90:
+            await self.retry_failed_agents(jira_result, meeting_result)
+            return
+            
+        # Execute summary agent
+        summary_result = await self.daily_summary_agent.execute({})
+        
+        # Final quality check
+        summary_quality = await self.quality_controller.validate_agent_result(summary_result)
+        
+        if summary_quality.score < 90:
+            await self.notify_admin_quality_issue(summary_result)
+        else:
+            await self.notify_success("Daily workflow completed successfully")
+            
+    except Exception as e:
+        await self.handle_critical_error(e)
 ```
 
-#### 🧠 LLM Prompts Examples
-
-##### Prompt для анализа контекста:
-```
-Ты - эксперт бизнес-аналитик. Проанализируй задачу и определи, какие данные нужны из Excel.
-
-ЗАДАЧА: {task_description}
-
-КЛЮЧЕВЫЕ АСПЕКТЫ:
-1. Какие бизнес-сущности упоминаются?
-2. Какие метрики важны?
-3. Какие сравнения нужны?
-4. Какие временные периоды релевантны?
-
-СГЕНЕРИРУЙ запросы для Excel, которые дадут точные ответы на эти вопросы.
-```
-
-##### Prompt для улучшения результатов:
-```
-Проанализируй полученные результаты и определи, как их улучшить.
-
-ПОЛУЧЕННЫЕ ДАННЫЕ: {result_data}
-
-ОЖИДАНИЯ ИЗ КОНТЕКСТА: {expected_data}
-
-ЧТО НЕДОСТАТОЧНО:
-1. Какие данные missing?
-2. Какие аспекты не освещены?
-3. Какие уточнения нужны?
-
-СГЕНЕРИРУЙ улучшенные запросы для следующей итерации.
+#### **Configuration:**
+```yaml
+orchestrator_agent:
+  scheduler_timezone: "Europe/Moscow"
+  daily_workflow_time: "19:00"
+  weekly_workflow_day: "friday"
+  weekly_workflow_time: "19:00"
+  max_retry_attempts: 3
+  retry_delay_seconds: 300
+  admin_notification_email: "admin@company.com"
+  health_check_interval: 3600
 ```
 
 ---
 
-## 3. 🎯 ExcelAgent (LLM-GUIDED)
+## 🔄 **QUALITY CONTROL SYSTEM**
 
-### 🔄 Ключевая инновация: Исполнение LLM-запросов
-
-### Ответственность
-- **Исполнение интеллектуальных запросов** от ContextAnalyzer
-- **Динамическая обработка данных** без hardcoded паттернов
-- **Адаптивная фильтрация** на основе LLM-инструкций
-- **Гибкое форматирование** результатов
-
-#### LLM-Guided методы
+### **LLM-Based Validation:**
 ```python
-class ExcelAgent(BaseAgent):
-    async def execute_llm_generated_queries(self, queries: List[str], file_paths: List[str]) -> Dict[str, Any]:
-        """Исполнение LLM-сгенерированных запросов"""
-        results = {}
-        
-        for query in queries:
-            try:
-                # LLM-парсинг запроса в конкретные операции
-                operations = await self._parse_query_with_llm(query)
-                
-                # Исполнение операций
-                query_result = await self._execute_operations(operations, file_paths)
-                results[query] = query_result
-                
-            except Exception as e:
-                logger.error(f"Failed to execute query: {query}", error=str(e))
-                results[query] = {"error": str(e)}
-        
-        return results
-    
-    async def parse_query_with_llm(self, query: str) -> List[Dict[str, Any]]:
-        """LLM-парсинг natural language запроса в операции"""
+class ReportQualityController:
+    async def validate_agent_result(self, result: AgentResult) -> QualityMetrics:
         prompt = f"""
-        Преобразуй natural language запрос в конкретные операции с Excel.
+        Оцени качество результата агента {result.agent_type}:
         
-        ЗАПРОС: {query}
+        Данные: {result.data}
         
-        ВОЗМОЖНЫЕ ОПЕРАЦИИ:
-        1. filter_columns: фильтрация колонок
-        2. filter_rows: фильтрация строк
-        3. aggregate: агрегация данных
-        4. calculate: вычисления
-        5. group_by: группировка
+        Критерии оценки:
+        1. Полнота данных (completeness) - все ли типы данных присутствуют
+        2. Точность данных (accuracy) - корректность значений
+        3. Формат данных (format) - соответствие JSON схеме
         
-        СГЕНЕРИРУЙ JSON массив операций.
+        Вери балл от 0 до 100 для каждого критерия и общий балл.
         """
         
-        response = await self.llm_client.complete(prompt)
-        return self._parse_operations(response)
+        llm_response = await self.llm_client.complete(prompt)
+        return self.parse_quality_response(llm_response)
+```
+
+### **Quality Metrics:**
+```typescript
+interface QualityMetrics {
+  completeness_score: number;    // 0-100
+  accuracy_score: number;        // 0-100  
+  format_score: number;          // 0-100
+  overall_quality: number;       // 0-100
+  needs_retry: boolean;          // Auto-retry decision
+  feedback: string;              // LLM feedback for improvement
+}
 ```
 
 ---
 
-## 4. 🧪 ComparisonAgent (LLM-DRIVEN + ADAPTIVE)
+## 📂 **MEMORY STORE ARCHITECTURE**
 
-### 🔄 Ключевая инновация: Итеративное улучшение анализа
-
-### Ответственность
-- **Интеллектуальное сравнение** данных с контекстом через LLM
-- **Адаптивная корректировка** стратегии анализа
-- **Генерация контекстуальных выводов** и рекомендаций
-- **LLM-driven оценка** качества сравнения
-
-#### 🧪 LLM-Driven методы
-```python
-class ComparisonAgent(BaseAgent):
-    async def compare_with_iterative_improvement(
-        self, 
-        jira_data: JiraResult, 
-        excel_data: Dict, 
-        context_result: ContextResult
-    ) -> ComparisonResult:
-        """Итеративное сравнение с улучшением"""
-        
-        current_iteration = 0
-        best_analysis = None
-        best_quality = 0.0
-        
-        while current_iteration < self.max_iterations:
-            # LLM-анализ соответствия
-            comparison_analysis = await self._perform_llm_comparison(
-                jira_data, excel_data, context_result
-            )
-            
-            # Оценка качества анализа
-            analysis_quality = await self._evaluate_analysis_quality(
-                comparison_analysis, jira_data, excel_data
-            )
-            
-            # Проверка условия остановки
-            if analysis_quality >= self.quality_threshold:
-                break
-            
-            # Корректировка стратегии анализа
-            refined_strategy = await self._refine_analysis_strategy(
-                comparison_analysis, analysis_quality
-            )
-            
-            # Сохранение лучшего результата
-            if analysis_quality > best_quality:
-                best_quality = analysis_quality
-                best_analysis = comparison_analysis
-            
-            current_iteration += 1
-        
-        return await self._generate_final_comparison_result(
-            best_analysis, context_result
-        )
-    
-    async def _perform_llm_comparison(
-        self, 
-        jira_data: JiraResult, 
-        excel_data: Dict, 
-        context_result: ContextResult
-    ) -> Dict[str, Any]:
-        """LLM-анализ соответствия данных контексту"""
-        prompt = f"""
-        Проведи глубокий анализ соответствия данных из Excel исходному контексту из Jira.
-        
-        КОНТЕКСТ JIRA:
-        {self._format_jira_context(jira_data)}
-        
-        ДАННЫЕ EXCEL:
-        {self._format_excel_data(excel_data)}
-        
-        АНАЛИТИЧЕСКИЕ ЦЕЛИ:
-        {context_result.refined_strategy}
-        
-        ПРОАНАЛИЗИРУЙ:
-        1. Насколько полно данные отвечают на вопросы из Jira?
-        2. Какие аспекты контекста не освещены?
-        3. Есть ли противоречия или несоответствия?
-        4. Какие дополнительные инсайты можно извлечь?
-        
-        Формат: детальный анализ с оценками и рекомендациями.
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_comparison_analysis(response)
+### **JSON File Structure:**
 ```
-
----
-
-## 🔄 ИНТЕГРАЦИОННЫЙ WORKFLOW С ИТЕРАТИВНЫМ УЛУЧШЕНИЕМ
-
-```python
-async def execute_intelligent_analysis_pipeline(task_description: str):
-    """Основной pipeline с итеративным улучшением"""
-    
-    # 1. JiraAgent (без изменений)
-    jira_result = await jira_agent.execute_with_fallback({
-        "project_key": extract_project_key(task_description),
-        "task_description": task_description,
-        "search_keywords": extract_keywords(task_description)
-    })
-    
-    # 2. Анализ структуры Excel через LLM
-    excel_structure = await excel_agent.analyze_structure_with_llm(get_excel_files())
-    
-    # 3. ContextAnalyzer с итеративным улучшением
-    context_task = ContextTask(
-        jira_data=jira_result.data,
-        task_description=task_description,
-        original_context=jira_result.data.get("context", "")
-    )
-    
-    context_result = await context_analyzer.iterative_improvement_loop(
-        context_task, excel_structure
-    )
-    
-    # 4. ExcelAgent исполнение LLM-запросов
-    excel_result = await excel_agent.execute_llm_generated_queries(
-        context_result.intelligent_queries,
-        get_excel_files()
-    )
-    
-    # 5. ComparisonAgent с итеративным улучшением
-    comparison_result = await comparison_agent.compare_with_iterative_improvement(
-        jira_result.data,
-        excel_result,
-        context_result
-    )
-    
-    # 6. Публикация результатов
-    final_result = await confluence_agent.create_intelligent_page({
-        "title": generate_title(task_description),
-        "content": format_llm_enhanced_content(context_result, comparison_result),
-        "tables": excel_result.get("tables", []),
-        "quality_metrics": context_result.quality_metrics,
-        "iteration_info": context_result.iteration_result
-    })
-    
-    return final_result
-```
-
----
-
-## 🎯 КЛЮЧЕВЫЕ ПРЕИМУЩЕСТВА НОВОЙ АРХИТЕКТУРЫ
-
-### 1. **Полная интеллектуализация**
-- Никаких hardcoded паттернов
-- 100% LLM-driven принятие решений
-- Динамическая адаптация к любому контексту
-
-### 2. **Самообучение и улучшение**
-- Итеративное приближение к оптимальному результату
-- Автоматическая корректировка стратегии
-- Качественная оценка на каждом шаге
-
-### 3. **Универсальность**
-- Работает с любой структурой Excel
-- Понимает любой бизнес-контекст
-- Адаптируется к любым требованиям
-
-### 4. **Прозрачность и контролируемость**
-- Логирование каждой итерации
-- Метрики качества для анализа
-- Возможность вмешательства и корректировки
-
----
-
-## 🚀 РЕАЛИЗАЦИОННЫЕ АСПЕКТЫ
-
-### LLM Integration Requirements:
-- **API Key**: OpenAI или локальная LLM
-- **Rate Limiting**: Управление запросами к LLM
-- **Caching**: Кэширование LLM-ответов
-- **Fallback**: Резервовые стратегии при недоступности LLM
-
-### Performance Optimization:
-- **Parallel LLM calls**: Параллельные запросы к LLM
-- **Smart Caching**: Интеллектуальное кэширование
-- **Batch Processing**: Группировка операций
-- **Lazy Evaluation**: Отложенное выполнение
-
-### Quality Assurance:
-- **Convergence Testing**: Тестирование сходимости итераций
-- **Quality Threshold Validation**: Валидация порогов качества
-- **A/B Testing**: Сравнение с предыдущими версиями
-- **Human-in-the-Loop**: Возможность экспертной оценки
-
-Эта архитектура создает genuinely интеллектуальную систему, которая не просто следует жестким правилам, а учится, адаптируется и улучшается на каждом шаге.
-
----
-
-## 🎉 **PHASE 1 & 2 COMPLETION STATUS**
-
-### ✅ **Phase 1: LLM Foundation - 100% COMPLETE**
-- **LLMClient**: Multi-provider поддержка (OpenAI, Local LLM, Mock)
-- **QualityMetrics**: Comprehensive scoring система
-- **IterativeEngine**: Self-improvement с convergence detection
-- **Enhanced Models**: LLM-oriented data структуры
-
-### ✅ **Phase 2: Agent Redesign - 100% COMPLETE**
-- **ContextAnalyzer**: 100% LLM-driven, zero hardcoded logic
-- **ExcelAgent**: LLM-guided с real table validation
-- **ComparisonAgent**: Новый intelligent agent (заменяет UniversalAnalyzer)
-- **JiraAgent**: LLM enhancements при сохранении стабильности
-
-### 🚀 **Достижения новой архитектуры:**
-
-#### **Zero Hardcoded Logic - ACHIEVED:**
-- ❌ **Eliminated**: ВСЕ hardcoded паттерны и маппинги
-- ✅ **Achieved**: 100% интеллектуальные решения через LLM
-- 🧠 **Result**: Адаптивность к любому контексту и структуре данных
-
-#### **Iterative Intelligence - IMPLEMENTED:**
-- 🔄 **Self-Improvement**: Автоматическое улучшение до 85%+ качества
-- ⚡ **Convergence Detection**: Автоматическая остановка при достижении целей
-- 📈 **Quality Metrics**: Relevance, Completeness, Accuracy, Clarity, Actionability
-- 🎯 **Adaptive Thresholds**: Intelligent quality assessment
-
-#### **Real Results Guarantee - ENSURED:**
-- 📊 **Real Tables**: Обязательные реальные таблицы данных из Excel
-- 🧠 **Intelligent Insights**: LLM-generated анализ вместо общих фраз
-- ⚖️ **Concrete Comparisons**: Specific comparison data с метриками
-- 🎯 **Actionable Recommendations**: Практические рекомендации
-
-### 📊 **Техническая реализация:**
-
-#### **LLM Integration:**
-- **Multi-provider support**: OpenAI, Local LLM, Mock modes
-- **Intelligent caching**: Оптимизация LLM запросов
-- **Rate limiting**: Управление API лимитами
-- **Fallback strategies**: Резервные варианты при недоступности
-
-#### **Quality Infrastructure:**
-- **IterativeEngine**: Автоматическое улучшение результатов
-- **QualityMetrics**: Комплексная оценка качества
-- **Convergence detection**: Определение момента остановки
-- **Performance optimization**: Async processing и кэширование
-
-#### **Agent Architecture:**
-- **ContextAnalyzer**: Полный LLM-driven анализ с самооценкой
-- **ExcelAgent**: Исполнение интеллектуальных запросов
-- **ComparisonAgent**: Умное сравнение с предиктивными инсайтами
-- **JiraAgent**: Стабильная основа + LLM улучшения
-
-### 🎯 **Business Value Delivered:**
-- **Intelligence**: Система понимает и анализирует любой бизнес-контекст
-- **Adaptability**: Работает с любыми Excel файлами без настроек
-- **Quality**: Гарантирует реальные данные и интеллектуальные выводы
-- **Reliability**: Самоулучшается и обеспечивает стабильные результаты
-
-**🎉 PROJECT TRANSFORMATION COMPLETE: От hardcoded системы к genuinely intelligent LLM-driven architecture!**
-
----
-
-*Последнее обновление: 24.03.2026 10:52*
-*Статус: Phase 2 Agent Redesign ЗАВЕРШЕН (100%)*
-*Достижение: Полная LLM-архитектура с итеративным улучшением*
+/data/memory/json/
+├── daily_jira_data_2026-03-25.json
+├── daily_meeting_data_2026-03-25.json  
+├── daily_summary_data_2026-03-25.json
+├── employee_metrics_2026-03-25.json
+├── weekly_summary_data_2026-03-31.json
+├── system_state.json              # Current system status
+├── agent_health.json             # Health monitoring
+└── history/                      # 365-day retention

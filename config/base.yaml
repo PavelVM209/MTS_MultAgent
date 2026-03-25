@@ -1,0 +1,328 @@
+# 📋 MTS MultAgent - Base Configuration
+# Foundation configuration for all environments
+
+# 🏗️ System Configuration
+system:
+  name: "MTS_MultAgent"
+  version: "3.0.0"
+  environment: "${ENVIRONMENT:development}"
+  debug: ${DEBUG:false}
+  log_level: "${LOG_LEVEL:INFO}"
+  
+# 🕒 Scheduler Configuration
+scheduler:
+  timezone: "Europe/Moscow"
+  enabled: true
+  
+  # Daily execution schedule
+  daily_schedule:
+    jira_analysis: "19:00"
+    meeting_analysis: "19:05"
+    daily_summary: "19:30"
+  
+  # Weekly execution schedule  
+  weekly_schedule:
+    weekly_report: "19:00"  # Friday
+    
+  # Job persistence
+  persistence:
+    enabled: true
+    store_path: "/data/scheduler/jobs"
+    
+  # Health monitoring
+  health_check:
+    enabled: true
+    interval_seconds: 300
+    timeout_seconds: 30
+
+# 🤖 Agent Configuration
+agents:
+  # Jira Analysis Agent
+  jira_analyzer:
+    enabled: true
+    projects: ["CSI", "PROJ", "DEV"]
+    api_timeout: 30
+    max_retries: 3
+    retry_delay: 5
+    batch_size: 50
+    
+  # Meeting Analysis Agent
+  meeting_analyzer:
+    enabled: true
+    supported_formats: [".txt", ".docx", ".pdf"]
+    max_file_size_mb: 10
+    processing_timeout: 300
+    
+  # Daily Summary Agent
+  daily_summary:
+    enabled: true
+    output_formats: ["txt", "json"]
+    template_path: "/templates/daily_summary"
+    
+  # Weekly Reporter Agent
+  weekly_reporter:
+    enabled: true
+    confluence_enabled: true
+    output_formats: ["pdf", "txt", "confluence"]
+    template_path: "/templates/weekly_report"
+
+# 📊 Data Storage Configuration
+storage:
+  # JSON Memory Store
+  json_store:
+    base_path: "/data/memory/json"
+    backup_path: "/data/memory/backups"
+    max_file_size_mb: 100
+    retention_days: 365
+    enable_compression: true
+    atomic_writes: true
+    
+  # Index Manager
+  index_manager:
+    index_path: "/data/memory/index"
+    cache_size_mb: 50
+    rebuild_interval_hours: 24
+    enable_full_text_search: true
+    max_results_cache: 1000
+    parallel_indexing: true
+    
+  # Report Storage
+  reports:
+    base_path: "/data/reports"
+    human readable_path: "/data/reports/human"
+    json_path: "/data/reports/json"
+    archive_path: "/data/reports/archive"
+
+# 🔗 External Services Configuration
+external_services:
+  # Jira Configuration
+  jira:
+    base_url: "${JIRA_BASE_URL:https://jira.company.com}"
+    username: "${JIRA_USERNAME:}"
+    api_token: "${JIRA_API_TOKEN:}"
+    timeout: 30
+    max_retries: 3
+    
+  # OpenAI Configuration
+  openai:
+    model: "${OPENAI_MODEL:gpt-4}"
+    api_key: "${OPENAI_API_KEY:}"
+    max_tokens: 4000
+    temperature: 0.3
+    timeout: 60
+    max_retries: 3
+    
+  # Confluence Configuration
+  confluence:
+    base_url: "${CONFLUENCE_BASE_URL:https://confluence.company.com}"
+    username: "${CONFLUENCE_USERNAME:}"
+    api_token: "${CONFLUENCE_API_TOKEN:}"
+    space_key: "${CONFLUENCE_SPACE_KEY:PROJECTS}"
+    parent_page_id: "${CONFLUENCE_PARENT_PAGE_ID:}"
+
+# 🔔 Notification Configuration
+notifications:
+  enabled: true
+  
+  # Email notifications
+  email:
+    enabled: ${EMAIL_ENABLED:false}
+    smtp_server: "${SMTP_SERVER:}"
+    smtp_port: ${SMTP_PORT:587}
+    username: "${SMTP_USERNAME:}"
+    password: "${SMTP_PASSWORD:}"
+    from_address: "${FROM_ADDRESS:alerts@company.com}"
+    to_addresses: ${TO_ADDRESSES:[]}
+    
+  # Slack notifications
+  slack:
+    enabled: ${SLACK_ENABLED:false}
+    webhook_url: "${SLACK_WEBHOOK_URL:}"
+    channel: "${SLACK_CHANNEL:#alerts}"
+    
+  # System thresholds
+  thresholds:
+    error_rate: 0.05  # 5%
+    response_time: 30  # seconds
+    disk_usage: 0.80  # 80%
+    memory_usage: 0.85  # 85%
+
+# 🔧 Performance Configuration
+performance:
+  # Concurrency settings
+  max_workers: ${MAX_WORKERS:4}
+  thread_pool_size: ${THREAD_POOL_SIZE:8}
+  
+  # Caching settings
+  cache_ttl_seconds: 3600
+  max_cache_size_mb: 100
+  
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+    
+  # Memory management
+  memory:
+    max_usage_mb: 512
+    gc_threshold: 0.8
+    cleanup_interval_seconds: 300
+
+# 🔒 Security Configuration
+security:
+  # Authentication
+  authentication:
+    enabled: false
+    method: "token"  # token, oauth, ldap
+    
+  # Data encryption
+  encryption:
+    enabled: false
+    algorithm: "AES-256-GCM"
+    key_path: "/data/security/encryption.key"
+    
+  # Access control
+  access_control:
+    enabled: false
+    default_permissions: "read"
+    
+  # Audit logging
+  audit:
+    enabled: false
+    log_path: "/data/audit/audit.log"
+    rotation_days: 30
+
+# 📈 Monitoring Configuration
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+    retention_days: 30
+    storage_path: "/data/metrics"
+    
+  # Health checks
+  health_checks:
+    enabled: true
+    endpoints:
+      - "/health"
+      - "/health/detailed"
+    interval_seconds: 30
+    
+  # Performance monitoring
+  performance:
+    enabled: true
+    slow_query_threshold_ms: 1000
+    memory_threshold_mb: 400
+    disk_threshold_percent: 80
+
+# 🔧 Development Configuration
+development:
+  # Debug settings
+  debug_mode: ${DEBUG_MODE:false}
+  verbose_logging: ${VERBOSE_LOGGING:false}
+  
+  # Testing
+  test_mode: ${TEST_MODE:false}
+  mock_external_services: ${MOCK_EXTERNAL_SERVICES:true}
+  
+  # Hot reload
+  hot_reload:
+    enabled: ${HOT_RELOAD:true}
+    watch_paths:
+      - "config/"
+      - "src/"
+      - "templates/"
+    exclude_patterns:
+      - "*.pyc"
+      - "__pycache__/"
+      - ".git/"
+      
+# 📝 Logging Configuration
+logging:
+  version: 1
+  disable_existing_loggers: false
+  
+  formatters:
+    standard:
+      format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+      
+    detailed:
+      format: "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+      
+    json:
+      format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
+      datefmt: "%Y-%m-%dT%H:%M:%S"
+      
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: INFO
+      formatter: standard
+      stream: ext://sys.stdout
+      
+    file:
+      class: logging.handlers.RotatingFileHandler
+      level: DEBUG
+      formatter: detailed
+      filename: "/data/logs/application.log"
+      maxBytes: 10485760  # 10MB
+      backupCount: 5
+      
+    error_file:
+      class: logging.handlers.RotatingFileHandler
+      level: ERROR
+      formatter: detailed
+      filename: "/data/logs/error.log"
+      maxBytes: 10485760  # 10MB
+      backupCount: 5
+      
+  loggers:
+    "":
+      level: INFO
+      handlers: [console, file]
+      propagate: false
+      
+    "src":
+      level: DEBUG
+      handlers: [console, file]
+      propagate: false
+      
+    "src.agents":
+      level: INFO
+      handlers: [console, file]
+      propagate: false
+      
+    "error":
+      level: ERROR
+      handlers: [console, error_file]
+      propagate: false
+
+# 🚀 Startup Configuration
+startup:
+  # Initialization order
+  init_order:
+    - "logging"
+    - "storage"
+    - "index_manager"
+    - "external_services"
+    - "scheduler"
+    - "agents"
+    
+  # Health checks on startup
+  startup_health_checks:
+    enabled: true
+    timeout_seconds: 30
+    components:
+      - "storage"
+      - "external_services"
+      - "memory"
+      
+  # Graceful shutdown
+  shutdown:
+    timeout_seconds: 60
+    wait_for_jobs: true
+    force_cleanup: false

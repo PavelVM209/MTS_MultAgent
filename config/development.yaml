@@ -1,0 +1,220 @@
+# 🔧 MTS MultAgent - Development Environment Configuration
+# Overrides for development environment
+
+# Environment identification
+system:
+  environment: "development"
+  debug: true
+  log_level: "DEBUG"
+
+# Development scheduler settings
+scheduler:
+  enabled: true
+  
+  # Faster execution for development (every 5 minutes for testing)
+  daily_schedule:
+    jira_analysis: "*/5"  # Every 5 minutes
+    meeting_analysis: "*/5"  # Every 5 minutes  
+    daily_summary: "*/10"  # Every 10 minutes
+    
+  weekly_schedule:
+    weekly_report: "0 */6"  # Every 6 hours (dev testing)
+    
+  # Faster health checks
+  health_check:
+    interval_seconds: 60
+    timeout_seconds: 10
+
+# Development agent settings
+agents:
+  # Smaller batches for faster testing
+  jira_analyzer:
+    projects: ["CSI"]  # Single project for dev
+    api_timeout: 10
+    max_retries: 1
+    retry_delay: 2
+    batch_size: 10
+    
+  meeting_analyzer:
+    max_file_size_mb: 5
+    processing_timeout: 60
+    
+  daily_summary:
+    output_formats: ["txt"]  # Only text for dev
+    
+  weekly_reporter:
+    confluence_enabled: false  # Disabled in dev
+    output_formats: ["txt"]
+
+# Development storage paths
+storage:
+  json_store:
+    base_path: "./data/dev/memory/json"
+    backup_path: "./data/dev/memory/backups"
+    retention_days: 7  # Shorter retention for dev
+    
+  index_manager:
+    index_path: "./data/dev/memory/index"
+    cache_size_mb: 10
+    rebuild_interval_hours: 1  # Frequent rebuilds for testing
+    
+  reports:
+    base_path: "./data/dev/reports"
+    human_readable_path: "./data/dev/reports/human"
+    json_path: "./data/dev/reports/json"
+
+# Mock services for development
+external_services:
+  jira:
+    base_url: "http://localhost:8080"
+    username: "dev_user"
+    api_token: "dev_token"
+    timeout: 5
+    
+  openai:
+    model: "gpt-3.5-turbo"  # Cheaper model for dev
+    api_key: "dev_openai_key"
+    max_tokens: 1000
+    temperature: 0.5
+    
+  confluence:
+    base_url: "http://localhost:8090"
+    username: "dev_user"
+    api_token: "dev_token"
+
+# Development notifications (console only)
+notifications:
+  enabled: true
+  
+  email:
+    enabled: false
+    
+  slack:
+    enabled: false
+    
+  thresholds:
+    error_rate: 0.10  # 10% (more lenient for dev)
+    response_time: 10
+    disk_usage: 0.90
+    memory_usage: 0.90
+
+# Development performance settings
+performance:
+  max_workers: 2
+  thread_pool_size: 4
+  
+  cache_ttl_seconds: 300  # 5 minutes
+  max_cache_size_mb: 20
+  
+  rate_limit:
+    requests_per_minute: 120  # Higher limit for dev
+    
+  memory:
+    max_usage_mb: 256
+    gc_threshold: 0.7
+    cleanup_interval_seconds: 60
+
+# Development security (disabled)
+security:
+  authentication:
+    enabled: false
+    
+  encryption:
+    enabled: false
+    
+  access_control:
+    enabled: false
+    
+  audit:
+    enabled: false
+
+# Development monitoring
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 30
+    retention_days: 3
+    storage_path: "./data/dev/metrics"
+    
+  health_checks:
+    enabled: true
+    interval_seconds: 30
+    
+  performance:
+    enabled: true
+    slow_query_threshold_ms: 500
+    memory_threshold_mb: 200
+    disk_threshold_percent: 90
+
+# Development-specific settings
+development:
+  debug_mode: true
+  verbose_logging: true
+  test_mode: false
+  mock_external_services: true
+  
+  hot_reload:
+    enabled: true
+    watch_paths:
+      - "config/"
+      - "src/"
+      - "tests/"
+    exclude_patterns:
+      - "*.pyc"
+      - "__pycache__/"
+      - ".git/"
+      - "*.log"
+      - "data/"
+
+# Development logging
+logging:
+  formatters:
+    standard:
+      format: "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s"
+      
+    detailed:
+      format: "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d [%(funcName)s]: %(message)s"
+      
+  handlers:
+    console:
+      level: DEBUG
+      formatter: detailed
+      
+    file:
+      level: DEBUG
+      filename: "./data/dev/logs/application.log"
+      maxBytes: 5242880  # 5MB
+      backupCount: 3
+      
+    error_file:
+      level: ERROR
+      filename: "./data/dev/logs/error.log"
+      maxBytes: 5242880  # 5MB
+      backupCount: 2
+      
+  loggers:
+    "":
+      level: DEBUG
+      handlers: [console, file]
+      
+    "src":
+      level: DEBUG
+      handlers: [console, file]
+      
+    "tests":
+      level: DEBUG
+      handlers: [console]
+
+# Development startup
+startup:
+  startup_health_checks:
+    enabled: true
+    timeout_seconds: 15
+    components:
+      - "storage"
+      - "memory"  # Skip external services in dev
+      
+  shutdown:
+    timeout_seconds: 30
+    wait_for_jobs: false
+    force_cleanup: true

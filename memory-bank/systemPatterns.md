@@ -1,599 +1,610 @@
-# System Patterns - MTS_MultAgent LLM-Driven Architecture
+# System Patterns - MTS MultAgent Scheduled Architecture
 
-## 🧠 НОВАЯ LLM-CENTRIC АРХИТЕКТУРНАЯ ДИАГРАММА
+## 🏗️ **Design Patterns & Conventions**
 
-```mermaid
-graph TD
-    CLI[CLI Interface] --> COORD[Coordinator]
-    
-    COORD --> JA[JiraAgent]
-    COORD --> CA[ContextAnalyzer<br/>LLM-Driven + Self-Evaluation]
-    COORD --> EA[ExcelAgent<br/>LLM-Guided]
-    COORD --> CPA[ComparisonAgent<br/>LLM-Driven + Adaptive]
-    COORD --> CFA[ConfluenceAgent]
-    
-    JA --> API1[Jira API]
-    EA --> FILES[Excel Files<br/>2-3 GB Support]
-    CFA --> API2[Confluence API]
-    
-    CA --> LLM[LLM Engine<br/>OpenAI/Local]
-    CPA --> LLM
-    EA --> LLM
-    
-    subgraph "Итеративное Улучшение"
-        CA --> QC[Quality Checker]
-        CPA --> QC
-        QC --> IM[Iteration Manager]
-        IM --> CA
-        IM --> CPA
-    end
-    
-    subgraph "LLM Caching"
-        LLM --> CACHE[Vector DB<br/>ChromaDB]
-        CACHE --> LLM
-    end
-    
-    subgraph "Quality Metrics"
-        QC --> METRICS[Quality Metrics<br/>Relevance/Completeness/Accuracy]
-    end
-```
+**Phase:** 3 - Scheduled Multi-Agent System  
+**Approach:** Event-driven architecture with orchestrated workflows  
+**Principles:** JSON-first data flow, async-first processing, quality-controlled execution  
 
-## 🔄 ИТЕРАТИВНЫЙ ПАТТЕРН УЛУЧШЕНИЯ
+---
 
-### Core Iterative Pattern
+## 🔄 **Core Architectural Patterns**
+
+### **1. Orchestrator Pattern**
 ```python
-class IterativeImprovementPattern:
-    """Базовый паттерн для итеративного улучшения через LLM"""
+# Centralized Coordination Pattern
+class OrchestratorAgent(BaseAgent):
+    """
+    Master coordinator for scheduled multi-agent workflows
+    """
     
-    async def improve_until_convergence(
-        self,
-        initial_input: Any,
-        quality_threshold: float = 85.0,
-        max_iterations: int = 5
-    ) -> IterationResult:
-        
-        current_iteration = 0
-        best_result = None
-        best_quality = 0.0
-        quality_history = []
-        
-        while current_iteration < max_iterations:
-            # LLM анализ и улучшение
-            improved_result = await self.llm_improve(
-                initial_input, 
-                previous_result=best_result,
-                iteration=current_iteration
-            )
-            
-            # LLM оценка качества
-            quality_score = await self.llm_evaluate_quality(
-                improved_result, 
-                initial_input
-            )
-            
-            quality_history.append(quality_score)
-            
-            # Проверка сходимости
-            if self._has_converged(quality_history) or quality_score >= quality_threshold:
-                break
-            
-            # Сохранение лучшего результата
-            if quality_score > best_quality:
-                best_quality = quality_score
-                best_result = improved_result
-            
-            current_iteration += 1
-        
-        return IterationResult(
-            final_result=best_result,
-            quality_score=best_quality,
-            iterations=current_iteration,
-            quality_history=quality_history,
-            converged=quality_score >= quality_threshold
-        )
-```
-
-### Quality Convergence Detector
-```python
-class QualityConvergenceDetector:
-    """Алгоритм определения сходимости качества"""
+    def __init__(self):
+        self.agents: Dict[str, BaseAgent] = {}
+        self.workflows: Dict[str, WorkflowDefinition] = {}
+        self.quality_controller: QualityController = QualityController()
+        self.error_handler: ErrorHandler = ErrorHandler()
     
-    def __init__(self, min_improvement: float = 5.0, window_size: int = 3):
-        self.min_improvement = min_improvement
-        self.window_size = window_size
-        self.quality_history = []
+    async def execute_workflow(self, workflow_name: str) -> WorkflowResult:
+        """Execute orchestrated workflow with quality control"""
         
-    def has_converged(self, current_quality: float) -> bool:
-        """Определение сходимости на основе истории качества"""
-        self.quality_history.append(current_quality)
+        # 🔹 Workflow Definition Resolution
+        workflow = self.workflows[workflow_name]
         
-        if len(self.quality_history) < self.window_size:
-            return False
-        
-        recent_qualities = self.quality_history[-self.window_size:]
-        improvements = [
-            recent_qualities[i] - recent_qualities[i-1]
-            for i in range(1, len(recent_qualities))
-        ]
-        
-        avg_improvement = sum(improvements) / len(improvements)
-        return avg_improvement < self.min_improvement
-```
-
-## 🧠 LLM-DRIVEN ПАТТЕРНЫ
-
-### 1. LLM Request-Response Pattern
-```python
-class LLMRequestPattern:
-    """Стандартизированный паттерн для LLM запросов"""
-    
-    async def execute_llm_request(
-        self, 
-        prompt_template: str, 
-        context: Dict[str, Any],
-        cache_key: Optional[str] = None
-    ) -> LLMResponse:
-        
-        # 1. Check cache
-        if cache_key:
-            cached_response = await self.cache.get(cache_key)
-            if cached_response:
-                return cached_response
-        
-        # 2. Format prompt
-        formatted_prompt = self.format_prompt(prompt_template, context)
-        
-        # 3. Execute with retry
-        response = await self.llm_client.complete_with_retry(
-            prompt=formatted_prompt,
-            max_retries=3,
-            timeout=60
-        )
-        
-        # 4. Parse and validate
-        parsed_response = self.parse_llm_response(response)
-        
-        # 5. Cache result
-        if cache_key and parsed_response.is_valid:
-            await self.cache.set(cache_key, parsed_response, ttl=3600)
-        
-        return parsed_response
-```
-
-### 2. LLM Quality Evaluation Pattern
-```python
-class LLMQualityEvaluationPattern:
-    """Паттерн оценки качества через LLM"""
-    
-    async def evaluate_quality(
-        self, 
-        result_data: Dict, 
-        expected_context: str,
-        evaluation_criteria: List[str]
-    ) -> QualityMetrics:
-        
-        prompt = f"""
-        Оцени качество анализа данных по отношению к исходному контексту.
-        
-        ИСХОДНЫЙ КОНТЕКСТ:
-        {expected_context}
-        
-        ПОЛУЧЕННЫЕ ДАННЫЕ:
-        {self._format_data_for_evaluation(result_data)}
-        
-        КРИТЕРИИ ОЦЕНКИ:
-        {', '.join(evaluation_criteria)}
-        
-        ОЦЕНИ ПО ШКАЛЕ 0-100%:
-        1. Relevance Score: Насколько данные соответствуют контексту
-        2. Completeness Score: Полнота охвата аспектов контекста
-        3. Accuracy Score: Точность извлечения и интерпретации
-        4. Overall Quality: Интегральная оценка качества
-        
-        Формат: JSON с метриками и объяснением
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_quality_metrics(response)
-```
-
-### 3. LLM-Guided Column Mapping Pattern
-```python
-class LLMColumnMappingPattern:
-    """LLM-driven интеллектуальное сопоставление колонок"""
-    
-    async def map_columns_intelligently(
-        self, 
-        available_columns: List[str], 
-        analysis_context: str,
-        sample_data: Dict[str, List[Any]]
-    ) -> ColumnMappingResult:
-        
-        prompt = f"""
-        Проанализируй доступные колонки в Excel и сопоставь их с потребностями анализа.
-        
-        КОНТЕКСТ ЗАДАЧИ:
-        {analysis_context}
-        
-        ДОСТУПНЫЕ КОЛОНКИ:
-        {', '.join(available_columns)}
-        
-        ОБРАЗЦЫ ДАННЫХ:
-        {self._format_sample_data(sample_data)}
-        
-        ОПРЕДЕЛИ:
-        1. Какие колонки релевантны для анализа?
-        2. Какова семантика каждой колонки?
-        3. Как использовать каждую колонку для ответа на вопросы из контекста?
-        4. Какие дополнительные обработки нужны?
-        
-        Формат: JSON с маппингом и объяснениями
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        return self._parse_column_mapping(response)
-```
-
-## 🔄 ARCHITECTURAL PATTERNS
-
-### 1. Orchestrator Pattern with Iteration
-```python
-class IntelligentOrchestrator:
-    """Координатор с итеративным улучшением"""
-    
-    async def execute_intelligent_workflow(self, task_description: str):
-        """Основной workflow с итеративным улучшением"""
-        
-        # 1. JiraAgent (без изменений)
-        jira_result = await self.jira_agent.execute_with_fallback({
-            "task_description": task_description
-        })
-        
-        # 2. ContextAnalyzer с итеративным улучшением
-        context_task = ContextTask(
-            jira_data=jira_result.data,
-            task_description=task_description,
-            original_context=jira_result.data.get("context", "")
-        )
-        
-        excel_structure = await self.excel_agent.analyze_structure_with_llm()
-        context_result = await self.context_analyzer.iterative_improvement_loop(
-            context_task, excel_structure
-        )
-        
-        # 3. ExcelAgent исполнение LLM-запросов
-        excel_result = await self.excel_agent.execute_llm_generated_queries(
-            context_result.intelligent_queries
-        )
-        
-        # 4. ComparisonAgent с итеративным улучшением
-        comparison_result = await self.comparison_agent.compare_with_iterative_improvement(
-            jira_result.data, excel_result, context_result
-        )
-        
-        # 5. Публикация с метриками качества
-        final_result = await self.confluence_agent.create_intelligent_page({
-            "title": self.generate_title(task_description),
-            "content": self.format_llm_enhanced_content(context_result, comparison_result),
-            "tables": excel_result.get("tables", []),
-            "quality_metrics": context_result.quality_metrics,
-            "iteration_info": context_result.iteration_result
-        })
-        
-        return final_result
-```
-
-### 2. LLM Pipeline Pattern
-```python
-class LLMPipelinePattern:
-    """Pipeline с LLM-проверкой на каждом этапе"""
-    
-    async def execute_pipeline_with_validation(self, data: Any):
-        """Исполнение pipeline с LLM-валидацией"""
-        
-        stages = [
-            ("extraction", self.extract_data),
-            ("analysis", self.analyze_data),
-            ("comparison", self.compare_data),
-            ("generation", self.generate_report)
-        ]
-        
-        pipeline_result = PipelineResult()
-        
-        for stage_name, stage_func in stages:
-            # Исполнение этапа
-            stage_result = await stage_func(data)
-            
-            # LLM-валидация результата этапа
-            validation_result = await self.validate_stage_result(
-                stage_result, stage_name
-            )
-            
-            if not validation_result.is_acceptable:
-                # Итеративное улучшение этапа
-                improved_result = await self.improve_stage_result(
-                    stage_result, validation_result.feedback
-                )
-                stage_result = improved_result
-            
-            pipeline_result.add_stage_result(stage_name, stage_result)
-            data = stage_result  # Pass to next stage
-        
-        return pipeline_result
-```
-
-### 3. Adaptive Strategy Pattern
-```python
-class AdaptiveStrategyPattern:
-    """Адаптивная стратегия на основе LLM-анализа"""
-    
-    async def select_optimal_strategy(
-        self, 
-        task_context: Dict[str, Any],
-        available_strategies: List[str]
-    ) -> SelectedStrategy:
-        
-        prompt = f"""
-        Проанализируй задачу и выбери оптимальную стратегию анализа.
-        
-        КОНТЕКСТ ЗАДАЧИ:
-        {task_context}
-        
-        ДОСТУПНЫЕ СТРАТЕГИИ:
-        {', '.join(available_strategies)}
-        
-        ВЫБЕРИ НАИЛУЧШУЮ СТРАТЕГИЮ И ОБЪЯСНИ ВЫБОР.
-        
-        Критерии:
-        1. Соответствие типу задачи
-        2. Эффективность для данного контекста
-        3. Вероятность достижения качественного результата
-        
-        Формат: JSON с выбранной стратегией и обоснованием
-        """
-        
-        response = await self.llm_client.complete(prompt)
-        strategy_data = self._parse_strategy_selection(response)
-        
-        return SelectedStrategy(
-            name=strategy_data.strategy,
-            confidence=strategy_data.confidence,
-            reasoning=strategy_data.reasoning
-        )
-```
-
-## 🎯 PERFORMANCE PATTERNS
-
-### 1. Concurrent LLM Processing
-```python
-class ConcurrentLLMProcessor:
-    """Параллельная обработка LLM запросов"""
-    
-    def __init__(self, max_concurrent: int = 3):
-        self.semaphore = Semaphore(max_concurrent)
-        self.request_queue = asyncio.Queue()
-        
-    async def process_batch_requests(
-        self, 
-        requests: List[LLMRequest]
-    ) -> List[LLMResponse]:
-        """Параллельная обработка с rate limiting"""
-        
-        async def process_single_request(request):
-            async with self.semaphore:
-                return await self.llm_client.complete_with_retry(
-                    prompt=request.prompt,
-                    max_tokens=request.max_tokens,
-                    temperature=request.temperature
-                )
-        
-        # Создание задач для параллельного выполнения
-        tasks = [process_single_request(req) for req in requests]
-        
-        # Выполнение с gathering результатов
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Обработка исключений
-        valid_responses = []
-        for i, response in enumerate(responses):
-            if isinstance(response, Exception):
-                logger.error(f"Request {i} failed: {response}")
-                valid_responses.append(LLMResponse.error_response(str(response)))
+        # 🔹 Phase-Based Execution
+        for phase in workflow.phases:
+            if phase.execution_type == "parallel":
+                results = await self.execute_parallel_phase(phase)
             else:
-                valid_responses.append(response)
+                results = await self.execute_sequential_phase(phase)
+            
+            # 🔹 Quality Gate Validation
+            if not await self.validate_phase_quality(phase, results):
+                await self.handle_quality_gate_failure(phase, results)
+                return WorkflowResult(success=False, error="Quality gate failed")
         
-        return valid_responses
-```
-
-### 2. Intelligent Caching Pattern
-```python
-class IntelligentLLMCache:
-    """Интеллектуальное кэширование LLM запросов"""
+        return WorkflowResult(success=True, data=results)
     
-    def __init__(self):
-        self.vector_db = ChromaDB()
-        self.cache_stats = CacheStats()
-        
-    async def get_cached_response(
-        self, 
-        prompt: str, 
-        context_hash: str,
-        similarity_threshold: float = 0.85
-    ) -> Optional[LLMResponse]:
-        
-        # Поиск похожих промптов в векторной базе
-        similar_prompts = await self.vector_db.similarity_search(
-            query=prompt,
-            threshold=similarity_threshold
-        )
-        
-        if similar_prompts:
-            best_match = similar_prompts[0]
-            self.cache_stats.record_hit()
-            return LLMResponse.from_cache(best_match.response)
-        
-        self.cache_stats.record_miss()
-        return None
-    
-    async def cache_response(
-        self, 
-        prompt: str, 
-        response: LLMResponse, 
-        context_hash: str
-    ):
-        """Кэширование с векторизацией"""
-        
-        await self.vector_db.add_document({
-            "prompt": prompt,
-            "response": response.to_dict(),
-            "context_hash": context_hash,
-            "timestamp": datetime.utcnow().isoformat()
-        })
-```
-
-## 🔄 ERROR HANDLING PATTERNS
-
-### 1. LLM Fallback Pattern
-```python
-class LLMFallbackPattern:
-    """Fallback стратегия для LLM отказов"""
-    
-    def __init__(self):
-        self.providers = [
-            OpenAIClient(),
-            LocalLLMClient(),
-            MockLLMClient()  # Ultimate fallback
+    async def execute_parallel_phase(self, phase: WorkflowPhase) -> Dict[str, AgentResult]:
+        """Execute multiple agents in parallel"""
+        tasks = [
+            self.agents[agent_id].execute(phase.agent_configs[agent_id])
+            for agent_id in phase.agents
         ]
         
-    async def execute_with_fallback(
+        parallel_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Convert exceptions to structured results
+        return {
+            agent_id: result if not isinstance(result, Exception) 
+                      else AgentResult(success=False, error=str(result))
+            for agent_id, result in zip(phase.agents, parallel_results)
+        }
+```
+
+### **2. Scheduled Execution Pattern**
+```python
+# Time-Based Workflow Scheduling
+class ScheduledExecutionPattern:
+    """
+    Scheduled execution with dependency management and error recovery
+    """
+    
+    async def setup_scheduled_workflows(self):
+        """Setup all scheduled workflows with dependencies"""
+        
+        # Daily Workflow - 19:00 UTC+3
+        self.scheduler.add_job(
+            func=self.execute_daily_workflow,
+            trigger="cron",
+            hour=19,
+            minute=0,
+            timezone="Europe/Moscow",
+            id="daily_workflow",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300
+        )
+        
+        # Weekly Workflow - Friday 19:00 UTC+3
+        self.scheduler.add_job(
+            func=self.execute_weekly_workflow,
+            trigger="cron",
+            day_of_week="fri",
+            hour=19,
+            minute=0,
+            timezone="Europe/Moscow",
+            id="weekly_workflow",
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=900
+        )
+        
+        # Health Check - Every hour
+        self.scheduler.add_job(
+            func=self.health_check,
+            trigger="interval",
+            hours=1,
+            id="health_check",
+            max_instances=1
+        )
+    
+    async def execute_daily_workflow(self):
+        """Daily workflow with parallel data collection"""
+        
+        workflow_id = generate_workflow_id("daily")
+        
+        try:
+            # Phase 1: Parallel Data Collection
+            await self.log_workflow_start(workflow_id, "daily_workflow", "data_collection")
+            
+            # Parallel execution of data collection agents
+            jira_future = asyncio.create_task(
+                self.safe_execute_agent("daily_jira_analyzer", {})
+            )
+            meeting_future = asyncio.create_task(
+                self.safe_execute_agent("daily_meeting_analyzer", {})
+            )
+            
+            jira_result, meeting_result = await asyncio.gather(
+                jira_future, meeting_future, return_exceptions=True
+            )
+            
+            # Phase 2: Sequential Consolidation
+            if isinstance(jira_result, Exception) or isinstance(meeting_result, Exception):
+                await self.handle_parallel_execution_failures([jira_result, meeting_result])
+                return
+            
+            await self.log_workflow_phase(workflow_id, "data_collection", "completed")
+            
+            # Execute summary consolidation
+            summary_result = await self.safe_execute_agent("daily_summary_agent", {})
+            
+            if summary_result.success:
+                await self.log_workflow_complete(workflow_id, "daily_workflow", "success")
+            else:
+                await self.log_workflow_complete(workflow_id, "daily_workflow", "failed")
+                
+        except Exception as e:
+            await self.log_workflow_complete(workflow_id, "daily_workflow", "critical_error", str(e))
+            await self.handle_critical_workflow_error("daily_workflow", e)
+```
+
+### **3. JSON-First Data Pattern**
+```python
+# JSON-Centric Data Management
+class JSONFirstDataPattern:
+    """
+    JSON-first data persistence with schema validation
+    """
+    
+    def __init__(self):
+        self.schemas: Dict[str, Schema] = self._load_schemas()
+        self.storage_path: Path = Path("/data/memory/json")
+        self.index_manager: IndexManager = IndexManager()
+    
+    async def persist_json_data(self, data_type: str, data: dict) -> str:
+        """Persist data with JSON schema validation"""
+        
+        # 🔹 Schema Validation
+        schema = self.schemas.get(data_type)
+        if schema:
+            validation_result = schema.validate(data)
+            if not validation_result.valid:
+                raise ValidationError(f"Schema validation failed: {validation_result.errors}")
+        
+        # 🔹 Data Enrichment
+        enriched_data = self._enrich_with_metadata(data, data_type)
+        
+        # 🔹 File Path Generation
+        timestamp = datetime.now().strftime("%Y-%m-%d")
+        filename = f"{data_type}_{timestamp}.json"
+        file_path = self.storage_path / filename
+        
+        # 🔹 Atomic Write
+        await self._atomic_json_write(file_path, enriched_data)
+        
+        # 🔹 Index Update
+        await self.index_manager.update_index(data_type, file_path, enriched_data)
+        
+        return str(file_path)
+    
+    async def load_json_data(self, data_type: str, date: str = None) -> dict:
+        """Load JSON data with date-based resolution"""
+        
+        if date is None:
+            date = datetime.now().strftime("%Y-%m-%d")
+        
+        filename = f"{data_type}_{date}.json"
+        file_path = self.storage_path / filename
+        
+        if not file_path.exists():
+            raise FileNotFoundError(f"JSON data file not found: {file_path}")
+        
+        # 🔹 Schema Validation on Load
+        data = await self._load_json_file(file_path)
+        schema = self.schemas.get(data_type)
+        
+        if schema:
+            validation_result = schema.validate(data)
+            if not validation_result.valid:
+                raise ValidationError(f"Loaded data validation failed: {validation_result.errors}")
+        
+        return data
+    
+    async def query_json_data(self, query: JSONQuery) -> List[dict]:
+        """Query JSON data using file-based indexes"""
+        
+        # 🔹 Index-Based Query Resolution
+        candidate_files = await self.index_manager.query_files(query)
+        
+        results = []
+        for file_path in candidate_files:
+            data = await self._load_json_file(file_path)
+            
+            # 🔹 In-Memory Query Filtering
+            if self._matches_query(data, query):
+                results.append(data)
+        
+        return results
+```
+
+### **4. Quality Control Pipeline Pattern**
+```python
+# Multi-Stage Quality Validation Pipeline
+class QualityControlPipeline:
+    """
+    LLM-driven quality control with iterative improvement
+    """
+    
+    def __init__(self):
+        self.llm_client: LLMClient = LLMClient()
+        self.validators: Dict[str, Validator] = {
+            "completeness": CompletenessValidator(),
+            "accuracy": AccuracyValidator(),
+            "format": FormatValidator(),
+            "consistency": ConsistencyValidator()
+        }
+        self.improver: DataImprover = DataImprover()
+    
+    async def validate_and_improve(
         self, 
-        prompt: str, 
-        max_failures: int = 2
-    ) -> LLMResponse:
+        data: Any, 
+        data_type: str, 
+        quality_threshold: float = 90.0
+    ) -> QualityControlledResult:
+        """Multi-stage quality validation with auto-improvement"""
         
-        last_exception = None
+        current_data = data
+        best_quality = 0.0
+        iterations = 0
+        max_iterations = 3
         
-        for provider in self.providers:
-            try:
-                response = await provider.complete(prompt)
-                if response.is_valid:
-                    return response
-                    
-            except Exception as e:
-                last_exception = e
-                logger.warning(f"Provider {provider.name} failed: {e}")
-                continue
+        while iterations < max_iterations:
+            # 🔹 Multi-Stage Validation
+            validation_results = {}
+            overall_quality = 0.0
+            
+            for validator_name, validator in self.validators.items():
+                result = await validator.validate(current_data)
+                validation_results[validator_name] = result
+                overall_quality += result.score * result.weight
+            
+            overall_quality = min(overall_quality, 100.0)
+            
+            # 🔹 Quality Threshold Check
+            if overall_quality >= quality_threshold:
+                return QualityControlledResult(
+                    data=current_data,
+                    quality_score=overall_quality,
+                    validation_results=validation_results,
+                    iterations=iterations,
+                    success=True
+                )
+            
+            # 🔹 Iterative Improvement
+            if iterations < max_iterations - 1:
+                feedback = await self._generate_improvement_feedback(
+                    current_data, validation_results, data_type
+                )
+                
+                improved_data = await self.improver.improve_data(current_data, feedback)
+                
+                # Only accept improvement if it increases quality
+                if improved_data != current_data:
+                    current_data = improved_data
+                    best_quality = overall_quality
+            
+            iterations += 1
         
-        # Все провайдеры недоступны
-        raise LLMAllProvidersFailedException(
-            f"All LLM providers failed. Last error: {last_exception}"
+        # Return best effort result
+        return QualityControlledResult(
+            data=current_data,
+            quality_score=best_quality,
+            validation_results=validation_results,
+            iterations=iterations,
+            success=False,
+            reason=f"Failed to achieve quality threshold {quality_threshold}"
+        )
+    
+    async def _generate_improvement_feedback(
+        self, 
+        data: Any, 
+        validation_results: Dict[str, ValidationResult], 
+        data_type: str
+    ) -> str:
+        """Generate LLM-based improvement feedback"""
+        
+        validation_summary = "\n".join([
+            f"- {name}: {result.score}% - {result.feedback}"
+            for name, result in validation_results.items()
+        ])
+        
+        prompt = f"""
+        Analyze the following {data_type} data and provide specific improvement suggestions:
+        
+        Current Data:
+        {json.dumps(data, indent=2, default=str)}
+        
+        Validation Results:
+        {validation_summary}
+        
+        Provide specific, actionable feedback to improve:
+        1. Data completeness
+        2. Accuracy of information
+        3. Format consistency
+        4. Logical consistency
+        
+        Focus on the lowest scoring areas first.
+        """
+        
+        return await self.llm_client.complete(prompt)
+```
+
+---
+
+## 🔌 **Integration Patterns**
+
+### **1. Circuit Breaker Resilience Pattern**
+```python
+# Fault-Tolerant External Service Integration
+class CircuitBreakerResilience:
+    """
+    Circuit breaker pattern for external service resilience
+    """
+    
+    def __init__(self, service_name: str, config: CircuitBreakerConfig):
+        self.service_name = service_name
+        self.failure_threshold = config.failure_threshold
+        self.recovery_timeout = config.recovery_timeout
+        self.success_threshold = config.success_threshold
+        
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = CircuitState.CLOSED
+        
+        self.metrics_collector = MetricsCollector()
+        self.logger = StructuredLogger()
+    
+    async def execute_with_protection(self, operation: Callable) -> Any:
+        """Execute operation with circuit breaker protection"""
+        
+        start_time = time.time()
+        
+        try:
+            # 🔹 Circuit State Validation
+            if self.state == CircuitState.OPEN:
+                if self._should_attempt_reset():
+                    self.state = CircuitState.HALF_OPEN
+                    await self.logger.info(f"Circuit breaker for {self.service_name} attempting reset")
+                else:
+                    raise CircuitBreakerOpenException(f"Circuit breaker for {self.service_name} is OPEN")
+            
+            # 🔹 Operation Execution
+            result = await operation()
+            
+            # 🔹 Success Handling
+            self.on_success()
+            
+            await self.metrics_collector.record_circuit_breaker_success(
+                self.service_name, time.time() - start_time
+            )
+            
+            return result
+            
+        except Exception as e:
+            # 🔹 Failure Handling
+            self.on_failure()
+            
+            await self.metrics_collector.record_circuit_breaker_failure(
+                self.service_name, time.time() - start_time, type(e).__name__
+            )
+            
+            await self.logger.error(f"Circuit breaker execution failed for {self.service_name}: {str(e)}")
+            
+            raise e
+    
+    def on_success(self):
+        """Handle successful operation execution"""
+        if self.state == CircuitState.HALF_OPEN:
+            if hasattr(self, 'consecutive_successes'):
+                self.consecutive_successes += 1
+            else:
+                self.consecutive_successes = 1
+            
+            if self.consecutive_successes >= self.success_threshold:
+                self.state = CircuitState.CLOSED
+                self.failure_count = 0
+                del self.consecutive_successes
+        else:
+            self.failure_count = 0
+    
+    def on_failure(self):
+        """Handle operation execution failure"""
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+    
+    def _should_attempt_reset(self) -> bool:
+        """Check if circuit breaker should attempt reset"""
+        return (
+            self.state == CircuitState.OPEN and
+            self.last_failure_time and
+            time.time() - self.last_failure_time >= self.recovery_timeout
         )
 ```
 
-### 2. Graceful Degradation Pattern
+### **2. Async Resource Pool Pattern**
 ```python
-class GracefulDegradationPattern:
-    """Плавное снижение функциональности при проблемах"""
+# Efficient Resource Management for External APIs
+class AsyncResourcePool:
+    """
+    Async resource pool for external service connections
+    """
     
-    async def execute_with_degradation(
-        self, 
-        primary_operation: Callable,
-        fallback_operations: List[Callable],
-        context: Dict[str, Any]
-    ):
+    def __init__(self, create_resource: Callable, max_size: int = 10):
+        self.create_resource = create_resource
+        self.max_size = max_size
+        self.pool: asyncio.Queue = asyncio.Queue(maxsize=max_size)
+        self.active_resources: Set = set()
+        self.resource_counter = 0
+        self.stats = PoolStatistics()
+    
+    async def acquire(self, timeout: float = 30.0) -> Any:
+        """Acquire resource from pool"""
         
-        operations = [primary_operation] + fallback_operations
+        start_time = time.time()
         
-        for i, operation in enumerate(operations):
-            try:
-                result = await operation(context)
+        try:
+            # 🔹 Try to get existing resource
+            resource = await asyncio.wait_for(
+                self.pool.get(), 
+                timeout=timeout
+            )
+            
+            # Validate resource health
+            if await self._is_resource_healthy(resource):
+                self.active_resources.add(resource)
+                await self.stats.record_acquisition(time.time() - start_time, "existing")
+                return resource
+            else:
+                # Resource unhealthy, dispose and create new
+                await self._dispose_resource(resource)
+                return await self._create_and_acquire(timeout)
                 
-                # Логирование уровня degradation
-                if i == 0:
-                    logger.info("Primary operation succeeded")
-                else:
-                    logger.warning(f"Fallback operation {i} succeeded")
-                
-                return result with Context(
-                    operation_used=operation.__name__,
-                    degradation_level=i
-                )
-                
-            except Exception as e:
-                logger.error(f"Operation {i} failed: {e}")
-                continue
+        except asyncio.TimeoutError:
+            # Pool empty, try to create new resource
+            return await self._create_and_acquire(timeout)
+    
+    async def release(self, resource: Any):
+        """Release resource back to pool"""
         
-        raise AllOperationsFailedException("All operations failed")
+        if resource in self.active_resources:
+            self.active_resources.remove(resource)
+            
+            # Validate resource before returning to pool
+            if await self._is_resource_healthy(resource):
+                await self.pool.put(resource)
+                await self.stats记录_release("healthy")
+            else:
+                await self._dispose_resource(resource)
+                await self.stats.record_release("unhealthy")
+    
+    async def _create_and_acquire(self, timeout: float) -> Any:
+        """Create new resource if under limit"""
+        
+        if len(self.active_resources) + self.pool.qsize() >= self.max_size:
+            raise ResourcePoolExhaustedException("Resource pool exhausted")
+        
+        resource = await self.create_resource()
+        self.resource_counter += 1
+        self.active_resources.add(resource)
+        
+        await self.stats.record_acquisition(time.time() - timeout, "created")
+        
+        return resource
+    
+    async def health_check(self) -> PoolHealthStatus:
+        """Check pool health"""
+        
+        total_resources = len(self.active_resources) + self.pool.qsize()
+        healthy_resources = 0
+        
+        # Check active resources health
+        for resource in list(self.active_resources):
+            if await self._is_resource_healthy(resource):
+                healthy_resources += 1
+            else:
+                await self._dispose_resource(resource)
+                self.active_resources.discard(resource)
+        
+        # Check pool resources health
+        pool_resources = []
+        while not self.pool.empty():
+            resource = await self.pool.get()
+            if await self._is_resource_healthy(resource):
+                pool_resources.append(resource)
+                healthy_resources += 1
+            else:
+                await self._dispose_resource(resource)
+        
+        # Return healthy resources to pool
+        for resource in pool_resources:
+            await self.pool.put(resource)
+        
+        return PoolHealthStatus(
+            total_resources=len(self.active_resources) + self.pool.qsize(),
+            healthy_resources=healthy_resources,
+            active_resources=len(self.active_resources),
+            pool_size=self.pool.qsize()
+        )
 ```
 
-## 📊 MONITORING PATTERNS
+---
 
-### 1. LLM Metrics Collection
+## 📊 **Data Processing Patterns**
+
+### **1. Pipeline Processing Pattern**
 ```python
-class LLMMetricsCollector:
-    """Сбор метрик LLM производительности"""
+# Configurable Data Processing Pipeline
+class PipelineProcessingPattern:
+    """
+    Configurable pipeline for data processing with error recovery
+    """
     
     def __init__(self):
-        self.metrics = {
-            "request_count": 0,
-            "total_tokens": 0,
-            "response_times": [],
-            "error_rates": {},
-            "quality_scores": [],
-            "cache_hit_rate": 0.0
-        }
-        
-    async def track_request(
-        self, 
-        operation: str,
-        tokens_used: int,
-        response_time: float,
-        quality_score: Optional[float] = None,
-        cache_hit: bool = False
-    ):
-        
-        self.metrics["request_count"] += 1
-        self.metrics["total_tokens"] += tokens_used
-        self.metrics["response_times"].append(response_time)
-        
-        if quality_score:
-            self.metrics["quality_scores"].append(quality_score)
-        
-        # Update cache hit rate
-        if cache_hit:
-            self.metrics["cache_hit_rate"] = (
-                self.metrics.get("cache_hits", 0) + 1
-            ) / self.metrics["request_count
-```
-
-### 2. Quality Tracking Pattern
-```python
-class QualityTrackingPattern:
-    """Отслеживание качества итеративного улучшения"""
+        self.stages: List[StageInterface] = []
+        self.error_handlers: Dict[str, ErrorHandler] = {}
+        self.middleware: List[Middleware] = []
     
-    def __init__(self):
-        self.iteration_history = []
-        self.convergence_metrics = {}
-        
-    async def track_iteration(
-        self,
-        iteration_number: int,
-        quality_metrics: QualityMetrics,
-        improvements_made: List[str]
-    ):
-        
-        iteration_record = {
-            "iteration": iteration_number,
-            "timestamp": datetime.utcnow().isoformat(),
-            "quality_metrics": quality_metrics.to_dict(),
-            "improvements": improvements_made
-        }
-        
-        self.iteration_history.append(iteration_record)
-        
-        # Анализ сходимости
-        if len(self.iteration_history) > 1:
-            convergence_analysis = self.analyze_convergence_trend()
-            self.convergence_metrics[iteration_number] = convergence_analysis
+    def add_stage(self, stage: StageInterface, name: str):
+        """Add processing stage to pipeline"""
+        self.stages.append(stage)
+        self.error_handlers[name] = DefaultErrorHandler()
     
-    def analyze_convergence_trend(self) -> Dict[str
+    def add_middleware(self, middleware: Middleware):
+        """Add middleware to pipeline"""
+        self.middleware.append(middleware)
+    
+    async def execute_pipeline(self, input_data: Any, context: PipelineContext) -> PipelineResult:
+        """Execute complete pipeline with middleware and error handling"""
+        
+        current_data = input_data
+        
+        try:
+            # 🔹 Pre-processing Middleware
+            for middleware in self.middleware:
+                current_data = await middleware.before_pipeline(current_data, context)
+            
+            # 🔹 Stage-by-Stage Processing
+            stage_results = {}
+            
+            for i, stage in enumerate(self.stages):
+                stage_name = f"stage_{i}"
+                
+                try:
+                    # Pre-stage middleware
+                    for middleware in self.middleware:
+                        current_data = await middleware.before_stage(
+                            current_data, context, stage_name
+                        )
+                    
+                    # Stage execution
+                    stage_result = await stage.execute(current_data, context)
+                    stage_results[stage_name] = stage_result
+                    
+                    # Validate stage output
+                    if not await self._validate_stage_output(stage_result, stage):
+                        raise StageValidationError(f"Stage {stage_name} output validation failed")
+                    
+                    current_data = stage_result.data
+                    
+                    # Post-stage middleware
+                    for middleware in self.middleware:
+                        current_data = await middleware.after_stage(
+                            current_data, context, stage_name
+                        )
+                
+                except Exception as e:
+                    #

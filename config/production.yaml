@@ -1,0 +1,298 @@
+# 🚀 MTS MultAgent - Production Environment Configuration
+# Overrides for production environment
+
+# Environment identification
+system:
+  environment: "production"
+  debug: false
+  log_level: "INFO"
+
+# Production scheduler settings
+scheduler:
+  enabled: true
+  
+  # Production schedule (daily at 19:00 Moscow time)
+  daily_schedule:
+    jira_analysis: "19:00"
+    meeting_analysis: "19:05"
+    daily_summary: "19:30"
+    
+  weekly_schedule:
+    weekly_report: "19:00"  # Friday
+    
+  # Robust health checks
+  health_check:
+    interval_seconds: 300
+    timeout_seconds: 45
+
+# Production agent settings
+agents:
+  jira_analyzer:
+    projects: ["CSI", "PROJ", "DEV"]
+    api_timeout: 60
+    max_retries: 3
+    retry_delay: 10
+    batch_size: 100
+    
+  meeting_analyzer:
+    supported_formats: [".txt", ".docx", ".pdf"]
+    max_file_size_mb: 50
+    processing_timeout: 600
+    
+  daily_summary:
+    output_formats: ["txt", "json"]
+    template_path: "/templates/daily_summary"
+    
+  weekly_reporter:
+    confluence_enabled: true
+    output_formats: ["pdf", "txt", "confluence"]
+    template_path: "/templates/weekly_report"
+
+# Production storage paths
+storage:
+  json_store:
+    base_path: "/data/memory/json"
+    backup_path: "/data/memory/backups"
+    max_file_size_mb: 200
+    retention_days: 365
+    enable_compression: true
+    atomic_writes: true
+    
+  index_manager:
+    index_path: "/data/memory/index"
+    cache_size_mb: 100
+    rebuild_interval_hours: 24
+    enable_full_text_search: true
+    max_results_cache: 2000
+    parallel_indexing: true
+    
+  reports:
+    base_path: "/data/reports"
+    human_readable_path: "/data/reports/human"
+    json_path: "/data/reports/json"
+    archive_path: "/data/reports/archive"
+
+# Production external services
+external_services:
+  jira:
+    base_url: "${JIRA_BASE_URL}"
+    username: "${JIRA_USERNAME}"
+    api_token: "${JIRA_API_TOKEN}"
+    timeout: 60
+    max_retries: 3
+    
+  openai:
+    model: "${OPENAI_MODEL:gpt-4}"
+    api_key: "${OPENAI_API_KEY}"
+    max_tokens: 4000
+    temperature: 0.3
+    timeout: 120
+    max_retries: 3
+    
+  confluence:
+    base_url: "${CONFLUENCE_BASE_URL}"
+    username: "${CONFLUENCE_USERNAME}"
+    api_token: "${CONFLUENCE_API_TOKEN}"
+    space_key: "${CONFLUENCE_SPACE_KEY}"
+    parent_page_id: "${CONFLUENCE_PARENT_PAGE_ID}"
+
+# Production notifications
+notifications:
+  enabled: true
+  
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+    smtp_server: "${SMTP_SERVER}"
+    smtp_port: ${SMTP_PORT:587}
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    from_address: "${FROM_ADDRESS:alerts@company.com}"
+    to_addresses: ${TO_ADDRESSES}
+    
+  slack:
+    enabled: ${SLACK_ENABLED:true}
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "${SLACK_CHANNEL:#alerts}"
+    
+  thresholds:
+    error_rate: 0.02  # 2% (stricter for prod)
+    response_time: 60
+    disk_usage: 0.80
+    memory_usage: 0.85
+
+# Production performance settings
+performance:
+  max_workers: ${MAX_WORKERS:8}
+  thread_pool_size: ${THREAD_POOL_SIZE:16}
+  
+  cache_ttl_seconds: 3600
+  max_cache_size_mb: 200
+  
+  rate_limit:
+    enabled: true
+    requests_per_minute: 30  # Conservative rate limiting
+    burst_size: 5
+    
+  memory:
+    max_usage_mb: 1024
+    gc_threshold: 0.8
+    cleanup_interval_seconds: 300
+
+# Production security
+security:
+  authentication:
+    enabled: true
+    method: "token"
+    
+  encryption:
+    enabled: true
+    algorithm: "AES-256-GCM"
+    key_path: "/data/security/encryption.key"
+    
+  access_control:
+    enabled: true
+    default_permissions: "read"
+    
+  audit:
+    enabled: true
+    log_path: "/data/audit/audit.log"
+    rotation_days: 90
+
+# Production monitoring
+monitoring:
+  metrics:
+    enabled: true
+    collection_interval_seconds: 60
+    retention_days: 90
+    storage_path: "/data/metrics"
+    
+  health_checks:
+    enabled: true
+    endpoints:
+      - "/health"
+      - "/health/detailed"
+      - "/metrics"
+    interval_seconds: 60
+    
+  performance:
+    enabled: true
+    slow_query_threshold_ms: 2000
+    memory_threshold_mb: 800
+    disk_threshold_percent: 80
+
+# Production-specific settings
+development:
+  debug_mode: false
+  verbose_logging: false
+  test_mode: false
+  mock_external_services: false
+  
+  hot_reload:
+    enabled: false  # Disabled in production
+    watch_paths: []
+    exclude_patterns: []
+
+# Production logging
+logging:
+  formatters:
+    standard:
+      format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+      
+    detailed:
+      format: "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s"
+      
+    json:
+      format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "file": "%(filename)s", "line": %(lineno)d}'
+      
+  handlers:
+    console:
+      level: WARNING  # Only warnings and errors to console
+      formatter: standard
+      
+    file:
+      level: INFO
+      formatter: json  # JSON format for log aggregation
+      filename: "/data/logs/application.log"
+      maxBytes: 52428800  # 50MB
+      backupCount: 10
+      
+    error_file:
+      level: ERROR
+      formatter: json
+      filename: "/data/logs/error.log"
+      maxBytes: 52428800  # 50MB
+      backupCount: 10
+      
+    audit_file:
+      class: logging.handlers.RotatingFileHandler
+      level: INFO
+      formatter: json
+      filename: "/data/logs/audit.log"
+      maxBytes: 52428800  # 50MB
+      backupCount: 20
+      
+  loggers:
+    "":
+      level: INFO
+      handlers: [file, error_file]
+      propagate: false
+      
+    "src":
+      level: INFO
+      handlers: [file]
+      propagate: false
+      
+    "src.agents":
+      level: INFO
+      handlers: [file]
+      propagate: false
+      
+    "security":
+      level: INFO
+      handlers: [audit_file, file]
+      propagate: false
+      
+    "error":
+      level: ERROR
+      handlers: [console, error_file]
+      propagate: false
+
+# Production startup
+startup:
+  startup_health_checks:
+    enabled: true
+    timeout_seconds: 60
+    components:
+      - "storage"
+      - "external_services"
+      - "memory"
+      - "security"
+      
+  shutdown:
+    timeout_seconds: 120
+    wait_for_jobs: true
+    force_cleanup: false
+
+# Production-specific additions
+production:
+  # Production monitoring
+  monitoring:
+    enabled: true
+    metrics_endpoint: "/metrics"
+    health_endpoint: "/health"
+    
+  # Production backup settings
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    compression: true
+    encryption: true
+    
+  # Production maintenance
+  maintenance:
+    enabled: true
+    window_start: "02:00"
+    window_end: "04:00"
+    cleanup_enabled: true
+    index_rebuild_enabled: true

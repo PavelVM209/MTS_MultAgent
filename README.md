@@ -1,450 +1,552 @@
-# MTS_MultAgent - LLM-Driven Intelligence System
+# MTS MultAgent - Scheduled Multi-Agent System
 
-🚀 **Интеллектуальная многоагентная система** для автоматизации анализа корпоративных данных с **100% LLM-архитектурой** и **итеративным самоулучшением**.
+**Automated Continuous Project & Employee Monitoring System**
 
-## 🎯 Обзор
-
-Система автоматически обрабатывает данные из Jira, Excel файлов и публикует результаты в Confluence через последовательность из **LLM-драйверенных агентов**:
-
-1. **JiraAgent** - интеллектуальный сбор данных с LLM-улучшениями
-2. **ContextAnalyzer** - 100% LLM-driven анализ контента
-3. **ExcelAgent** - LLM-guided извлечение с реальными таблицами
-4. **ComparisonAgent** - интеллектуальное сравнение с предиктивными инсайтами
-5. **ConfluenceAgent** - публикация результатов
-
-## ✨ Ключевые возможности
-
-### 🧠 **Интеллектуальный анализ**
-- ✅ **Zero hardcoded logic** - 100% интеллектуальные решения через LLM
-- ✅ **Итеративное самоулучшение** до качества 85%+
-- ✅ **Адаптивность к любому контексту** и структуре данных
-- ✅ **Предиктивные инсайты** и рекомендации
-
-### 📊 **Реальные результаты**
-- ✅ **Реальные таблицы данных** из Excel (без фейковых отчетов)
-- ✅ **Интеллектуальные выводы** через LLM интерпретацию
-- ✅ **Семантический анализ** контекста и отношений
-- ✅ **Quality metrics** с автоматической оценкой качества
-
-### 🔄 **Автоматическое улучшение**
-- ✅ **Convergence detection** - автоматическая стоп при достижении качества
-- ✅ **Self-improvement loops** - итеративное совершенствование результатов
-- ✅ **Multi-provider LLM support** - OpenAI, Local LLM, Mock
-- ✅ **Intelligent caching** и performance optimization
-
-## Требования
-
-- Python 3.8+ (проверено на 3.8 и выше)
-- Доступ к Jira API с персональным токеном
-- Доступ к Confluence API с персональным токеном
-- Excel файлы с данными для анализа
-
-## Установка
-
-### 1. Клонирование репозитория
-
-```bash
-git clone https://github.com/mts/MTS_MultAgent.git
-cd MTS_MultAgent
-```
-
-### 2. Создание и активация виртуального окружения (ОБЯЗАТЕЛЬНО)
-
-**⚠️ ВАЖНО: Всегда используйте виртуальное окружение для работы с проектом!**
-
-#### Сначала проверьте вашу версию Python:
-```bash
-# Проверка доступных версий Python
-python --version
-python3 --version
-which python
-which python3
-```
-
-#### Создание виртуального окружения:
-```bash
-# Если доступен python как python (версия 3.8+)
-python -m venv venv
-
-# Если доступен только python3
-python3 -m venv venv
-
-# Если у вас несколько версий (например, python3.8, python3.9)
-python3.8 -m venv venv
-python3.9 -m venv venv
-# Выберите доступную версию 3.8+
-
-# Пример для вашей ситуации (Python 3.8):
-/Library/Frameworks/Python.framework/Versions/3.8/bin/python3 -m venv venv
-```
-
-#### Активация окружения:
-```bash
-# Linux/Mac
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-```
-
-#### Проверка активации:
-```bash
-# Должно появиться (venv) в начале строки
-(venv) $ python --version
-(venv) $ which python
-# Должен показывать путь к venv/bin/python
-```
-
-### 3. Установка зависимостей
-
-```bash
-# Убедитесь что виртуальное окружение активно (видите (venv) в начале строки)
-pip install -r requirements.txt
-
-# Проверка установки
-pip list | grep -E "(aiohttp|pydantic|click|structlog)"
-```
-
-### 4. Настройка конфигурации
-
-```bash
-cp .env.example .env
-# Отредактируйте .env с вашими учетными данными
-```
-
-## Конфигурация
-
-Заполните `.env` файл необходимыми переменными:
-
-```bash
-# Jira Configuration
-# For Test Server:
-JIRA_BASE_URL="https://test.jira-clst.mts.ru/rest/scriptrunner/latest/custom"
-# For Production Server:
-# JIRA_BASE_URL="https://jira.mts.ru/"
-JIRA_ACCESS_TOKEN="your-jira-personal-token"
-JIRA_USERNAME="your-email@company.com"
-
-# Confluence Configuration
-# For Test Server:
-CONFLUENCE_BASE_URL="https://test.cnfl-clst.mts.ru/rest/scriptrunner/latest/custom"
-# For Production Server:
-# CONFLUENCE_BASE_URL="https://confluence.mts.ru/"
-CONFLUENCE_ACCESS_TOKEN="your-confluence-personal-token"
-CONFLUENCE_SPACE="PROJECTS"
-ROOT_PAGE_ID_TO_ADD_NEW_PAGES=897438835
-
-# Project Configuration
-PROJECT_NAME="Stroki.Clone.S3.Integration.Api"
-
-# Excel Configuration
-EXCEL_FILE_PATH="data/excel/"
-
-# 🧠 LLM Configuration (NEW!)
-OPENAI_API_KEY="your-openai-api-key"
-OPENAI_MODEL="gpt-4-turbo-preview"
-OPENAI_TEMPERATURE=0.1
-OPENAI_MAX_TOKENS=4000
-
-# 🔄 Iterative Improvement Configuration
-MAX_ITERATIONS=5
-QUALITY_THRESHOLD=85.0
-CONVERGENCE_MIN_IMPROVEMENT=5.0
-
-# 🚀 Performance & Caching
-CACHE_ENABLED=true
-CACHE_TTL=3600
-MAX_CONCURRENT_LLM_REQUESTS=3
-
-# 🔧 LLM Features Configuration
-JIRA_ENABLE_LLM_ENHANCEMENTS=true
-CONTEXT_MAX_ITERATIONS=5
-EXCEL_QUALITY_THRESHOLD=85.0
-COMPARISON_MAX_ITERATIONS=5
-```
-
-## 🧠 LLM Архитектура
-
-### **Phase 1 & 2 Completion Status**: ✅ **100% ЗАВЕРШЕНЫ**
-
-#### **🏗️ LLM Foundation (Phase 1)**
-- ✅ **LLMClient** - Multi-provider поддержка (OpenAI, Local, Mock)
-- ✅ **QualityMetrics** - Комплексная система оценки качества
-- ✅ **IterativeEngine** - Движок итеративного улучшения
-- ✅ **Enhanced Models** - LLM-ориентированные модели данных
-
-#### **🤖 Agent Redesign (Phase 2)**
-- ✅ **ContextAnalyzer** - 100% LLM-driven, zero hardcoded logic
-- ✅ **ExcelAgent** - LLM-guided анализ с real table validation
-- ✅ **ComparisonAgent** - Новый intelligent agent с predictive insights
-- ✅ **JiraAgent** - LLM enhancements при сохранении стабильности
-
-### **Ключевые достижения:**
-- 🎯 **Zero Hardcoded Logic**: 100% интеллектуальные решения через LLM
-- 📊 **Real Results**: Обязательные реальные таблицы данных
-- 🔄 **Iterative Improvement**: Автоулучшение до 85%+ качества
-- 🧠 **Semantic Intelligence**: Глубокое понимание контекста
-
-## Использование
-
-### CLI интерфейс
-
-#### Базовый анализ проекта
-
-```bash
-python -m src.cli.main --task "Проанализировать проект PROJECT_NAME"
-```
-
-#### Анализ с параметрами
-
-```bash
-python -m src.cli.main \
-  --task "Анализ проекта по метрикам" \
-  --project-key "PROJ" \
-  --keywords ["metric", "performance", "deadline"] \
-  --output-format "table"
-```
-
-#### Сводка совещаний
-
-```bash
-python -m src.cli.main \
-  --task "Сводка совещаний за неделю" \
-  --date-from "2024-01-01" \
-  --date-to "2024-01-07"
-```
-
-### Программное использование
-
-```python
-import asyncio
-from src.core.coordinator import Coordinator
-from src.core.config import initialize_config
-
-async def main():
-    # Инициализация конфигурации
-    config_manager = initialize_config()
-    
-    # Создание координатора
-    coordinator = Coordinator(config_manager.config)
-    
-    # Выполнение анализа
-    result = await coordinator.execute_workflow(
-        "Проанализировать проект в ручном режиме",
-        project_key="PROJECT",
-        keywords=["deadline", "budget", "team"]
-    )
-    
-    if result.success:
-        print(f"Анализ завершен: {result.data['confluence_url']}")
-    else:
-        print(f"Ошибка: {result.error}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-## Архитектура
-
-```
-MTS_MultAgent/
-├── src/
-│   ├── agents/          # Реализация агентов
-│   │   ├── jira_agent.py
-│   │   ├── context_analyzer.py
-│   │   ├── excel_agent.py
-│   │   ├── confluence_agent.py
-│   │   └── comparison_agent.py
-│   ├── core/           # Основные компоненты
-│   │   ├── base_agent.py
-│   │   ├── config.py
-│   │   ├── models.py
-│   │   └── coordinator.py
-│   ├── cli/            # CLI интерфейс
-│   │   └── main.py
-│   └── api/            # Web API (Phase 2)
-│       └── main.py
-├── tests/              # Тесты
-├── config/             # Конфигурация
-├── memory-bank/        # Банк памяти проекта
-└── data/               # Данные (Excel файлы)
-```
-
-## 🔄 Рабочий процесс (LLM-Enhanced)
-
-1. **📥 Получение задачи** - Система получает описание задачи или проекта
-2. **🧠 LL-Enhanced Сбор данных** - Интеллектуальный сбор из Jira и Excel
-3. **🎯 Итеративный анализ** - LLM-driven анализ с автоулучшением до 85%+
-4. **⚖️ Умное сравнение** - Сравнение с предиктивными инсайтами
-5. **📊 Публикация** - Создание отчета с реальными таблицами и выводами
-
-### **Ключевые преимущества нового workflow:**
-- 🔄 **Self-Improving**: Каждый цикл улучшает качество результатов
-- 🧠 **Context-Aware**: Понимание семантики и бизнес-контекста
-- 📊 **Real Data**: Только реальные таблицы и конкретные данные
-- ⚡ **Convergence**: Автоматическая остановка при достижении качества
-
-## Тестирование
-
-```bash
-# Запуск всех тестов
-pytest
-
-# Запуск с покрытием
-pytest --cov=src
-
-# Запуск конкретных тестов
-pytest tests/test_jira_agent.py
-pytest tests/test_coordinator.py
-```
-
-## Разработка
-
-### Добавление нового агента
-
-1. Создайте класс наследующий `BaseAgent`
-2. Реализуйте методы `execute()` и `validate()`
-3. Добавьте агент в координатор
-
-```python
-from src.core.base_agent import BaseAgent, AgentResult
-
-class CustomAgent(BaseAgent):
-    async def validate(self, task: Dict[str, Any]) -> bool:
-        return "required_field" in task
-    
-    async def execute(self, task: Dict[str, Any]) -> AgentResult:
-        # Ваша логика
-        return AgentResult(
-            success=True,
-            data={"result": "custom_result"},
-            agent_name=self.name
-        )
-```
-
-### Форматирование кода
-
-```bash
-# Форматирование
-black src/ tests/
-
-# Проверка типов
-mypy src/
-
-# Линтинг
-flake8 src/
-```
-
-## Структура банка памяти
-
-Проект использует систему "банка памяти" для документации:
-
-- `memory-bank/projectbrief.md` - Основной краткий проект
-- `memory-bank/productContext.md` - Бизнес-контекст и проблемы
-- `memory-bank/systemPatterns.md` - Архитектура и паттерны
-- `memory-bank/techContext.md` - Технологический стек
-- `memory-bank/agentsSpec.md` - Спецификация агентов
-- `memory-bank/activeContext.md` - Текущий фокус работы
-- `memory-bank/progress.md` - Отслеживание прогресса
-
-## Веб-интерфейс (Phase 2)
-
-На втором этапе будет доступен веб-интерфейс:
-
-```bash
-# Запуск веб-сервера
-uvicorn src.api.main:app --reload --port 8000
-
-# Доступ к интерфейсу
-open http://localhost:8000
-```
-
-## Мониторинг и логирование
-
-```bash
-# Просмотр логов
-tail -f logs/mts_agent.log
-
-# Структурированные логи
-python -c "
-import structlog
-logger = structlog.get_logger()
-logger.info('Test message', project='demo', status='running')
-"
-```
-
-## 🎉 **Результаты проекта**
-
-### **✅ Phase 1 & 2 COMPLETION**
-
-#### **🏗️ Phase 1: LLM Foundation (100% Complete)**
-- ✅ **LLMClient** - Multi-provider поддержка (OpenAI, Local LLM, Mock)
-- ✅ **QualityMetrics** - Comprehensive scoring (relevance, completeness, accuracy, clarity, actionability)
-- ✅ **IterativeEngine** - Self-improvement с convergence detection
-- ✅ **Enhanced Models** - LLM-oriented data structures
-
-#### **🤖 Phase 2: Agent Redesign (100% Complete)**
-- ✅ **ContextAnalyzer** - 100% LLM-driven, zero hardcoded logic eliminated
-- ✅ **ExcelAgent** - LLM-guided с обязательной real table validation
-- ✅ **ComparisonAgent** - Новый intelligent agent с predictive insights
-- ✅ **JiraAgent** - LLM enhancements при сохранении стабильной основы
-
-### **🚀 Ключевые достижения**
-
-#### **Zero Hardcoded Logic Achievement:**
-- ❌ **Eliminated**: ВСЕ hardcoded паттерны и маппинги
-- ✅ **Achieved**: 100% интеллектуальные решения через LLM
-- 🧠 **Result**: Адаптивность к любому контекту и структуре данных
-
-#### **Real Results Guarantee:**
-- 📊 **Real Tables**: Обязательные реальные таблицы данных из Excel
-- 🧠 **Intelligent Insights**: LLM-generated анализ вместо общих фраз
-- ⚖️ **Concrete Comparisons**: Specific comparison data с метриками
-- 🎯 **Actionable Recommendations**: Практические рекомендации
-
-#### **Iterative Intelligence:**
-- 🔄 **Self-Improvement**: Автоматическое улучшение до 85%+ качества
-- ⚡ **Convergence Detection**: Автоматическая остановка при достижении целей
-- 📈 **Quality Metrics**: Relevance, Completeness, Accuracy, Clarity, Actionability
-- 🎯 **Adaptive Thresholds**: Intelligent quality assessment
-
-### **📊 Технические метрики**
-
-#### **Architecture Metrics:**
-- **4 агента** полностью переработаны под LLM-архитектуру
-- **100% elimination** hardcoded логики
-- **85%+ quality threshold** achieved через iterative improvement
-- **Multi-provider LLM support** реализован
-- **Real data validation** обязательна для всех результатов
-
-#### **Performance Metrics:**
-- **Convergence detection** оптимальное количество итераций
-- **Caching system** для LLM запросов
-- **Async processing** для высокой производительности
-- **Error resilience** с fallback стратегиями
-
-### **🎯 Business Value**
-
-#### **Immediate Impact:**
-- 📊 **Real Reports**: Только реальные данные и таблицы
-- 🧠 **Intelligent Analysis**: Глубокое понимание бизнес-контекста
-- ⚡ **Automated Insights**: Самостоятельное генерирование выводов
-- 🔄 **Continuous Improvement**: Система учится и улучшается
-
-#### **Long-term Value:**
-- 🚀 **Scalability**: Работа с любыми Excel файлами и проектами
-- 🧠 **Adaptability**: Понимание любого бизнес-контекста
-- 🎯 **Reliability**: Стабильные результаты с гарантией качества
-- 💡 **Innovation**: Foundation для будущих AI-функций
+🤖 **Phase 3: Scheduled Architecture** | 🕒 **Daily/Weekly Automated Workflows** | 📊 **Employee Analytics & Reporting**
 
 ---
 
-## Устранение проблем
+## 🎯 **System Overview**
 
-### Частые проблемы
+MTS MultAgent - это интеллектуальная система непрерывного мониторинга проектов и сотрудников, которая автоматически анализирует данные из Jira, протоколы совещаний и репозитории кода, генерируя ежедневные и еженедельные отчеты с глубоким анализом производительности.
 
-1. **Ошибка аутентификации**
-   - Проверьте токены в `.env`
-   - Убедитесь что токены имеют необходимые права
+### **🔄 Key Transformation**
+- **❌ Legacy:** Manual one-time analysis → **✅ New:** Automated continuous monitoring
+- **❌ Legacy:** Ad-hoc reports → **✅ New:** Scheduled daily/weekly analytics  
+- **❌ Legacy:** Simple task tracking → **✅ New:** Comprehensive employee insights
+- **❌ Legacy:** Manual reporting → **✅ New:** Auto-published Confluence pages
 
-2. **Timeout ошиб
+---
+
+## 🏗️ **Architecture Overview**
+
+### **Scheduled Agent System**
+```
+🕒 APScheduler (Master Timer)
+    ↓
+🤖 OrchestratorAgent (Workflow Coordinator)
+    ├── 📊 DailyJiraAnalyzer (19:00) → JSON Memory
+    ├── 📄 DailyMeetingAnalyzer (19:00) → JSON Memory  
+    ├── 📋 DailySummaryAgent (19:30) → TXT Report
+    └── 📈 WeeklyReporter (Friday 19:00) → Confluence + TXT
+        ↓
+💾 JSON Memory Store + Human Reports
+```
+
+### **Core Components**
+- **🤖 5 Specialized Agents:** Jira, Meeting, Summary, Weekly, Orchestrator
+- **⏰ Scheduled Execution:** Daily 19:00, Friday 19:00 (UTC+3)
+- **💾 JSON-First Storage:** Persistent state management
+- **📈 LLM-Driven Analysis:** Intelligent insights and quality control
+- **🔄 Quality Control:** Auto-retry with 90%+ quality threshold
+
+---
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
+- Python 3.11+
+- OpenAI API key
+- Jira API access
+- Confluence API access
+
+### **Installation**
+
+```bash
+# Clone repository
+git clone https://github.com/PavelVM209/MTS_MultAgent.git
+cd MTS_MultAgent
+
+# Create virtual environment
+python -m venv venv_py311
+source venv_py311/bin/activate  # On Windows: venv_py311\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Setup configuration
+cp .env.example .env
+# Edit .env with your API keys and settings
+
+# Initialize data directories
+mkdir -p data/memory/json
+mkdir -p data/reports/human
+mkdir -p data/meetings
+```
+
+### **Configuration**
+
+Edit `.env` file:
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY="your-openai-api-key"
+OPENAI_MODEL="gpt-4-turbo-preview"
+OPENAI_TEMPERATURE=0.1
+
+# Jira Configuration
+JIRA_URL="https://your-company.atlassian.net"
+JIRA_USERNAME="your-jira-email"
+JIRA_API_TOKEN="your-jira-token"
+JIRA_PROJECT_KEYS="CSI,PROJ,DEV"
+
+# Confluence Configuration  
+CONFLUENCE_URL="https://your-company.atlassian.net/wiki"
+CONFLUENCE_USERNAME="your-confluence-email"
+CONFLUENCE_API_TOKEN="your-confluence-token"
+CONFLUENCE_SPACE_KEY="PROJECTS"
+CONFLUENCE_PARENT_PAGE_ID="897438835"
+
+# Scheduler Configuration
+SCHEDULER_TIMEZONE="Europe/Moscow"
+DAILY_JOBS_TIME="19:00"
+WEEKLY_REPORT_DAY="friday"
+WEEKLY_REPORT_TIME="19:00"
+
+# Data Paths
+MEMORY_STORAGE_PATH="/data/memory/json"
+REPORTS_OUTPUT_DIR="/data/reports/human"
+MEETING_PROTOCOLS_PATH="/data/meetings"
+
+# Quality Control
+QUALITY_THRESHOLD="90.0"
+MAX_RETRY_ATTEMPTS="3"
+ADMIN_EMAIL="admin@company.com"
+```
+
+### **Running the System**
+
+```bash
+# Start scheduled system
+python -m src.cli.main --mode scheduled
+
+# Run manual daily workflow
+python -m src.cli.main --mode daily
+
+# Run manual weekly report
+python -m src.cli.main --mode weekly
+
+# System health check
+python -m src.cli.main --mode health-check
+```
+
+---
+
+## 📊 **Features & Capabilities**
+
+### **🔄 Automated Workflows**
+
+#### **Daily Workflow (19:00 UTC+3)**
+```
+19:00 - Parallel Data Collection:
+├── Jira Analysis (multi-project employee tracking)
+└── Meeting Protocol Analysis (multi-format parsing)
+
+19:30 - Consolidation & Reporting:
+├── Employee Metrics Consolidation
+├── Performance Score Calculation  
+├── Human-Readable Report Generation
+└── Quality Validation & Persistence
+```
+
+#### **Weekly Workflow (Friday 19:00 UTC+3)**
+```
+19:00 - Comprehensive Analysis:
+├── 7-Day Data Aggregation
+├── Trend Analysis & Insights
+├── Employee Performance Review
+├── Project Velocity Analysis
+├── Confluence Publication
+└── Local Report Backup
+```
+
+### **📈 Employee Analytics**
+
+#### **Comprehensive Metrics**
+- **Task Tracking:** Total, in progress, completed per employee
+- **Activity Monitoring:** Status changes, git commits, meeting participation
+- **Performance Scoring:** 0-10 scale with trend analysis
+- **Deadline Tracking:** Performance against timelines
+- **Historical Trends:** 365-day retention with pattern analysis
+
+#### **Smart Insights**
+- **Performance Patterns:** Identification of high/low performers
+- **Blocking Issues:** Automatic detection and escalation
+- **Predictive Indicators:** Early warning signs for project risks
+- **Team Dynamics:** Collaboration and participation metrics
+
+### **📋 Multi-Format Support**
+
+#### **Input Sources**
+- **Jira API:** Multi-project task and issue tracking
+- **Git API:** Commit integration and code activity
+- **File System:** Meeting protocols (TXT, PDF, DOCX)
+- **Historical Data:** 365-day trend analysis
+
+#### **Output Formats**
+- **JSON Memory Store:** Machine-readable persistent data
+- **Human-Readable TXT:** Daily and weekly reports for stakeholders
+- **Confluence Pages:** Published weekly analytics for organization
+- **Admin Notifications:** Email alerts for system issues
+
+---
+
+## 🎯 **Business Value**
+
+### **📊 Continuous Visibility**
+- **Real-time Project Status:** Always current project health monitoring
+- **Employee Performance:** Objective data-driven performance analytics
+- **Trend Identification:** Early detection of positive/negative patterns
+- **Risk Prevention:** Proactive identification of blocking issues
+
+### **🤖 Automation Benefits**
+- **Zero Manual Effort:** Fully automated data collection and analysis
+- **Consistent Quality:** LLM-validated reports with 90%+ quality threshold
+- **Timely Insights:** Daily reports at 19:30, weekly comprehensive analysis
+- **Scalable Coverage:** Monitor multiple projects and employees simultaneously
+
+### **📈 Data-Driven Decisions**
+- **Performance Management:** Objective metrics for employee evaluation
+- **Resource Allocation:** Data-driven team and project assignments
+- **Process Optimization:** Identification of bottlenecks and inefficiencies
+- **Strategic Planning:** Long-term trend analysis for organizational insights
+
+---
+
+## 🏗️ **Technical Architecture**
+
+### **🤖 Agent System**
+
+#### **DailyJiraAnalyzer**
+```python
+# Multi-project Jira analysis with employee tracking
+- Project status across CSI, PROJ, DEV
+- Employee task assignment and progress
+- Status change monitoring
+- Git commit integration
+- Historical trend analysis
+```
+
+#### **DailyMeetingAnalyzer**  
+```python
+# Multi-format meeting protocol parsing
+- TXT, PDF, DOCX file processing
+- Employee action extraction
+- Meeting participation tracking
+- Decision and commitment monitoring
+- Participation score calculation
+```
+
+#### **DailySummaryAgent**
+```python
+# Data consolidation and human report generation
+- JSON data consolidation
+- Employee performance scoring
+- Trend analysis and insights
+- Human-readable TXT reports
+- Quality validation
+```
+
+#### **WeeklyReporter**
+```python
+# Comprehensive weekly analytics
+- 7-day data aggregation
+- Trend and pattern analysis
+- Employee performance insights
+- Confluence publication
+- Local backup generation
+```
+
+#### **OrchestratorAgent**
+```python
+# Master workflow coordination
+- Schedule management
+- Agent coordination
+- Quality control oversight
+- Error handling and recovery
+- Admin notifications
+```
+
+### **💾 Data Architecture**
+
+#### **JSON Memory Store**
+```
+/data/memory/json/
+├── daily_jira_data_2026-03-25.json
+├── daily_meeting_data_2026-03-25.json
+├── daily_summary_data_2026-03-25.json
+├── weekly_summary_data_2026-03-31.json
+├── employee_metrics_2026-03-25.json
+├── system_state.json
+└── history/ (365-day retention)
+```
+
+#### **Human Reports**
+```
+/data/reports/human/
+├── 2026/03/25/
+│   ├── daily_summary_2026-03-25.txt
+│   └── employees_analysis_2026-03-25.txt
+└── 2026/03/31/
+    └── weekly_summary_2026-03-25_to_2026-03-31.txt
+```
+
+### **🔄 Quality Control**
+
+#### **LLM Validation Pipeline**
+```python
+# Multi-dimensional quality assessment
+- Completeness Score: Data coverage analysis
+- Accuracy Score: Data correctness validation  
+- Format Score: JSON schema compliance
+- Overall Quality: Weighted composite score (90%+ threshold)
+- Auto-Retry Logic: 3 attempts with exponential backoff
+```
+
+---
+
+## 📊 **Monitoring & observability**
+
+### **🔍 Health Monitoring**
+- **System Health:** Hourly comprehensive health checks
+- **Job Status:** Real-time job execution monitoring
+- **Quality Metrics:** Continuous report quality assessment
+- **Resource Usage:** CPU, memory, disk space monitoring
+- **External Services:** Jira, Confluence, Git API availability
+
+### **📈 Performance Metrics**
+- **Execution Success Rate:** 99.9% target for scheduled jobs
+- **Report Quality:** 90%+ average LLM validation score
+- **Processing Time:** <5 minutes for daily workflows
+- **Data Retention:** 365-day historical data availability
+- **API Response:** <2 seconds average external API latency
+
+### **🚨 Alerting System**
+- **Job Failures:** Immediate email notifications
+- **Quality Issues:** Auto-retry with admin escalation
+- **System Health:** Critical alert on service degradation
+- **External Services:** Notifications for API unavailability
+- **Resource Limits:** Warnings for disk space/memory usage
+
+---
+
+## 🧪 **Testing**
+
+### **Unit Tests**
+```bash
+# Run all unit tests
+python -m pytest tests/unit/
+
+# Run specific agent tests
+python -m pytest tests/unit/test_daily_jira_analyzer.py
+python -m pytest tests/unit/test_daily_meeting_analyzer.py
+```
+
+### **Integration Tests**
+```bash
+# Run end-to-end workflow tests
+python -m pytest tests/integration/test_scheduled_workflows.py
+
+# Run data flow tests
+python -m pytest tests/integration/test_data_pipeline.py
+```
+
+### **Performance Tests**
+```bash
+# Run performance benchmarks
+python -m pytest tests/performance/test_scheduler_performance.py
+
+# Load testing
+python tests/load/test_concurrent_workflows.py
+```
+
+---
+
+## 📚 **Documentation**
+
+### **Memory Bank**
+- **[activeContext.md](memory-bank/activeContext.md)** - Current development focus
+- **[progress.md](memory-bank/progress.md)** - Project progress tracking
+- **[agentsSpec.md](memory-bank/agentsSpec.md)** - Detailed agent specifications
+- **[schedulerSpec.md](memory-bank/schedulerSpec.md)** - Scheduler architecture
+- **[dataFlowDesign.md](memory-bank/dataFlowDesign.md)** - Data flow specifications
+
+### **Technical Documentation**
+- **[systemPatterns.md](memory-bank/systemPatterns.md)** - Design patterns and conventions
+- **[techContext.md](memory-bank/techContext.md)** - Technical architecture context
+- **[productContext.md](memory-bank/productContext.md)** - Product vision and requirements
+
+---
+
+## 🔧 **Development**
+
+### **Adding New Agents**
+
+```python
+# 1. Create agent class
+class NewAgent(BaseAgent):
+    async def execute(self, task: Dict[str, Any]) -> AgentResult:
+        # Implementation
+        pass
+
+# 2. Add to scheduler
+scheduler.add_job(
+    func=new_agent.execute,
+    trigger="cron",
+    hour=20,
+    minute=0,
+    timezone="Europe/Moscow"
+)
+
+# 3. Update orchestrator
+await orchestrator.register_agent("new_agent", new_agent)
+```
+
+### **Configuration Extensions**
+
+```yaml
+# config/scheduler.yaml - Add new agent config
+agents:
+  new_agent:
+    enabled: true
+    schedule: "20:00"
+    config_param: value
+```
+
+### **Quality Control Extensions**
+
+```python
+# Add custom quality validation
+class CustomQualityController(QualityController):
+    async def custom_validation(self, data: dict) -> float:
+        # Custom validation logic
+        return quality_score
+```
+
+---
+
+## 🚀 **Deployment**
+
+### **Production Setup**
+
+```bash
+# Using Docker
+docker build -t mts-multagent .
+docker run -d --name mts-multagent \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/config:/config \
+  --env-file .env \
+  mts-multagent
+
+# Using Docker Compose
+docker-compose up -d
+```
+
+### **Environment Configuration**
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  mts-multagent:
+    build: .
+    volumes:
+      - ./data:/data
+      - ./config:/config
+    environment:
+      - PYTHONPATH=/app
+      - TZ=Europe/Moscow
+    restart: unless-stopped
+```
+
+### **Monitoring Setup**
+```yaml
+# monitoring/prometheus.yml
+scrape_configs:
+  - job_name: 'mts-multagent'
+    static_configs:
+      - targets: ['localhost:8080']
+```
+
+---
+
+## 🤝 **Contributing**
+
+### **Development Workflow**
+1. Fork repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Make changes and add tests
+4. Run test suite (`python -m pytest`)
+5. Commit changes (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Create Pull Request
+
+### **Code Standards**
+- **Python 3.11+** compliance
+- **Type hints** required for all functions
+- **Async/await** patterns for I/O operations
+- **Error handling** with comprehensive exception management
+- **Documentation** for all public APIs
+- **Testing** minimum 80% code coverage
+
+---
+
+## 📄 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🆘 **Support**
+
+### **Getting Help**
+- **Documentation:** Check memory bank for detailed specs
+- **Issues:** [GitHub Issues](https://github.com/PavelVM209/MTS_MultAgent/issues)
+- **Email:** admin@company.com for production support
+
+### **Troubleshooting**
+
+#### **Common Issues**
+```bash
+# Scheduler not starting
+python -c "from apscheduler.schedulers.asyncio import AsyncIOScheduler; print('APScheduler OK')"
+
+# Memory store permissions
+ls -la /data/memory/json/
+chmod 755 /data/memory/json/
+
+# API connectivity
+curl -H "Authorization: Bearer $JIRA_API_TOKEN" "$JIRA_URL/rest/api/3/myself"
+```
+
+#### **Debug Mode**
+```bash
+# Enable debug logging
+export LOG_LEVEL=DEBUG
+python -m src.cli.main --mode scheduled --debug
+```
+
+---
+
+## 🗺️ **Roadmap**
+
+### **Phase 4 (April 2026)**
+- **Predictive Analytics:** AI-driven trend prediction
+- **Mobile Interface:** Real-time dashboards and alerts
+- **Advanced Integrations:** Slack, email, calendar integration
+- **Multi-tenant Support:** Scalable enterprise architecture
+
+### **Phase 5 (May 2026)**
+- **Machine Learning:** Custom performance prediction models
+- **Voice Interfaces:** Natural language reporting
+- **Blockchain Integration:** Immutable audit trails
+- **Global Deployment:** Multi-region support
+
+---
+
+**🚀 Current Status: Phase 3 Implementation (48% Complete)**  
+
+**📊 Next Milestone: Scheduled Agent Deployment (March 29, 2026)**
+
+---
+
+*Built with ❤️ for intelligent project automation*
