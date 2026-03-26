@@ -214,7 +214,7 @@ class ConfigurationManager:
     
     async def load_config(self) -> Dict[str, Any]:
         """
-        Load and merge configuration from base and environment files.
+        Load and merge configuration from base, environment, and feature-specific files.
         
         Returns:
             Merged configuration dictionary
@@ -236,8 +236,30 @@ class ConfigurationManager:
                     logger.warning(f"Environment config not found: {env_config_path}")
                     self._env_config = {}
                 
+                # Load feature-specific configurations
+                feature_configs = {}
+                feature_config_files = [
+                    'employee_monitoring.yaml',
+                    'production.yaml'
+                ]
+                
+                for config_file in feature_config_files:
+                    config_path = self.config.environment_configs_path / config_file
+                    if config_path.exists():
+                        try:
+                            feature_config = await self._load_yaml_file(config_path)
+                            feature_config_name = config_file.replace('.yaml', '')
+                            feature_configs[feature_config_name] = feature_config
+                            logger.info(f"Loaded feature configuration: {config_file}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load feature config {config_file}: {e}")
+                
                 # Merge configurations
                 self._merged_config = self._merge_configs(self._base_config, self._env_config)
+                
+                # Merge feature configurations
+                for feature_name, feature_config in feature_configs.items():
+                    self._merged_config = self._merge_configs(self._merged_config, feature_config)
                 
                 # Substitute environment variables
                 self._merged_config = self._substitute_env_vars(self._merged_config)
@@ -620,3 +642,8 @@ def is_development() -> bool:
 def is_production() -> bool:
     """Check if running in production environment"""
     return get_section('system.environment') == 'production'
+
+
+def get_employee_monitoring_config() -> Dict[str, Any]:
+    """Get employee monitoring configuration"""
+    return get_section('employee_monitoring', {})

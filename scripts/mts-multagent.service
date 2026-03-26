@@ -1,0 +1,39 @@
+[Unit]
+Description=MTS MultAgent System Service
+Documentation=https://github.com/mts/mts-multagent
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=multagent
+Group=multagent
+WorkingDirectory=/opt/mts-multagent
+Environment=PYTHONPATH=/opt/mts-multagent/src
+EnvironmentFile=/opt/mts-multagent/.env
+ExecStart=/opt/mts-multagent/venv/bin/python -m src.cli.main
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/mts-multagent/logs/service.log
+StandardError=append:/opt/mts-multagent/logs/error.log
+
+# Ограничения ресурсов
+LimitNOFILE=65536
+MemoryLimit=2G
+CPUQuota=80%
+
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/mts-multagent/data /opt/mts-multagent/logs /opt/mts-multagent/temp
+ProtectHome=true
+RemoveIPC=true
+
+# Настройки окружения
+Environment=PYTHONUNBUFFERED=1
+Environment=ENVIRONMENT=production
+
+[Install]
+WantedBy=multi-user.target

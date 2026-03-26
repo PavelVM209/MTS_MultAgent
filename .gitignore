@@ -191,10 +191,6 @@ logs/
 .env.local
 .env.production
 
-# Excel files (if not needed in repo)
-data/excel/*.xlsx
-!data/excel/sample_data.xlsx
-
 # Temporary files
 *.tmp
 *.temp

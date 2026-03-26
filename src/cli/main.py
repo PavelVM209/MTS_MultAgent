@@ -16,7 +16,7 @@ import click
 from dateutil.parser import parse as parse_date
 
 from src.core.config import initialize_config, get_config
-from src.core.models import WorkflowTask, WorkflowResult
+from core.models import WorkflowTask, WorkflowResult
 from src.agents.jira_agent import JiraAgent
 
 import structlog
@@ -96,10 +96,9 @@ def cli(ctx, env_file, debug):
 @click.option('--keywords', '-k', multiple=True, help='Search keywords (can be used multiple times)')
 @click.option('--date-from', help='Start date for filtering (YYYY-MM-DD)')
 @click.option('--date-to', help='End date for filtering (YYYY-MM-DD)')
-@click.option('--excel-files', '-f', multiple=True, help='Excel file paths (can be used multiple times)')
 @click.option('--output', '-o', help='Output file for results (JSON)')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
-def analyze(task, project_key, keywords, date_from, date_to, excel_files, output, verbose):
+def analyze(task, project_key, keywords, date_from, date_to, output, verbose):
     """Analyze project task using multi-agent system."""
     
     async def run_analysis():
@@ -109,16 +108,14 @@ def analyze(task, project_key, keywords, date_from, date_to, excel_files, output
                 description=task,
                 project_key=project_key,
                 keywords=list(keywords) if keywords else [],
-                date_range={"from": date_from, "to": date_to} if date_from or date_to else None,
-                excel_files=list(excel_files) if excel_files else []
+                date_range={"from": date_from, "to": date_to} if date_from or date_to else None
             )
             
             if verbose:
                 click.echo("🚀 Starting analysis...")
                 click.echo(f"📝 Task: {task}")
                 click.echo(f"🔑 Project: {project_key or 'Auto-detect'}")
-                click.echo(f"🔍 Keywords: {workflow_task.keywords}")
-                click.echo(f"📊 Excel files: {len(workflow_task.excel_files)}")
+                click.echo(f" Keywords: {workflow_task.keywords}")
             
             # Execute analysis
             result = await execute_workflow(workflow_task, verbose)
@@ -258,10 +255,6 @@ def config():
     click.echo(f"  Base URL: {cli_instance.config.confluence.base_url}")
     click.echo(f"  Space: {cli_instance.config.confluence.space}")
     click.echo(f"  Root Page ID: {cli_instance.config.confluence.root_page_id}")
-    
-    click.echo("\n📊 Excel Configuration:")
-    click.echo(f"  File Path: {cli_instance.config.excel.file_path}")
-    click.echo(f"  Sheet Name: {cli_instance.config.excel.sheet_name}")
     
     click.echo("\n⚡ Performance Configuration:")
     click.echo(f"  Max Concurrent: {cli_instance.config.performance.max_concurrent_requests}")
@@ -427,7 +420,6 @@ async def _check_all_agents_health():
     
     # TODO: Add health checks for other agents
     click.echo("\n📝 Context Analyzer: Not implemented yet")
-    click.echo("📊 Excel Agent: Not implemented yet")
     click.echo("🔗 Confluence Agent: Not implemented yet")
     click.echo("⚖️ Comparison Agent: Not implemented yet")
 

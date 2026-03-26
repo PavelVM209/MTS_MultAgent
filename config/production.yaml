@@ -1,298 +1,264 @@
-# 🚀 MTS MultAgent - Production Environment Configuration
-# Overrides for production environment
+# Production конфигурация MTS MultAgent System
+# Настройки для production-окружения
 
-# Environment identification
-system:
+# Базовые настройки
+app:
+  name: "MTS MultAgent System"
+  version: "1.0.0"
   environment: "production"
   debug: false
   log_level: "INFO"
 
-# Production scheduler settings
+# Настройки LLM (языковые модели)
+llm:
+  provider: "openai"
+  model: "gpt-4"
+  api_key: "${OPENAI_API_KEY}"
+  max_tokens: 4000
+  temperature: 0.1
+  timeout: 30
+  retry_attempts: 3
+  retry_delay: 1
+
+# Настройки JIRA
+jira:
+  url: "${JIRA_URL}"
+  username: "${JIRA_USERNAME}"
+  api_token: "${JIRA_API_TOKEN}"
+  timeout: 30
+  retry_attempts: 3
+  batch_size: 50
+  project_keys: ["PROJ", "DEV", "QA"]
+
+# Настройки Confluence
+confluence:
+  url: "${CONFLUENCE_URL}"
+  username: "${CONFLUENCE_USERNAME}"
+  api_token: "${CONFLUENCE_API_TOKEN}"
+  timeout: 30
+  retry_attempts: 3
+  space_key: "DOC"
+
+# Настройки базы данных
+database:
+  type: "json"
+  path: "./data"
+  backup_interval: 3600  # 1 час
+  max_file_size: "100MB"
+  compression: true
+
+# Настройки оркестрации
+orchestrator:
+  workflow:
+    max_parallel_agents: 4
+    agent_timeout: 300  # 5 минут
+    enable_data_sharing: true
+    fail_fast: false
+  monitoring:
+    health_check_interval: 60  # 1 минута
+    metrics_collection: true
+    alert_threshold: 0.8
+
+# Настройки планировщика
 scheduler:
   enabled: true
-  
-  # Production schedule (daily at 19:00 Moscow time)
-  daily_schedule:
-    jira_analysis: "19:00"
-    meeting_analysis: "19:05"
-    daily_summary: "19:30"
-    
-  weekly_schedule:
-    weekly_report: "19:00"  # Friday
-    
-  # Robust health checks
-  health_check:
-    interval_seconds: 300
-    timeout_seconds: 45
+  timezone: "Europe/Moscow"
+  jobs:
+    daily_jira_analysis:
+      enabled: true
+      cron: "0 8 * * 1-5"  # Будни в 8:00
+      agent: "daily_jira_analyzer"
+    daily_meeting_analysis:
+      enabled: true
+      cron: "0 18 * * 1-5"  # Будни в 18:00
+      agent: "daily_meeting_analyzer"
+    health_check:
+      enabled: true
+      cron: "*/10 * * * *"  # Каждые 10 минут
+      agent: "health_monitor"
 
-# Production agent settings
-agents:
-  jira_analyzer:
-    projects: ["CSI", "PROJ", "DEV"]
-    api_timeout: 60
-    max_retries: 3
-    retry_delay: 10
-    batch_size: 100
-    
-  meeting_analyzer:
-    supported_formats: [".txt", ".docx", ".pdf"]
-    max_file_size_mb: 50
-    processing_timeout: 600
-    
-  daily_summary:
-    output_formats: ["txt", "json"]
-    template_path: "/templates/daily_summary"
-    
-  weekly_reporter:
-    confluence_enabled: true
-    output_formats: ["pdf", "txt", "confluence"]
-    template_path: "/templates/weekly_report"
+# Настройки логирования
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    file:
+      enabled: true
+      path: "./logs/app.log"
+      max_size: "50MB"
+      backup_count: 5
+      rotation: "daily"
+    console:
+      enabled: true
+      level: "INFO"
+    error_file:
+      enabled: true
+      path: "./logs/error.log"
+      level: "ERROR"
+      max_size: "20MB"
+      backup_count: 10
+    performance_file:
+      enabled: true
+      path: "./logs/performance.log"
+      level: "INFO"
+      format: "%(asctime)s - %(message)s"
 
-# Production storage paths
-storage:
-  json_store:
-    base_path: "/data/memory/json"
-    backup_path: "/data/memory/backups"
-    max_file_size_mb: 200
-    retention_days: 365
-    enable_compression: true
-    atomic_writes: true
-    
-  index_manager:
-    index_path: "/data/memory/index"
-    cache_size_mb: 100
-    rebuild_interval_hours: 24
-    enable_full_text_search: true
-    max_results_cache: 2000
-    parallel_indexing: true
-    
-  reports:
-    base_path: "/data/reports"
-    human_readable_path: "/data/reports/human"
-    json_path: "/data/reports/json"
-    archive_path: "/data/reports/archive"
-
-# Production external services
-external_services:
-  jira:
-    base_url: "${JIRA_BASE_URL}"
-    username: "${JIRA_USERNAME}"
-    api_token: "${JIRA_API_TOKEN}"
-    timeout: 60
-    max_retries: 3
-    
-  openai:
-    model: "${OPENAI_MODEL:gpt-4}"
-    api_key: "${OPENAI_API_KEY}"
-    max_tokens: 4000
-    temperature: 0.3
-    timeout: 120
-    max_retries: 3
-    
-  confluence:
-    base_url: "${CONFLUENCE_BASE_URL}"
-    username: "${CONFLUENCE_USERNAME}"
-    api_token: "${CONFLUENCE_API_TOKEN}"
-    space_key: "${CONFLUENCE_SPACE_KEY}"
-    parent_page_id: "${CONFLUENCE_PARENT_PAGE_ID}"
-
-# Production notifications
-notifications:
-  enabled: true
-  
-  email:
-    enabled: ${EMAIL_ENABLED:true}
-    smtp_server: "${SMTP_SERVER}"
-    smtp_port: ${SMTP_PORT:587}
-    username: "${SMTP_USERNAME}"
-    password: "${SMTP_PASSWORD}"
-    from_address: "${FROM_ADDRESS:alerts@company.com}"
-    to_addresses: ${TO_ADDRESSES}
-    
-  slack:
-    enabled: ${SLACK_ENABLED:true}
-    webhook_url: "${SLACK_WEBHOOK_URL}"
-    channel: "${SLACK_CHANNEL:#alerts}"
-    
-  thresholds:
-    error_rate: 0.02  # 2% (stricter for prod)
-    response_time: 60
-    disk_usage: 0.80
-    memory_usage: 0.85
-
-# Production performance settings
-performance:
-  max_workers: ${MAX_WORKERS:8}
-  thread_pool_size: ${THREAD_POOL_SIZE:16}
-  
-  cache_ttl_seconds: 3600
-  max_cache_size_mb: 200
-  
-  rate_limit:
-    enabled: true
-    requests_per_minute: 30  # Conservative rate limiting
-    burst_size: 5
-    
-  memory:
-    max_usage_mb: 1024
-    gc_threshold: 0.8
-    cleanup_interval_seconds: 300
-
-# Production security
+# Настройки безопасности
 security:
-  authentication:
-    enabled: true
-    method: "token"
-    
   encryption:
     enabled: true
     algorithm: "AES-256-GCM"
-    key_path: "/data/security/encryption.key"
-    
-  access_control:
+  authentication:
+    enabled: false  # Включить если нужен веб-интерфейс
+    session_timeout: 3600
+  rate_limiting:
     enabled: true
-    default_permissions: "read"
-    
+    requests_per_minute: 100
   audit:
     enabled: true
-    log_path: "/data/audit/audit.log"
-    rotation_days: 90
+    log_level: "INFO"
 
-# Production monitoring
+# Настройки мониторинга
 monitoring:
   metrics:
     enabled: true
-    collection_interval_seconds: 60
-    retention_days: 90
-    storage_path: "/data/metrics"
-    
+    collection_interval: 60
+    retention_days: 30
+  alerts:
+    enabled: true
+    email_notifications: false
+    webhook_url: "${WEBHOOK_URL:}"
   health_checks:
     enabled: true
     endpoints:
-      - "/health"
-      - "/health/detailed"
-      - "/metrics"
-    interval_seconds: 60
-    
-  performance:
+      - name: "database"
+        url: "/health/db"
+        timeout: 5
+      - name: "llm"
+        url: "/health/llm"
+        timeout: 10
+      - name: "agents"
+        url: "/health/agents"
+        timeout: 15
+
+# Настройки производительности
+performance:
+  caching:
     enabled: true
-    slow_query_threshold_ms: 2000
-    memory_threshold_mb: 800
-    disk_threshold_percent: 80
-
-# Production-specific settings
-development:
-  debug_mode: false
-  verbose_logging: false
-  test_mode: false
-  mock_external_services: false
-  
-  hot_reload:
-    enabled: false  # Disabled in production
-    watch_paths: []
-    exclude_patterns: []
-
-# Production logging
-logging:
-  formatters:
-    standard:
-      format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-      
-    detailed:
-      format: "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s"
-      
-    json:
-      format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "file": "%(filename)s", "line": %(lineno)d}'
-      
-  handlers:
-    console:
-      level: WARNING  # Only warnings and errors to console
-      formatter: standard
-      
-    file:
-      level: INFO
-      formatter: json  # JSON format for log aggregation
-      filename: "/data/logs/application.log"
-      maxBytes: 52428800  # 50MB
-      backupCount: 10
-      
-    error_file:
-      level: ERROR
-      formatter: json
-      filename: "/data/logs/error.log"
-      maxBytes: 52428800  # 50MB
-      backupCount: 10
-      
-    audit_file:
-      class: logging.handlers.RotatingFileHandler
-      level: INFO
-      formatter: json
-      filename: "/data/logs/audit.log"
-      maxBytes: 52428800  # 50MB
-      backupCount: 20
-      
-  loggers:
-    "":
-      level: INFO
-      handlers: [file, error_file]
-      propagate: false
-      
-    "src":
-      level: INFO
-      handlers: [file]
-      propagate: false
-      
-    "src.agents":
-      level: INFO
-      handlers: [file]
-      propagate: false
-      
-    "security":
-      level: INFO
-      handlers: [audit_file, file]
-      propagate: false
-      
-    "error":
-      level: ERROR
-      handlers: [console, error_file]
-      propagate: false
-
-# Production startup
-startup:
-  startup_health_checks:
+    ttl: 3600  # 1 час
+    max_size: "100MB"
+  connection_pooling:
     enabled: true
-    timeout_seconds: 60
-    components:
-      - "storage"
-      - "external_services"
-      - "memory"
-      - "security"
-      
-  shutdown:
-    timeout_seconds: 120
-    wait_for_jobs: true
-    force_cleanup: false
+    max_connections: 10
+    timeout: 30
+  async_workers: 4
+  batch_processing:
+    enabled: true
+    batch_size: 20
+    timeout: 60
 
-# Production-specific additions
+# Настройки качества данных
+quality:
+  validation:
+    enabled: true
+    strict_mode: false
+  quality_thresholds:
+    data_completeness: 0.8
+    analysis_accuracy: 0.7
+    response_time: 5.0  # секунды
+  auto_correction:
+    enabled: true
+    max_attempts: 3
+
+# Настройки уведомлений
+notifications:
+  email:
+    enabled: false
+    smtp_server: "${SMTP_SERVER:}"
+    smtp_port: 587
+    username: "${SMTP_USERNAME:}"
+    password: "${SMTP_PASSWORD:}"
+    from_address: "noreply@mts.ru"
+    to_addresses: []
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL:}"
+    channel: "#alerts"
+  teams:
+    enabled: false
+    webhook_url: "${TEAMS_WEBHOOK_URL:}"
+
+# Настройки резервного копирования
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Ежедневно в 2:00
+  retention_days: 30
+  compression: true
+  encryption: true
+  destinations:
+    - type: "local"
+      path: "./backups"
+    - type: "s3"  # Опционально
+      bucket: "${S3_BUCKET:}"
+      access_key: "${AWS_ACCESS_KEY:}"
+      secret_key: "${AWS_SECRET_KEY:}"
+
+# Настройки API (если нужен веб-интерфейс)
+api:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8080
+  workers: 4
+  cors:
+    enabled: true
+    origins: ["http://localhost:3000"]
+  authentication:
+    enabled: false
+    jwt_secret: "${JWT_SECRET:}"
+    token_expiry: 3600
+
+# Настройки интеграций
+integrations:
+  active_directory:
+    enabled: false
+    server: "${AD_SERVER:}"
+    domain: "${AD_DOMAIN:}"
+  ldap:
+    enabled: false
+    server: "${LDAP_SERVER:}"
+    base_dn: "${LDAP_BASE_DN:}"
+  webhook:
+    enabled: true
+    secret: "${WEBHOOK_SECRET:}"
+    allowed_ips: ["127.0.0.1", "10.0.0.0/8"]
+
+# Пути к файлам и директориям
+paths:
+  logs: "./logs"
+  data: "./data"
+  temp: "./temp"
+  backups: "./backups"
+  uploads: "./uploads"
+  certificates: "./certs"
+
+# Ограничения ресурсов
+resource_limits:
+  max_memory_usage: "2GB"
+  max_cpu_usage: 80  # процентов
+  max_disk_usage: "10GB"
+  max_concurrent_requests: 50
+
+# Настройки отладки (production-safe)
+debug:
+  slow_query_threshold: 2.0  # секунды
+  error_traceback: false
+  profiling: false
+  memory_profiling: false
+
+# Специфичные настройки окружения
 production:
-  # Production monitoring
-  monitoring:
-    enabled: true
-    metrics_endpoint: "/metrics"
-    health_endpoint: "/health"
-    
-  # Production backup settings
-  backup:
-    enabled: true
-    schedule: "0 2 * * *"  # Daily at 2 AM
-    retention_days: 30
-    compression: true
-    encryption: true
-    
-  # Production maintenance
-  maintenance:
-    enabled: true
-    window_start: "02:00"
-    window_end: "04:00"
-    cleanup_enabled: true
-    index_rebuild_enabled: true
+  graceful_shutdown_timeout: 30
+  health_check_timeout: 10
+  metrics_retention_days: 90
+  audit_retention_days: 365
+  backup_compression_level: 6

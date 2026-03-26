@@ -47,19 +47,6 @@ class ConfluenceConfig(BaseModel):
         return v
 
 
-class ExcelConfig(BaseModel):
-    """Configuration for Excel file processing."""
-    file_path: str = Field(default="data/excel/", description="Path to Excel files")
-    sheet_name: str = Field(default="Sheet1", description="Default sheet name")
-    max_file_size_mb: int = Field(default=100, description="Maximum file size in MB")
-    chunk_size: int = Field(default=1000, description="Chunk size for processing")
-    
-    @validator('file_path')
-    def validate_file_path(cls, v):
-        path = Path(v)
-        return str(path.absolute())
-
-
 class LoggingConfig(BaseModel):
     """Configuration for logging."""
     level: str = Field(default="INFO", description="Log level")
@@ -121,7 +108,6 @@ class AppConfig(BaseModel):
     
     jira: JiraConfig
     confluence: ConfluenceConfig
-    excel: ExcelConfig
     logging: LoggingConfig
     performance: PerformanceConfig
     security: SecurityConfig
@@ -175,13 +161,6 @@ class ConfigManager:
                 "space": self._get_env_var("CONFLUENCE_SPACE", required=True),
                 "root_page_id": int(self._get_env_var("ROOT_PAGE_ID_TO_ADD_NEW_PAGES", required=True)),
                 "timeout": int(self._get_env_var("WEB_REQUEST_TIMEOUT_IN_SECONDS", default="30")),
-            },
-            
-            "excel": {
-                "file_path": self._get_env_var("EXCEL_FILE_PATH", default="data/excel/"),
-                "sheet_name": self._get_env_var("EXCEL_SHEET_NAME", default="Sheet1"),
-                "max_file_size_mb": 100,  # Default value
-                "chunk_size": 1000,  # Default value
             },
             
             "logging": {
@@ -287,8 +266,6 @@ class ConfigManager:
             base_config["jira"] = self.config.jira.dict()
         elif agent_name.lower() == "confluence":
             base_config["confluence"] = self.config.confluence.dict()
-        elif agent_name.lower() == "excel":
-            base_config["excel"] = self.config.excel.dict()
         
         return base_config
     
@@ -311,7 +288,6 @@ class ConfigManager:
         """Create necessary directories based on configuration."""
         directories = [
             os.path.dirname(self.config.logging.file_path),
-            self.config.excel.file_path,
         ]
         
         for directory in directories:
@@ -357,3 +333,14 @@ def initialize_config(env_file: Optional[str] = None) -> ConfigManager:
     _config_manager = ConfigManager(env_file)
     _config_manager.create_directories()
     return _config_manager
+
+
+def get_employee_monitoring_config() -> Dict[str, Any]:
+    """
+    Get employee monitoring configuration.
+    
+    Returns:
+        Employee monitoring configuration dictionary
+    """
+    from ..core.config_manager import get_employee_monitoring_config as get_emp_config
+    return get_emp_config()

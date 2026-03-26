@@ -1,0 +1,163 @@
+# Employee Monitoring System Configuration
+# MTS MultAgent - Employee Performance Analytics
+
+employee_monitoring:
+  # Jira Configuration
+  jira:
+    project_keys: "ROOBY,0BF,DEV"
+    query_filter: "status in (In Progress, Done, To Do) AND updated >= -7d"
+    fields: 
+      - "assignee"
+      - "status" 
+      - "summary"
+      - "description"
+      - "created"
+      - "updated"
+      - "priority"
+    assignee_field: "assignee"
+    exclude_unassigned: true
+    
+  # Meeting Protocols Configuration
+  protocols:
+    directory_path: "/data/meeting-protocols"
+    file_formats: ["txt", "pdf", "docx", "doc"]
+    scan_subdirectories: true
+    encoding: "utf-8"
+    processed_files_marker: ".processed"
+    
+  # Reports Configuration
+  reports:
+    daily_reports_dir: "./reports/daily"
+    weekly_reports_dir: "./reports/weekly"
+    quality_reports_dir: "./reports/quality"
+    report_format: "json"
+    backup_enabled: true
+    retention_days: 90
+    
+  # Confluence Configuration
+  confluence:
+    weekly_reports_space: "TEAM"
+    parent_page_id: "123456"
+    template_name: "weekly-report-template"
+    page_prefix: "Еженедельный отчет по команде"
+    publish_format: "markdown"
+    
+  # Scheduler Configuration
+  scheduler:
+    daily_analysis_time: "09:00"
+    weekly_report_time: "17:00"
+    weekly_report_day: "friday"
+    timezone: "Europe/Moscow"
+    enabled: true
+    
+  # Quality Control Configuration
+  quality:
+    threshold: 0.9
+    max_retries: 3
+    validation_timeout: 300
+    auto_improve: true
+    quality_factors:
+      completeness_weight: 0.3
+      coherence_weight: 0.3
+      standards_weight: 0.2
+      llm_quality_weight: 0.2
+      
+  # Git Integration Configuration
+  git:
+    enabled: true
+    repositories:
+      - "https://github.com/company/project1.git"
+      - "https://github.com/company/project2.git"
+    commit_analysis_days: 7
+    exclude_patterns:
+      - "merge"
+      - "bot"
+      - "automated"
+    git_metrics:
+      - "commits_count"
+      - "pull_requests"
+      - "code_reviews"
+      - "lines_added"
+      - "lines_deleted"
+      
+  # Employee Configuration
+  employees:
+    tracking_enabled: true
+    excluded_users:
+      - "bot"
+      - "system"
+      - "automation"
+      - "service-account"
+    department_mapping:
+      "ROOBY": "CloudBilling"
+      "0BF": "B2B"
+      "DEV": "Development"
+    min_activity_threshold: 0.1
+    
+  # LLM Configuration
+  llm:
+    model: "gpt-4"
+    temperature: 0.1
+    max_tokens: 2000
+    system_prompt: |
+      You are an expert analyst specializing in employee performance evaluation.
+      Analyze the provided data objectively and provide actionable insights.
+      Focus on productivity, collaboration, and growth opportunities.
+      Be constructive and supportive in your recommendations.
+      
+  # Analytics Configuration
+  analytics:
+    trends_analysis:
+      enabled: true
+      lookback_days: 30
+      moving_average_window: 7
+    performance_metrics:
+      - "task_completion_rate"
+      - "meeting_engagement_score"
+      - "git_activity_score"
+      - "overall_productivity"
+    benchmarking:
+      enabled: true
+      peer_comparison: true
+      historical_comparison: true
+      
+  # Notification Configuration
+  notifications:
+    email_enabled: false
+    slack_enabled: false
+    weekly_report_recipients:
+      - "team-lead@company.com"
+      - "manager@company.com"
+    alert_thresholds:
+      low_productivity: 0.3
+      high_workload: 0.9
+      quality_issues: 0.8
+      
+  # Security Configuration
+  security:
+    pii_detection: true
+    data_anonymization: false
+    access_log_enabled: true
+    encryption_at_rest: true
+    audit_retention_days: 365
+    
+  # Monitoring Configuration
+  monitoring:
+    health_check_interval: 300  # 5 minutes
+    metrics_collection: true
+    performance_tracking: true
+    alert_on_failures: true
+    log_level: "INFO"
+    
+# Development Override Configuration
+development:
+  employee_monitoring:
+    scheduler:
+      enabled: false  # Disable scheduled runs in development
+    reports:
+      daily_reports_dir: "./dev-reports/daily"
+      weekly_reports_dir: "./dev-reports/weekly"
+    llm:
+      model: "gpt-3.5-turbo"  # Use cheaper model for development
+    quality:
+      threshold: 0.7  # Lower threshold for development
