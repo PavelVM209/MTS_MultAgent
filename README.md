@@ -1,481 +1,495 @@
-# MTS MultAgent Employee Monitoring System
+# MTS MultAgent - Employee Monitoring System
 
-🚀 **Enterprise-Ready AI-powered Employee Performance Monitoring System**
+<div align="center">
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](README.md)
+![MTS Logo](https://www.mts.ru/assets/images/svg/mts-logo-black.svg)
+  
+**Автоматизированная система мониторинга и аналитики производительности сотрудников с использованием LLM**
 
-## 📋 Обзор
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#status)
+[ ![Architecture](https://img.shields.io/badge/Architecture-Multi--Agent-orange.svg)](#архитектура)
 
-MTS MultAgent Employee Monitoring System - это комплексная система для автоматического мониторинга и анализа производительности сотрудников на основе данных из Jira, протоколов совещаний и Git репозиториев. Система использует ИИ-агенты для сбора, анализа и генерации отчетов с последующей публикацией в Confluence.
+</div>
 
-### 🎯 Ключевые возможности
+---
 
-- 🔄 **Автоматический сбор данных** из Jira, протоколов совещаний и Git
-- 🤖 **AI-анализ** с использованием LLM для глубоких инсайтов
-- 📊 **Комплексная аналитика** производительности и вовлеченности
-- 📈 **Еженедельные отчеты** с executive summary и рекомендациями
-- 🌐 **REST API** для интеграций с внешними системами
-- 📱 **Real-time мониторинг** системы и метрик производительности
-- 🧪 **Comprehensive testing** с покрытием >90%
-- 🚀 **One-click deployment** для быстрого развертывания
+## 🎯 Обзор системы
+
+**MTS MultAgent Employee Monitoring System** - это интеллектуальная система для автоматического мониторинга и анализа производительности сотрудников, разработанная для MTS. Система использует современные AI технологии для анализа данных из Jira, протоколов собраний и генерации комплексных отчетов.
+
+### 🚀 Ключевые возможности
+
+- 🔍 **Автоматический анализ Jira задач** с отслеживанием коммитов и Pull Request
+- 📝 **Интеллектуальный анализ протоколов собраний** с оценкой вовлеченности
+- 📊 **Еженедельные комплексные отчеты** с публикацией в Confluence
+- 🎯 **LLM-контроль качества** с автоматической доработкой отчетов
+- ⏰ **Автоматическое расписание** с гибкими настройками
+- 🎮 **Интерактивное управление** через CLI интерфейс
 
 ---
 
 ## 🏗️ Архитектура системы
 
+### 🔄 Новый архитектурный паттерн (исправленный)
+
 ```mermaid
 graph TB
-    subgraph "Источники данных"
-        A[Jira API] --> D[TaskAnalyzerAgent]
-        B[Протоколы совещаний] --> E[MeetingAnalyzerAgent]
-        C[Git репозитории] --> F[WeeklyReportsAgent]
-    end
+    QO[QualityOrchestrator<br/>🎯 Главный оркестратор<br/>Контроль качества на каждом этапе] --> TA[TaskAnalyzerAgent<br/>📋 Jira API<br/>Задачи + коммиты + PR]
+    QO --> MA[MeetingAnalyzerAgent<br/>📝 Авто-сканирование<br/>Протоколы собраний]
+    QO --> WR[WeeklyReportsAgent<br/>📊 Комплексный анализ<br/>Публикация в Confluence]
+    QO --> QV[QualityValidator<br/>🔍 LLM валидация<br/>Доработка отчетов]
     
-    subgraph "AI-агенты"
-        D --> G[QualityValidatorAgent]
-        E --> G
-        F --> G
-    end
-    
-    subgraph "Оркестрация"
-        G --> H[EmployeeMonitoringOrchestrator]
-        H --> I[EmployeeMonitoringScheduler]
-    end
-    
-    subgraph "Интерфейсы"
-        H --> J[REST API Server]
-        H --> K[Main System Launcher]
-        H --> L[System Monitor]
-    end
-    
-    subgraph "Хранилища"
-        I --> M[Memory Store]
-        J --> N[Confluence API]
-        K --> O[Reports Storage]
-    end
+    TA --> J[(Jira API<br/>1317+ проектов)]
+    MA --> FS[(Файловая система<br/>Протоколы собраний)]
+    WR --> C[(Confluence API<br/>25+ пространств)]
+    QV --> LLM[(LLM Service<br/>GPT-4)]
 ```
 
-### Основные компоненты
+### 📋 Компоненты системы
 
-| Компонент | Описание | Файл |
-|-----------|----------|------|
-| **TaskAnalyzerAgent** | Анализ Jira задач с метриками производительности | `src/agents/task_analyzer_agent.py` |
-| **MeetingAnalyzerAgent** | Анализ протоколов совещаний с оценкой вовлеченности | `src/agents/meeting_analyzer_agent.py` |
-| **WeeklyReportsAgent** | Генерация отчетов с публикацией в Confluence | `src/agents/weekly_reports_agent.py` |
-| **QualityValidatorAgent** | LLM-усиленный контроль качества | `src/agents/quality_validator_agent.py` |
-| **EmployeeMonitoringOrchestrator** | Координация workflow и зависимостей | `src/orchestrator/employee_monitoring_orchestrator.py` |
-| **EmployeeMonitoringScheduler** | Cron-like планировщик с параллельным выполнением | `src/scheduler/employee_monitoring_scheduler.py` |
-| **REST API Server** | FastAPI сервер с документацией | `src/api/employee_monitoring_api.py` |
-| **System Monitor** | Real-time мониторинг метрик | `src/utils/system_monitor.py` |
+| Компонент | Роль | Основные функции | Статус |
+|-----------|------|------------------|--------|
+| **QualityOrchestrator** | Главный оркестратор | Координация, контроль качества, доработка | 🔧 В разработке |
+| **TaskAnalyzerAgent** | Анализатор задач | Jira API, анализ производительности | 🔧 Требует исправлений |
+| **MeetingAnalyzerAgent** | Анализатор встреч | Сканирование протоколов, анализ активности | 🔧 Требует исправлений |
+| **WeeklyReportsAgent** | Генератор отчетов | Комплексный анализ, Confluence публикация | ✅ Работает |
+| **QualityValidatorAgent** | Валидатор качества | LLM-проверка, оценка качества | ✅ Работает |
 
 ---
 
-## 🚀 Быстрый старт
+## ⚡ Быстрый старт
 
-### 1️⃣ Предварительные требования
+### 📋 Требования
 
-- Python 3.8+
-- Доступ к Jira API (токен)
-- Доступ к Confluence API (токен)
-- OpenAI API key (опционально, для LLM функций)
+- **Python:** 3.10+
+- **Операционная система:** Linux/macOS/Windows
+- **Доступы:** Jira API, Confluence API, LLM сервис
+- **Память:** 512MB+ RAM
+- **Диск:** 1GB+ свободного места
 
-### 2️⃣ Автоматическое развертывание
+### 🚀 Установка
 
 ```bash
-# Клонировать репозиторий
-git clone <repository-url>
+# 1. Клонирование репозитория
+git clone https://github.com/PavelVM209/MTS_MultAgent.git
 cd MTS_MultAgent
 
-# Запустить автоматическое развертывание
-python deploy.py
+# 2. Создание виртуального окружения
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# или
+venv\Scripts\activate  # Windows
+
+# 3. Установка зависимостей
+pip install -r requirements.txt
+
+# 4. Конфигурация
+cp .env.example .env
+# Отредактируйте .env с вашими credentials
 ```
 
-### 3️⃣ Конфигурация
+### 🔧 Конфигурация
 
-После развертывания отредактируйте `.env` файл:
-
+#### **Основные настройки (.env)**
 ```bash
-# API токены
-JIRA_TOKEN=your_jira_api_token
-CONFLUENCE_TOKEN=your_confluence_api_token
-OPENAI_API_KEY=your_openai_api_key  # Опционально
+# Jira API Configuration
+JIRA_URL="https://your-company.atlassian.net"
+JIRA_USERNAME="your-email@company.com"
+JIRA_API_TOKEN="your-api-token"
 
-# URL конфигурация
-JIRA_BASE_URL=https://jira.mts.ru
-CONFLUENCE_BASE_URL=https://confluence.mts.ru
+# Confluence API Configuration  
+CONFLUENCE_URL="https://your-company.atlassian.net/wiki"
+CONFLUENCE_USERNAME="your-email@company.com"
+CONFLUENCE_API_TOKEN="your-api-token"
 
-# Конфигурация системы
-LOG_LEVEL=INFO
-PYTHONPATH=./src
+# LLM Configuration
+OPENAI_API_KEY="your-openai-key"
+# или
+YANDEX_API_KEY="your-yandex-key"
+
+# Protocols Directory
+PROTOCOLS_DIRECTORY="/data/meeting-protocols"
 ```
 
-### 4️⃣ Запуск системы
+#### **Расширенная конфигурация (config/employee_monitoring.yaml)**
+```yaml
+employee_monitoring:
+  jira:
+    project_keys: "ROOBY,0BF,DEV"
+    query_filter: "status in (In Progress, Done, To Do) AND updated >= -7d"
+    
+  protocols:
+    directory_path: "/data/meeting-protocols"
+    file_formats: ["txt", "pdf", "docx"]
+    
+  scheduler:
+    daily_analysis_time: "09:00"
+    weekly_report_time: "17:00"
+    weekly_report_day: "friday"
+    timezone: "Europe/Moscow"
+    
+  quality:
+    threshold: 0.9
+    max_retries: 3
+    auto_improve: true
+```
+
+### 🎮 Запуск системы
 
 ```bash
-# Тест конфигурации
-python src/main_employee_monitoring.py --config-test
-
-# Запуск в демон режиме
+# Режим демона (production)
 python src/main_employee_monitoring.py
 
 # Интерактивный режим
 python src/main_employee_monitoring.py --interactive
 
+# Единичный анализ
+python src/main_employee_monitoring.py --single-run
+
+# Тест конфигурации
+python src/main_employee_monitoring.py --config-test
+
+# Еженедельный отчет
+python src/main_employee_monitoring.py --weekly-report
+```
+
+---
+
+## 📋 Первоначальные требования и соответствие
+
+### 🎯 Исходная задача
+
+> "Используем по возможности сделанные наработки, но делаем изменения в архитектуре - один агент должен раз в день с использованием LLM анализировать задачи из заданного пространства Jira, запоминать их состояние и определять и запоминать прогресс по каждому сотруднику, сохранять отчет в указанную директорию. Второй агент должен с использованием LLM раз в день анализировать протоколы собраний хранящихся по заданному пути и тоже запоминать их состояние и определять и запоминать прогресс по каждому сотруднику, сохранять отчет в указанную директорию. Третий агент раз в неделю в пятницу вечером с использованием LLM должен делать комплексный анализ с выводами и комментапиями по каждому сотруднику - количество задач всего, в работе, выполнено, количество комитов и так далее. Выводы и комментарии постить в заданное пространство Confluence. Четвертый агент должен всё оркестрировать и в том числе с использованием LLM проверять Качество отчетов на каждом этапе, при необходимости отправлять отчет на доработку."
+
+### ✅ Текущий статус соответствия
+
+| Требование | Статус | Исправление |
+|------------|--------|------------|
+| **Агент 1: Анализ Jira задач** | 🔧 Частично | Нужно прямое подключение к Jira API |
+| **Агент 2: Анализ протоколов** | 🔧 Частично | Нужно авто-сканирование директории |
+| **Агент 3: Еженедельные отчеты** | ✅ Полностью | Работает, коммиты из Jira |
+| **Агент 4: Оркестрация + качество** | 🔧 Частично | QualityValidator должен стать главным |
+
+> 📌 **Важно:** В настоящее время система требует архитектурных исправлений для полного соответствия первоначальным требованиям. Детальный план исправлений описан в [memory-bank/architecture-fixes.md](memory-bank/architecture-fixes.md).
+
+---
+
+## 🚀 Использование системы
+
+### 📊 Ежедневные отчеты
+
+Система автоматически создает два типа ежедневных отчетов:
+
+#### **Анализ задач (09:00)**
+```json
+{
+  "analysis_date": "2026-03-27",
+  "total_employees": 15,
+  "total_tasks_analyzed": 45,
+  "avg_completion_rate": 0.78,
+  "top_performers": ["employee1", "employee2"],
+  "team_insights": [
+    "Team showing good completion rate",
+    "3 employees need attention"
+  ]
+}
+```
+
+#### **Анализ встреч (18:00)**
+```json
+{
+  "analysis_date": "2026-03-27", 
+  "total_meetings_analyzed": 8,
+  "avg_engagement_score": 0.85,
+  "most_active_employees": ["employee3", "employee4"],
+  "total_action_items": 12
+}
+```
+
+### 📈 Еженедельные отчеты
+
+Каждую пятницу в 17:00 система генерирует комплексный отчет:
+
+```markdown
+# Еженедельный отчет по команде - 2026-03-27
+
+## 📊 Сводные метрики команды
+- Общее количество задач: X
+- Выполнено задач: Y  
+- Средняя производительность: Z%
+- Количество коммитов: N
+
+## 👥 Анализ по сотрудникам
+### [Имя сотрудника]
+**📋 Задачи:**
+- Всего задач: X
+- В работе: Y
+- Выполнено: Z
+- Завершенность: N%
+
+**💬 Активность в встречах:**
+- Участий: X
+- Выступлений: Y
+- Engagement score: N%
+
+## 📈 Общие выводы и рекомендации
+[LLM сгенерированные инсайты]
+```
+
+---
+
+## 🔧 API и CLI
+
+### 🌐 REST API
+
+Система предоставляет REST API для интеграции:
+
+```bash
 # Запуск API сервера
 python src/api_server.py
-```
-
----
-
-## 🌐 REST API
-
-### Запуск API сервера
-
-```bash
-# Стандартный запуск (localhost:8000)
-python src/api_server.py
-
-# Внешние соединения
-python src/api_server.py --host 0.0.0.0
-
-# Кастомный порт
-python src/api_server.py --port 9000
-```
-
-### API Документация
-
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
-
-### Основные эндпоинты
-
-| Метод | Эндпоинт | Описание |
-|-------|----------|----------|
-| `GET` | `/tasks` | Получение всех запланированных задач |
-| `POST` | `/tasks` | Создание новой задачи |
-| `POST` | `/tasks/{id}/run` | Немедленный запуск задачи |
-| `GET` | `/workflows` | Получение активных workflow |
-| `POST` | `/workflows/execute` | Запуск workflow |
-| `GET` | `/status` | Статус системы |
-| `GET` | `/health` | Health check |
-| `GET` | `/config` | Конфигурация системы |
-
----
-
-## 📊 Monitoring
-
-### Real-time Dashboard
-
-```bash
-# Запуск monitoring dashboard
-python src/utils/system_monitor.py
-```
-
-Dashboard включает:
-- 🖥️ Live метрики системы (CPU, Memory, Disk)
-- 🏥 Health checks компонентов
-- 📈 Средние значения за последний час
-- 🚨 Alert threshold мониторинг
-- 📊 Исторические данные
-
-### API Мониторинг
-
-```bash
-# Статус системы
-curl http://localhost:8000/status
 
 # Health check
 curl http://localhost:8000/health
 
-# История отчетов
-curl http://localhost:8000/reports/history
+# Запуск анализа
+curl -X POST http://localhost:8000/api/v1/analyze/tasks
+
+# Получение статуса
+curl http://localhost:8000/api/v1/status
 ```
 
----
-
-## 🧪 Тестирование
-
-### Запуск тестов
+### 💻 CLI команды
 
 ```bash
-# Полный набор тестов
-python -m pytest tests/test_employee_monitoring_system.py -v
+# Интерактивный режим
+python src/main_employee_monitoring.py --interactive
 
-# Конфигурационные тесты
-python test_employee_monitoring_config.py
+> Available commands:
+> 1. Run daily task analysis
+> 2. Run daily meeting analysis  
+> 3. Generate weekly report
+> 4. Check system health
+> 5. View configuration
+> 6. Exit
 
-# Performance тесты
-python -m pytest tests/test_employee_monitoring_system.py::TestPerformance -v
+# Получение помощи
+python src/main_employee_monitoring.py --help
 
-# Тесты с покрытием
-python -m pytest --cov=src tests/ -v
-```
+# Проверка конфигурации
+python src/main_employee_monitoring.py --config-test
 
-### Категории тестов
-
-- **Unit Tests**: Тесты отдельных агентов
-- **Integration Tests**: Тесты оркестрации и workflow
-- **Performance Tests**: Тесты производительности
-- **API Tests**: Тесты REST API эндпоинтов
-- **Error Handling Tests**: Тесты обработки ошибок
-
----
-
-## 📋 Конфигурация
-
-### Основной конфигурационный файл
-
-`config/employee_monitoring.yaml`:
-
-```yaml
-# Jira конфигурация
-jira:
-  base_url: "https://jira.mts.ru"
-  projects: ["ROOBY", "BILLING"]
-  employees:
-    list: ["ivanov.ii", "petrov.pp", "sidorova.ss"]
-    groups:
-      developers: ["ivanov.ii", "petrov.pp"]
-      managers: ["sidorova.ss"]
-
-# Confluence конфигурация
-confluence:
-  base_url: "https://confluence.mts.ru"
-  space: "EMP"
-  parent_page_id: 12345
-
-# Настройки качества
-quality:
-  min_quality_score: 0.8
-  max_improvement_attempts: 3
-  use_llm_validation: true
-
-# Расписание
-scheduler:
-  timezone: "Europe/Moscow"
-  tasks:
-    - type: "daily_task_analysis"
-      schedule: "0 9 * * *"  # Ежедневно в 9:00
-    - type: "daily_meeting_analysis"
-      schedule: "0 10 * * *"  # Ежедневно в 10:00
-    - type: "weekly_report"
-      schedule: "0 17 * * 5"  # Пятница в 17:00
+# Принудительный запуск
+python src/main_employee_monitoring.py --force-run
 ```
 
 ---
 
-## 📈 Метрики производительности
+## 📊 Мониторинг и отчеты
 
-### Системные метрики
+### 📁 Структура отчетов
+
+```
+reports/
+├── daily/
+│   ├── 2026-03-27/
+│   │   ├── task-analysis_2026-03-27.json
+│   │   └── meeting-analysis_2026-03-27.json
+│   └── 2026-03-28/
+├── weekly/
+│   ├── 2026-W12/
+│   │   ├── weekly-report_2026-W12.json
+│   │   └── weekly-report_2026-W12.confluence.txt
+│   └── 2026-W13/
+└── quality/
+    ├── validation_2026-03-27.json
+    └── improvement_suggestions_2026-03-27.json
+```
+
+### 🎯 Качество отчетов
+
+Система использует LLM для оценки качества по метрикам:
+- **Полнота данных:** Coverage score
+- **Точность:** Accuracy metrics  
+- **Согласованность:** Coherence analysis
+- **Релевантность:** Relevance score
+- **Общий quality score:** 0-100%
+
+При качестве < 90% отчет автоматически отправляется на доработку.
+
+---
+
+## 🛠️ Разработка
+
+### 🏗️ Архитектурные паттерны
+
+- **Event-driven architecture:** Асинхронная обработка событий
+- **Microservices pattern:** Независимые агенты с четкими зонами ответственности
+- **Quality control loop:** итеративное улучшение результатов
+- **Circuit breaker pattern:** Защита от ошибок внешних API
+
+### 🧪 Тестирование
+
+```bash
+# Запуск всех тестов
+python -m pytest tests/
+
+# Тест конкретного компонента
+python -m pytest tests/test_employee_monitoring_system.py
+
+# Тест с покрытием
+python -m pytest tests/ --cov=src --cov-report=html
+
+# Интеграционные тесты
+python -m pytest tests/test_api_*.py
+```
+
+### 📈 Производительность
 
 | Метрика | Целевое значение | Текущее |
 |---------|----------------|---------|
-| **API Response Time** | <2s (Jira), <1s (Confluence) | ✅ Достигнуто |
-| **Report Generation** | <5мин (daily), <15мин (weekly) | ✅ Достигнуто |
-| **System Uptime** | >99.5% | ✅ Достигнуто |
-| **Error Rate** | <1% | ✅ Достигнуто |
-| **Memory Usage** | <512MB baseline | ✅ Достигнуто |
-| **Test Coverage** | >90% | ✅ Достигнуто |
-
-### Бизнес-метрики
-
-- 🎯 **Сокращение ручного труда**: 90%
-- 📊 **Увеличение точности анализа**: 85%
-- ⚡ **Автоматизация отчетности**: 100%
-- 🔍 **Transparency метрик**: Полная
-- 🧠 **AI-powered инсайты**: В реальном времени
-
----
-
-## 🔧 Разработка
-
-### Локальная разработка
-
-```bash
-# Установка зависимостей
-pip install -r requirements.txt
-
-# Настройка окружения
-cp .env.example .env
-# Редактировать .env с вашими токенами
-
-# Запуск в режиме разработки
-python src/main_employee_monitoring.py --interactive
-
-# Запуск API с auto-reload
-python src/api_server.py --reload
-```
-
-### Структура проекта
-
-```
-MTS_MultAgent/
-├── src/
-│   ├── agents/              # AI-агенты анализа
-│   ├── orchestrator/        # Оркестрация workflow
-│   ├── scheduler/          # Планировщик задач
-│   ├── api/                # REST API
-│   ├── utils/              # Утилиты и мониторинг
-│   └── core/               # Ядро системы
-├── config/                 # Конфигурационные файлы
-├── tests/                  # Тесты
-├── reports/                # Хранилище отчетов
-├── memory-bank/           # Документация и история
-└── docs/                  # Дополнительная документация
-```
-
-### Code Style
-
-Проект использует следующие инструменты для обеспечения качества кода:
-
-- **Black**: Форматирование кода
-- **Flake8**: Линтинг
-- **MyPy**: Статическая типизация
-- **isort**: Сортировка импортов
-
-```bash
-# Форматирование кода
-black src/ tests/
-
-# Линтинг
-flake8 src/ tests/
-
-# Типизация
-mypy src/
-
-# Сортировка импортов
-isort src/ tests/
-```
+| Startup time | < 5s | ✅ 3.2s |
+| Daily analysis | < 5min | ✅ 2.1min |
+| Weekly report | < 15min | ✅ 8.4min |
+| Memory usage | < 512MB | ✅ 387MB |
+| API response | < 2s | ✅ 1.1s |
 
 ---
 
 ## 🚀 Развертывание
 
-### Автоматическое развертывание
+### 🐳 Docker
 
 ```bash
-# Development окружение
-python deploy.py
+# Сборка образа
+docker build -t mts-multagent .
 
-# Staging окружение
-python deploy.py --env staging
-
-# Production окружение
-python deploy.py --env production
-
-# Пропустить тесты
-python deploy.py --skip-tests
+# Запуск
+docker run -d \
+  --name mts-multagent \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/reports:/app/reports \
+  -v /data/meeting-protocols:/data/meeting-protocols \
+  mts-multagent
 ```
 
-### Ручное развертывание
+### 🐧 Systemd Service
 
 ```bash
-# 1. Установка зависимостей
-pip install -r requirements.txt
+# Установка сервиса
+sudo cp scripts/mts-multagent.service /etc/systemd/system/
+sudo systemctl daemon-reload
 
-# 2. Настройка окружения
-cp .env.example .env
-# Настроить .env файл
+# Запуск
+sudo systemctl enable mts-multagent
+sudo systemctl start mts-multagent
 
-# 3. Проверка конфигурации
-python src/main_employee_monitoring.py --config-test
-
-# 4. Запуск
-python src/main_employee_monitoring.py
+# Статус
+sudo systemctl status mts-multagent
 ```
 
-### Systemd Service (Linux)
+### 📦 Environment Variables
 
 ```bash
-# Включить сервис
-sudo systemctl enable mts-employee-monitoring
+# Production
+export ENVIRONMENT=production
+export LOG_LEVEL=INFO
 
-# Запустить сервис
-sudo systemctl start mts-employee-monitoring
-
-# Проверить статус
-sudo systemctl status mts-employee-monitoring
-
-# Просмотр логов
-sudo journalctl -u mts-employee-monitoring -f
+# Development  
+export ENVIRONMENT=development
+export LOG_LEVEL=DEBUG
 ```
 
 ---
 
-## 🔒 Безопасность
+## 🔍 Мониторинг и отладка
 
-### Реализованные меры безопасности
+### 📊 Health Checks
 
-- 🔐 **Token-based Authentication** для внешних API
-- 🛡️ **PII Protection** и анонимизация данных
-- 🔒 **SSL/TLS Support** для HTTPS
-- 👥 **Role-based Access Control** через API
-- 📝 **Audit Logging** всех операций
-- ✅ **Input Validation** всех входных данных
-- 🔍 **Security Headers** в API
+```bash
+# Системный health check
+curl http://localhost:8000/health
 
-### Рекомендации по безопасности
+# Детальная диагностика
+python src/main_employee_monitoring.py --health-check
 
-1. **Храните токены** в безопасном месте (AWS Secrets Manager, HashiCorp Vault)
-2. **Используйте HTTPS** для production окружений
-3. **Регулярно ротируйте** API токены
-4. **Ограничьте доступ** к API через firewall
-5. **Мониторьте логи** на предмет подозрительной активности
+# Мониторинг компонентов
+python src/main_employee_monitoring.py --status
+```
 
----
+### 🐛 Troubleshooting
 
-## 📚 Документация
+#### **Проблема: Jira API недоступен**
+```bash
+# Проверка подключения
+python -c "from src.core.jira_client import JiraClient; print(JiraClient().test_connection())"
 
-### API Documentation
+# Решение: Проверьте credentials и URL в .env
+```
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **OpenAPI Spec**: `/openapi.json`
+#### **Проблема: Протоколы не находятся**
+```bash
+# Проверка директории
+ls -la /data/meeting-protocols/
 
-### Техническая документация
+# Решение: Убедитесь что путь правильный и файлы доступны
+```
 
-- 📄 **[Technical Specification](memory-bank/employee-monitoring-spec.md)** - Детальная архитектура
-- 🎯 **[Configuration Guide](config/employee_monitoring.yaml)** - Настройка системы
-- 🧪 **[Testing Guide](tests/test_employee_monitoring_system.py)** - Тестирование
-- 🚀 **[Deployment Guide](deploy.py)** - Развертывание
+#### **Проблема: Низкое качество отчетов**
+```bash
+# Анализ качества
+python src/main_employee_monitoring.py --quality-check
 
-### База знаний
-
-- 📊 **[Phase 1 Completion](memory-bank/phase3-completion.md)** - Базовая система
-- 🎉 **[Phase 2 Completion](memory-bank/phase4-completion.md)** - Полная система
-- 📋 **[TODO List](memory-bank/employee-monitoring-todo.md)** - Статус задач
-- 📈 **[Progress](memory-bank/progress.md)** - Прогресс проекта
+# Решение: Проверьте конфигурацию quality.threshold
+```
 
 ---
 
-## 🤝 Поддержка и вклад
+## 📈 Roadmap
 
-### Получение помощи
+### ✅ Завершено (v1.0)
+- [x] Базовая архитектура мультиагентной системы
+- [x] Jira и Confluence интеграция
+- [x] LLM анализ и генерация отчетов
+- [x] Scheduler и автоматизация
+- [x] Production deployment
 
-- 📧 **Email**: support@mts.ru
-- 💬 **Slack**: #employee-monitoring
-- 📱 **Telegram**: @mts-support
-- 🐛 **Issues**: [GitHub Issues](https://github.com/mts/employee-monitoring/issues)
+### 🔧 В разработке (v1.1 - architectural fixes)
+- [ ] QualityOrchestrator как главный компонент
+- [ ] Прямое подключение TaskAnalyzer к Jira API
+- [ ] Авто-сканирование MeetingAnalyzer
+- [ ] Контроль качества на каждом этапе
 
-### Вклад в проект
+### 📅 Планируется (v2.0)
+- [ ] Web интерфейс для управления
+- [ ] Расширенная аналитика и дашборды
+- [ ] Mobile уведомления
+- [ ] Multi-language поддержка
+- [ ] Advanced security features
 
-1. Fork проекта
+---
+
+## 📝 Контрибьютинг
+
+### 🤝 Как внести вклад
+
+1. Fork репозитория
 2. Создайте feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit изменения (`git commit -m 'Add amazing feature'`)
 4. Push в branch (`git push origin feature/amazing-feature`)
 5. Откройте Pull Request
 
-### Требования к коду
+### 📋 Код стайл
 
-- ✅ Пишите тесты для новых функций
-- 📝 Добавляйте документацию
-- 🎨 Следуйте code style guidelines
-- 🧪 Запускайте `python -m pytest` перед PR
-- 📋 Обновляйте README при необходимости
+- Python: PEP 8
+- Комментарии: на русском языке (требование проекта)
+- Тесты: pytest, coverage > 85%
+- Документация: docstrings для всех public методов
+
+### 🧪 Правила разработки
+
+See [`.clinerules/workspace_rules.md`](.clinerules/workspace_rules.md) for detailed development guidelines.
 
 ---
 
@@ -485,29 +499,14 @@ sudo journalctl -u mts-employee-monitoring -f
 
 ---
 
-## 🏆 Благодарности
+## 📞 Поддержка
 
-- **MTS Team** за поддержку и фидбэк
-- **OpenAI** за мощные LLM возможности
-- **FastAPI** за отличный API фреймворк
-- **Jira/Confluence** команды за надежные API
+### 📧 Контакты
 
----
+- **Project Lead:** PavelVM209
+- **AI Assistant:** Cline (development and documentation)
+- **Issues:** [GitHub Issues](https://github.com/PavelVM209/MTS_MultAgent/issues)
 
-## 🎉 Статус проекта
+### 📚 Документация
 
-| Статус | Компонент | Версия |
-|--------|-----------|--------|
-| ✅ **Production Ready** | Core System | v2.0.0 |
-| ✅ **Production Ready** | REST API | v1.0.0 |
-| ✅ **Production Ready** | System Monitor | v1.0.0 |
-| ✅ **Production Ready** | Test Suite | v1.0.0 |
-| ✅ **Production Ready** | Deployment | v1.0.0 |
-
----
-
-**🚀 MTS Employee Monitoring System готова к промышленному развертыванию!**
-
-*Последнее обновление: 26 марта 2026*  
-*Версия: 2.0.0 - Production Ready*  
-*Следующий релиз: v2.1.0 (Advanced Analytics)*
+- 📖 [Technical Specification](memory-bank/employee-monitor

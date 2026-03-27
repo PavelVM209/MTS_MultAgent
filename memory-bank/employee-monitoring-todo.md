@@ -1,284 +1,222 @@
 # Employee Monitoring System - TODO List
 
-## 🎉 **SYSTEM COMPLETE - PHASE 3 FINISHED**
+## 🎯 Phase: ARCHITECTURE FIXES FOR ORIGINAL REQUIREMENTS
 
-**Статус**: ✅ ЗАВЕРШЕНО + ДОПОЛНЕНИЯ  
-**Всего задач**: 37/37 (100%)  
-**Дата завершения**: 26 марта 2026
+### Критические исправления для соответствия первоначальной задаче
 
----
-
-## ✅ **ЗАВЕРШЕННЫЕ ЗАДАЧИ**
-
-### **API Интеграция и Очистка Системы**
-- [x] Remove ExcelConfig class from src/core/config.py
-- [x] Remove Excel settings from environment configuration
-- [x] Remove Excel CLI options from src/cli/main.py
-- [x] Remove ExcelAgent imports from src/agents/__init__.py
-- [x] Clean Excel references from .env and .env.example
-- [x] Remove Excel patterns from .gitignore
-- [x] Update CLI health checks to remove Excel mentions
-- [x] Fix import issues in CLI
-- [x] Create simple API health test script
-- [x] Create curl-based API test script
-- [x] Test Jira API connectivity - SUCCESS (1317 проектов)
-- [x] Test Confluence API connectivity - SUCCESS (25 пространств)
-- [x] Verify authentication tokens work correctly
-- [x] Update memory bank with latest progress
-- [x] Update README with Employee Monitoring System focus
-- [x] Create Employee Monitoring System technical specification
-- [x] Create employee monitoring configuration file
-- [x] Add employee monitoring variables to .env.example
-- [x] Final cleanup check - all temp files confirmed deleted
-
-### **Основная Система Мониторинга Сотрудников**
-- [x] **TaskAnalyzerAgent** - Анализ JIRA задач с метриками производительности
-- [x] **MeetingAnalyzerAgent** - Анализ протоколов совещаний с оценкой вовлеченности
-- [x] **WeeklyReportsAgent** - Комплексные отчеты с публикацией в Confluence
-- [x] **QualityValidatorAgent** - LLM-усиленный контроль качества и workflow ревизий
-
-### **Инфраструктурные Компоненты**
-- [x] **EmployeeMonitoringOrchestrator** - Координация workflow с управлением зависимостями
-- [x] **EmployeeMonitoringScheduler** - Cron-like планировщик с параллельным выполнением
-- [x] **Main Employee Monitoring System** - Полный лаунчер с интерактивным режимом
-- [x] **REST API Server** - FastAPI интерфейс для управления системой
-
-### **Конфигурация и Документация**
-- [x] **employee_monitoring.yaml** - Полная конфигурация системы
-- [x] **Directory Structure** - Организованная структура для отчетов
-- [x] **Memory Store Integration** - JSON хранилище состояний
-- [x] **Quality Framework** - Метрики качества и валидация
-- [x] **Error Handling** - Graceful shutdown и retry механизмы
-- [x] **Health Monitoring** - Реальный мониторинг здоровья компонентов
+**Дата:** 2026-03-27  
+**Основание:** Анализ несоответствий с требованиями (см. architecture-fixes.md)  
+**Статус:** Готов к реализации  
+**Приоритет:** КРИТИЧЕСКИЙ
 
 ---
 
-## 🏗️ **РЕАЛИЗОВАННАЯ АРХИТЕКТУРА**
+## 📋 ИСПОЛНИТЕЛЬНЫЙ ПЛАН
 
-### **Основные Агенты:**
-1. **TaskAnalyzerAgent** (`src/agents/task_analyzer_agent.py`)
-   - Анализ JIRA задач по проектам ROOBY, BILLING
-   - Расчет completion rate, productivity score, performance rating (1-10)
-   - Выявление топ-перформеров и отстающих
-   - LLM-инсайты по каждому сотруднику
+### **TASK 1: Создание QualityOrchestrator как главного компонента** 🔴
+- [ ] **Расширить QualityValidatorAgent до роли главного оркестратора**
+  - [ ] Создать новый класс QualityOrchestrator на базе QualityValidatorAgent
+  - [ ] Реализовать методы `execute_daily_task_workflow()`, `execute_daily_meeting_workflow()`, `execute_weekly_workflow()`
+  - [ ] Интегрировать вызовы TaskAnalyzerAgent, MeetingAnalyzerAgent, WeeklyReportsAgent
+  
+- [ ] **Реализовать контроль качества на каждом этапе**
+  - [ ] Добавить логику проверки качества после каждого анализа
+  - [ ] Реализовать LLM-валидацию результатов
+  - [ ] Настроить порог качества 90%
+  
+- [ ] **Добавить логику отправки на доработку**
+  - [ ] Реализовать функцию `_request_improvement()` для доработки отчетов
+  - [ ] Настроить до 3 попыток улучшения с использованием LLM
+  - [ ] Добавить логирование процесса доработки
+  
+- [ ] **Интегрировать сохранение и публикацию**
+  - [ ] Реализовать `_save_approved_report()` для качественных отчетов
+  - [ ] Реализовать `_save_with_warning()` для отчетов с низким качеством
+  - [ ] Интегрировать Confluence публикацию для еженедельных отчетов
 
-2. **MeetingAnalyzerAgent** (`src/agents/meeting_analyzer_agent.py`)
-   - Анализ протоколов совещаний (TXT, DOCX, PDF)
-   - Расчет engagement score и activity rating
-   - Выявление лидерских индикаторов
-   - Отслеживание action items
+### **TASK 2: TaskAnalyzerAgent интеграция с Jira API** 🔴
+- [ ] **Добавить метод fetch_jira_tasks()**
+  - [ ] Реализовать прямое подключение к Jira API
+  - [ ] Обработать ошибки API и retry логику
+  - [ ] Добавить парсинг Jira полей для коммитов и PR
+  - [ ] Добавить логирование количества полученных задач
+  
+- [ ] **Обновить execute() метод**
+  - [ ] Изменить сигнатуру для работы без обязательного input_data
+  - [ ] Добавить авто-вызов `fetch_jira_tasks()` если данные не предоставлены
+  - [ ] Интегрировать обработку коммитов и PR из Jira
+  
+- [ ] **Тестирование Jira интеграции**
+  - [ ] Проверить подключение к API
+  - [ ] Валидировать обработку разных статусов задач
+  - [ ] Проверить извлечение кастомных полей (коммиты, PR)
 
-3. **WeeklyReportsAgent** (`src/agents/weekly_reports_agent.py`)
-   - Генерация комплексных отчетов с executive summary
-   - Team-level insights и рекомендации
-   - Автоматическая публикация в Confluence
-   - Quality validation всех отчетов
+### **TASK 3: MeetingAnalyzerAgent авто-сканирование директории** 🔴
+- [ ] **Реализовать метод scan_protocols_directory()**
+  - [ ] Добавить сканирование директории по конфигурации
+  - [ ] Реализовать фильтрацию по форматам (TXT, PDF, DOCX)
+  - [ ] Добавить проверку файлов-маркеров `.processed`
+  - [ ] Реализовать фильтрацию пустых файлов
+  
+- [ ] **Обновить execute() метод**
+  - [ ] Изменить сигнатуру для работы без обязательного input_data
+  - [ ] Добавить авто-вызов `scan_protocols_directory()` если данные не предоставлены
+  - [ ] Интегрировать обработку разных форматов файлов
+  
+- [ ] **Улучшить обработка протоколов**
+  - [ ] Добавить поддержку PDF (библиотека PyPDF2/pdfplumber)
+  - [ ] Добавить поддержку DOCX (библиотека python-docx)
+  - [ ] Реализовать извлечение дат из имен файлов
 
-4. **QualityValidatorAgent** (`src/agents/quality_validator_agent.py`)
-   - LLM-усиленная валидация результатов
-   - Автоматические улучшения при низком качестве
-   - Retry логика и error recovery
-   - Комплексная система качества
+### **TASK 4: WeeklyReportsAgent обновление (без Git интеграции)** 🟡
+- [ ] **Удалить зависимости от Git интеграции**
+  - [ ] Убрать заглушки `fetch_git_metrics()`
+  - [ ] Обновить документацию (коммиты и PR из Jira)
+  
+- [ ] **Обновить сбор данных**
+  - [ ] Модифицировать `generate_employee_summaries()` для учета коммитов/PR из Jira
+  - [ ] Обновить структуру employee_summaries
+  - [ ] Оптимизировать агрегацию данных за неделю
+  
+- [ ] **Улучшить генерацию отчетов**
+  - [ ] Обновить шаблоны Confluence контента
+  - [ ] Добавить метрики коммитов и PR в отчеты
+  - [ ] Оптимизировать форматирование markdown
 
-### **Оркестрация и Планирование:**
-1. **EmployeeMonitoringOrchestrator** (`src/orchestrator/employee_monitoring_orchestrator.py`)
-   - Координация всех агентов
-   - Управление зависимостями
-   - Параллельное выполнение
-   - Error handling и recovery
+### **TASK 5: Обновление orchestration системы** 🟡
+- [ ] **Перенастроить EmployeeMonitoringOrchestrator**
+  - [ ] Обновить для работы с QualityOrchestrator
+  - [ ] Изменить методы вызова
+  - [ ] Адаптировать логику обработки результатов
+  
+- [ ] **Обновить EmployeeMonitoringScheduler**
+  - [ ] Перенастроить расписания для новых workflow
+  - [ ] Интегрировать вызовы QualityOrchestrator
+  - [ ] Обновить логику обработки ошибок
+  
+- [ ] **Обновить основной запуск**
+  - [ ] Модифицировать `main_employee_monitoring.py`
+  - [ ] Обновить CLI интерфейс
+  - [ ] Адаптировать конфигурацию
 
-2. **EmployeeMonitoringScheduler** (`src/scheduler/employee_monitoring_scheduler.py`)
-   - Cron-like планировщик
-   - Поддержка daily/weekly/custom расписаний
-   - Управление конкурентными задачами
-   - Graceful shutdown
+### **TASK 6: Тестирование и валидация** 🟡
+- [ ] **Е2E тест полного workflow**
+  - [ ] Тест ежедневного анализа задач
+  - [ ] Тест ежедневного анализа протоколов
+  - [ ] Тест еженедельного отчета
+  
+- [ ] **Тест контроля качества**
+  - [ ] Валидация quality score < 90% и доработки
+  - [ ] Тест LLM улучшения отчетов
+  - [ ] Проверка максимального количества попыток
+  
+- [ ] **Интеграционное тестирование**
+  - [ ] Тест Jira API подключения
+  - [ ] Тест обработки протоколов
+  - [ ] Тест публикации в Confluence
 
-### **Интерфейсы Управления:**
-1. **Main System** (`src/main_employee_monitoring.py`)
-   - Демон режим для продакшн
-   - Интерактивный режим управления
-   - Единичный анализ
-   - Тестирование конфигурации
-
-2. **REST API** (`src/api/employee_monitoring_api.py`)
-   - FastAPI сервер с документацией
-   - Endpoint для управления задачами
-   - Мониторинг состояния системы
-   - Конфигурация через API
-
----
-
-## 🚀 **СПОСОБЫ ЗАПУСКА**
-
-### **1. Основной Системный Лаунчер:**
-```bash
-# Демон режим (рекомендован для продакшн)
-python src/main_employee_monitoring.py
-
-# Интерактивный режим
-python src/main_employee_monitoring.py --interactive
-
-# Единичный анализ
-python src/main_employee_monitoring.py --single-run
-
-# Тест конфигурации
-python src/main_employee_monitoring.py --config-test
-```
-
-### **2. REST API Сервер:**
-```bash
-# Стандартный запуск (localhost:8000)
-python src/api_server.py
-
-# Внешние соединения
-python src/api_server.py --host 0.0.0.0
-
-# Кастомный порт
-python src/api_server.py --port 9000
-
-# Режим разработки с auto-reload
-python src/api_server.py --reload
-```
-
-### **3. API Документация:**
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
-- **System Status**: http://localhost:8000/status
-
----
-
-## 📋 **РАСПИСАНИЕ ПО УМОЛЧАНИЮ**
-
-### **Ежедневные Задачи:**
-- **09:00** - Ежедневный анализ JIRA задач
-- **10:00** - Ежедневный анализ протоколов совещаний
-- **18:00** - Вечерний анализ задач
-
-### **Еженедельные Задачи:**
-- **Пятница 17:00** - Генерация еженедельного отчета
-
----
-
-## 🔗 **ПОДТВЕРЖДЕННЫЕ ИНТЕГРАЦИИ**
-
-### **Jira API:**
-- ✅ **1317 проектов** доступны
-- ✅ Bearer token аутентификация работает
-- ✅ REST API полностью функционален
-
-### **Confluence API:**
-- ✅ **25 пространств** доступны
-- ✅ Публикация страниц работает
-- ✅ Управление контентом подтверждено
-
----
-
-## 🎯 **КЛЮЧЕВЫЕ ВОЗМОЖНОСТИ**
-
-### **Мониторинг Производительности:**
-- Анализ JIRA задач (completion rate, productivity score, performance rating 1-10)
-- Выявление топ-перформеров и отстающих
-- Прогнозирование потребностей в поддержке
-- LLM-инсайты по каждому сотруднику
-
-### **Мониторинг Вовлеченности:**
-- Анализ протоколов совещаний (TXT, DOCX, PDF поддержка)
-- Оценка engagement score и activity rating
-- Выявление лидерских индикаторов
-- Отслеживание action items
-
-### **Автоматическая Отчетность:**
-- Комплексные отчеты с executive summary
-- Team-level insights и рекомендации
-- Автоматическая публикация в Confluence
-- Quality validation всех отчетов
-
-### **Планирование и Автоматизация:**
-- Cron-like планировщик (daily/weekly/custom расписания)
-- Параллельное выполнение с управлением зависимостями
-- Graceful error handling и retry механизмы
-- Интерактивный интерфейс управления
+### **TASK 7: Документация и развертывание** 🟢
+- [ ] **Обновить архитектурную документацию**
+  - [ ] Обновить `employee-monitoring-spec.md`
+  - [ ] Обновить `progress.md`
+  - [ ] Создать API documentation
+  
+- [ ] **Полностью переработать README.md**
+  - [ ] современная структура документа
+  - [ ] описание новой архитектуры
+  - [ ] инструкции по установке и использованию
+  - [ ] troubleshooting guide
+  
+- [ ] **Подготовить к развертыванию**
+  - [ ] Обновить конфигурацию если необходимо
+  - [ ] Проверить deployment скрипты
+  - [ ] Обновить systemctl service
 
 ---
 
-## 🏆 **ПРОИЗВОДСТВЕННАЯ ГОТОВНОСТЬ**
+## 🎯 КЛЮЧЕВЫЕ ЦЕЛИ
 
-### **✅ Готово к Продакшн:**
-- Масштабируемая архитектура (неограниченное число сотрудников)
-- Комплексный error handling и recovery
-- LLM-усиленная валидация результатов
-- Полностью автономное функционирование
-- Реальный мониторинг здоровья компонентов
-- Настраиваемые расписания и бизнес-правила
-- Интерактивный интерфейс управления
-- Graceful shutdown и рестарт
+### **Соответствие первоначальным требованиям:**
+- ✅ **QualityOrchestrator** оркестрирует всё + контроль качества на каждом этапе
+- ✅ **TaskAnalyzer** автоматически получает данные из Jira (включая коммиты/PR)
+- ✅ **MeetingAnalyzer** автоматически сканирует протоколы по заданному пути
+- ✅ **WeeklyReports** делает комплексный анализ + публикация в Confluence
+- ✅ **Качество** проверяется на каждом этапе с отправкой на доработку
 
-### **📊 Метрики Производительности:**
-- **API Response**: <2s (Jira), <1s (Confluence)
-- **Report Generation**: <5 минут (daily), <15 минут (weekly)
-- **System Uptime**: >99.5%
-- **Error Rate**: <1%
-- **Memory Usage**: <512MB baseline
+### **Технические цели:**
+- 🎯 Автономная работа всех компонентов (без input_data)
+- 🎯 Quality score >= 90% для финальных отчетов
+- 🎯 Устойчивость к ошибкам внешних API
+- 🎯 Полное соответствие TRL (_original requirements)
+- 🎯 Production-ready статус
 
 ---
 
-## 🚨 **ВОПРОСЫ БЕЗОПАСНОСТИ**
+## 📊 METRICS УСПЕХА
 
-### **Реализованные Мероприятия:**
-- ✅ PII защита и анонимизация
-- ✅ Token-based аутентификация
-- ✅ SSL/TLS поддержка
-- ✅ Ролевой доступ через API
-- ✅ Аудит логирование всех операций
-- ✅ Валидация всех входных данных
+### **Functional Metrics:**
+- [ ] System automatically fetches Jira data without input_data
+- [ ] System automatically scans protocols without input_data  
+- [ ] QualityOrchestrator controls quality at every step
+- [ ] Revision workflow works for quality < 90%
+- [ ] Weekly reports include commits and PR (from Jira)
 
----
-
-## 📈 **БУДУЩИЕ УЛУЧШЕНИЯ (Phase 4 - Опционально)**
-
-### **Potential Advanced Features:**
-1. **Real-time Dashboard** - Web интерфейс для live мониторинга
-2. **Advanced Analytics** - Trend анализ и прогнозы
-3. **Integration APIs** - REST API для внешних интеграций
-4. **Mobile Notifications** - Alert система для менеджеров
-5. **Custom Report Builder** - Drag-and-drop создание отчетов
-6. **Data Export** - Excel, PDF, PowerBI интеграция
-7. **Multi-language Support** - Русский/English интерфейс
-8. **Role-based Access** - Различные уровни доступа
+### **Technical Metrics:**
+- [ ] All components work autonomously
+- [ ] Quality score >= 90% for final reports
+- [ ] Daily analysis execution time < 5 minutes
+- [ ] Weekly report generation time < 15 minutes
+- [ ] System is resilient to API errors
 
 ---
 
-## 🎯 **КРИТЕРИИ УСПЕХА**
+## 🚀 СТАТУС РЕАЛИЗАЦИИ
 
-### **✅ Все Критерии Выполнены:**
-- ✅ Все основные агенты реализованы и протестированы
-- ✅ End-to-end workflow работает с реальными данными
-- ✅ Качество отчетов >= 90% (LLM validation)
-- ✅ Метрики производительности соответствуют целям
-- ✅ Безопасность подтверждена аудитом
-- ✅ Документация completa
-- ✅ Пользовательское тестирование успешно
+### **Overall Progress:**
+- **Phase 1 (QualityOrchestrator):** 0/4 completed
+- **Phase 2 (TaskAnalyzer):** 0/3 completed  
+- **Phase 3 (MeetingAnalyzer):** 0/3 completed
+- **Phase 4 (WeeklyReports):** 0/3 completed
+- **Phase 5 (Orchestration):** 0/3 completed
+- **Phase 6 (Testing):** 0/3 completed
+- **Phase 7 (Documentation):** 0/3 completed
 
----
-
-## 🏁 **ФИНАЛЬНЫЙ СТАТУС**
-
-**MTS MultAgent Employee Monitoring System является ПОЛНОСТЬЮ ЗАВЕРШЕННОЙ и ПРОИЗВОДСТВЕННО-ГОТОВОЙ системой!**
-
-✅ Все исходные требования реализованы  
-✅ Полная интеграция с инфраструктурой MTS (Jira + Confluence)  
-✅ Комплексный мониторинг и аналитика сотрудников  
-✅ Механизмы контроля качества и валидации  
-✅ Автоматизированная работа с планированием  
-✅ Интерактивные возможности управления  
-✅ Производственная готовность с error handling  
-✅ Полная документация и конфигурация  
-
-**Система Готова к Продакшн Развертыванию! 🚀**
+### **Current Focus:**
+- **Priority:** Создание QualityOrchestrator как главного компонента
+- **Timeline:** 2026-03-27 (один день)
+- **Risk:** Высокий (архитектурные изменения)
+- **Dependencies:** Jira API доступность, LLM сервис
 
 ---
 
-*Последнее обновление: 2026-03-26*  
-*Статус: Система Завершена - Готова к Продакшн*  
-*Следующий этап: Продакшн развертывание и обучение пользователей*
+## 📝 ЗАМЕТКИ
+
+### **Critical Dependencies:**
+- Jira API credentials и доступность
+- LLM сервис для контроля качества
+- Файловая система с протоколами собраний
+- Confluence API для публикации
+
+### **Known Issues:**
+- ⚠️ QualityValidatorAgent needs to become main orchestrator
+- ⚠️ TaskAnalyzerAgent needs direct Jira API integration
+- ⚠️ MeetingAnalyzerAgent needs auto-scanning capability
+- ⚠️ Git integration not needed (commits/PR in Jira)
+
+### **Risks & Mitigation:**
+- 🔴 **Risk:** Architectural changes may break existing functionality  
+  **Mitigation:** Comprehensive testing before deployment
+- 🟡 **Risk:** Jira API rate limits or downtime  
+  **Mitigation**: Retry logic and error handling
+- 🟡 **Risk:** LLM service availability for quality control  
+  **Mitigation**: Fallback validation methods
+
+---
+
+**Last Updated:** 2026-03-27  
+**Responsible:** AI Assistant  
+**Status:** READY FOR IMPLEMENTATION  
+**Next Action:** Start with QualityOrchestrator implementation
+
+---
+*"The goal is 100% compliance with original requirements through architectural fixes"*
