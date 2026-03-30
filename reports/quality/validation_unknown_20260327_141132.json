@@ -1,0 +1,109 @@
+{
+  "validation_timestamp": "2026-03-27T14:11:32.602825",
+  "validator_agent": "QualityValidatorAgent",
+  "analysis_type": "unknown",
+  "analysis_id": "analysis_20260327_141132",
+  "validation_status": "rejected",
+  "overall_score": 0.40499999999999997,
+  "rule_results": {
+    "employee_data_completeness": {
+      "score": 0.0,
+      "threshold": 0.8,
+      "passed": false,
+      "weight": 0.2,
+      "issues": [
+        "No employee data found"
+      ],
+      "recommendations": [
+        "Add employee data to analysis"
+      ]
+    },
+    "data_consistency": {
+      "score": 1.0,
+      "threshold": 0.85,
+      "passed": true,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": []
+    },
+    "performance_accuracy": {
+      "score": 1.0,
+      "threshold": 0.9,
+      "passed": true,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": []
+    },
+    "insight_quality": {
+      "score": 0.3,
+      "threshold": 0.75,
+      "passed": false,
+      "weight": 0.2,
+      "issues": [
+        "No team insights provided"
+      ],
+      "recommendations": [
+        "Add meaningful team insights to the analysis"
+      ]
+    },
+    "data_integrity": {
+      "score": 0.0,
+      "threshold": 0.95,
+      "passed": false,
+      "weight": 0.15,
+      "issues": [
+        "Critical field 'total_employees' is missing or null",
+        "Critical field 'employees_progress' is missing or null"
+      ],
+      "recommendations": [
+        "Review and fix data integrity issues"
+      ]
+    },
+    "recommendation_relevance": {
+      "score": 0.3,
+      "threshold": 0.8,
+      "passed": false,
+      "weight": 0.15,
+      "issues": [
+        "No recommendations provided"
+      ],
+      "recommendations": [
+        "Add actionable recommendations to the analysis"
+      ]
+    }
+  },
+  "issues_found": [
+    "No employee data found",
+    "No team insights provided",
+    "Critical field 'total_employees' is missing or null",
+    "Critical field 'employees_progress' is missing or null",
+    "No recommendations provided"
+  ],
+  "recommendations": [
+    "Add employee data to analysis",
+    "Add meaningful team insights to the analysis",
+    "Review and fix data integrity issues",
+    "Add actionable recommendations to the analysis"
+  ],
+  "revision_suggestions": {
+    "llm_insights": "LLM validation insights would be added here",
+    "automated_improvements": [
+      "Consider adding more specific metrics to insights",
+      "Review recommendation actionability",
+      "Enhance data visualization suggestions"
+    ]
+  },
+  "quality_metrics": {
+    "completeness_score": 0.0,
+    "accuracy_score": 1.0,
+    "consistency_score": 1.0,
+    "insight_quality_score": 0.3,
+    "data_integrity_score": 0.0,
+    "overall_quality_score": 0.43999999999999995
+  },
+  "analysis_summary": {
+    "employees_analyzed": 0,
+    "insights_generated": 0,
+    "recommendations_generated": 0
+  }
+}

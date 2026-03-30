@@ -8,6 +8,7 @@ atomic operations, and indexing for scheduled architecture.
 import json
 import asyncio
 import aiofiles
+import logging
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
@@ -22,12 +23,14 @@ from .schemas import (
     DailySummarySchema, WeeklySummarySchema
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class StorageConfig:
     """Configuration for JSON memory store"""
-    base_path: Path = Path("/data/memory/json")
-    backup_path: Path = Path("/data/memory/backups")
+    base_path: Path = Path("./data/memory/json")
+    backup_path: Path = Path("./data/memory/backups")
     max_file_size_mb: int = 100
     retention_days: int = 365
     enable_compression: bool = True
@@ -459,6 +462,67 @@ class JSONMemoryStore:
         except Exception as e:
             raise StorageError(f"Failed to get storage stats: {str(e)}")
     
+    async def save_record(
+        self,
+        data: Dict[str, Any],
+        record_type: str,
+        record_id: str = None,
+        source: str = "unknown"
+    ) -> str:
+        """
+        Save a record with automatic type handling and ID generation.
+        
+        This method provides a simplified interface for saving records
+        that can be used by agents without worrying about file paths.
+        
+        Args:
+            data: Record data to save
+            record_type: Type of record (e.g., 'quality_validation', 'employee_analysis')
+            record_id: Optional record ID (auto-generated if not provided)
+            source: Source of the record (agent name, system component)
+            
+        Returns:
+            Record ID and file path
+        """
+        try:
+            # Generate record ID if not provided
+            if record_id is None:
+                record_id = f"{record_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+            
+            # Enrich data with record metadata
+            enriched_data = {
+                "record_id": record_id,
+                "record_type": record_type,
+                "source": source,
+                "created_at": datetime.now().isoformat(),
+                "data": data
+            }
+            
+            # Determine data type for schema validation
+            data_type_mapping = {
+                "quality_validation": "daily_summary_data",
+                "employee_analysis": "daily_jira_data", 
+                "employee_analysis_record": "daily_jira_data",
+                "meeting_analysis": "daily_meeting_data",
+                "weekly_report": "weekly_summary_data"
+            }
+            
+            mapped_data_type = data_type_mapping.get(record_type, "daily_summary_data")
+            
+            # Save using persist_json_data
+            file_path = await self.persist_json_data(
+                data_type=mapped_data_type,
+                data=enriched_data,
+                target_date=date.today()
+            )
+            
+            logger.info(f"Record saved: {record_id} -> {file_path}")
+            return record_id
+            
+        except Exception as e:
+            logger.error(f"Failed to save record {record_id}: {e}")
+            raise StorageError(f"Failed to save record: {str(e)}")
+    
     async def health_check(self) -> Dict[str, Any]:
         """Perform health check on storage system"""
         try:
@@ -477,8 +541,16 @@ class JSONMemoryStore:
             stat = shutil.disk_usage(str(self.base_path))
             free_space_gb = round(stat.free / (1024**3), 2)
             
+            # Check if store is healthy for common operations
+            try:
+                # Test basic operations
+                await self.get_storage_stats()
+                is_healthy = True
+            except Exception:
+                is_healthy = False
+            
             return {
-                "status": "healthy" if permissions_ok else "unhealthy",
+                "status": "healthy" if permissions_ok and is_healthy else "unhealthy",
                 "permissions_ok": permissions_ok,
                 "free_space_gb": free_space_gb,
                 "storage_stats": stats,

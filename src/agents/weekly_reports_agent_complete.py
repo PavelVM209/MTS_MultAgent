@@ -1,0 +1,970 @@
+# -*- coding: utf-8 -*-
+"""
+Weekly Reports Agent - Employee Monitoring System (Complete version)
+
+Генерирует еженедельные отчеты по сотрудникам с публикацией в Confluence.
+"""
+
+import asyncio
+import logging
+import json
+import aiohttp
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from core.base_agent import BaseAgent, AgentConfig, AgentResult
+from core.llm_client import LLMClient
+from core.json_memory_store import JSONMemoryStore
+from core.quality_metrics import QualityMetrics
+from core.config import get_employee_monitoring_config
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EmployeeWeeklySummary:
+    """Еженедельная сводка по сотруднику."""
+    employee_name: str
+    week_start: datetime
+    week_end: datetime
+    
+    # Task metrics (из Jira)
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    in_progress_tasks: int = 0
+    story_points_completed: float = 0.0
+    commits_count: int = 0  # Из Jira development panel
+    
+    # Meeting metrics
+    meetings_attended: int = 0
+    meetings_total: int = 0
+    speaking_turns: int = 0
+    action_items_completed: int = 0
+    suggestions_made: int = 0
+    
+    # Performance indicators
+    task_completion_rate: float = 0.0
+    meeting_engagement_score: float = 0.0
+    overall_performance_score: float = 0.0
+    
+    # Insights
+    key_achievements: List[str] = field(default_factory=list)
+    areas_for_improvement: List[str] = field(default_factory=list)
+    llm_insights: str = ""
+    
+    # Metadata
+    last_updated: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
+class WeeklyReportResult:
+    """Результат еженедельного отчета."""
+    week_start: datetime
+    week_end: datetime
+    employees_summaries: Dict[str, EmployeeWeeklySummary]
+    
+    # Summary statistics
+    total_employees: int
+    total_tasks_completed: int
+    total_story_points: int
+    total_meetings: int
+    avg_performance_score: float
+    
+    # Team insights
+    top_performers: List[str]
+    employees_needing_attention: List[str]
+    team_achievements: List[str]
+    team_challenges: List[str]
+    
+    # Recommendations
+    individual_recommendations: Dict[str, List[str]]
+    team_recommendations: List[str]
+    
+    # Quality and metadata
+    quality_score: float
+    report_generated_at: datetime
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class WeeklyReportsAgentComplete(BaseAgent):
+    """
+    Агент еженедельных отчетов для Employee Monitoring System.
+    """
+    
+    def __init__(self, config: Optional[AgentConfig] = None):
+        super().__init__(
+            config or AgentConfig(
+                name="WeeklyReportsAgent",
+                description="Generates weekly employee reports with Confluence publishing",
+                version="1.0.0"
+            )
+        )
+        
+        # Initialize components
+        self.llm_client = LLMClient()
+        self.memory_store = JSONMemoryStore()
+        self.quality_metrics = QualityMetrics()
+        
+        # Load configuration
+        self.emp_config = get_employee_monitoring_config()
+        self.reports_config = self.emp_config.get('reports', {})
+        self.confluence_config = self.emp_config.get('confluence', {})
+        self.quality_config = self.emp_config.get('quality', {})
+        
+        # Analysis parameters
+        self.weekly_reports_dir = Path(self.reports_config.get('weekly_reports_dir', './reports/weekly'))
+        self.weekly_reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Confluence configuration
+        self.confluence_url = self.confluence_config.get('url', '')
+        self.confluence_api_token = self.confluence_config.get('api_token', '')
+        self.confluence_space_key = self.confluence_config.get('space_key', '')
+        self.confluence_parent_page_id = self.confluence_config.get('parent_page_id', '')
+        
+        logger.info("WeeklyReportsAgent initialized (without Git integration)")
+    
+    async def publish_to_confluence(self, report_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Публикация отчета в Confluence."""
+        try:
+            if not all([self.confluence_url, self.confluence_api_token]):
+                logger.warning("Confluence configuration incomplete, skipping publication")
+                return {
+                    'success': False,
+                    'error': 'Confluence configuration incomplete'
+                }
+            
+            # Формируем контент страницы
+            page_title = f"Weekly Report - Week {report_data.get('week_number', 'Unknown')} ({report_data.get('period', {}).get('start', 'Unknown')[:10]})"
+            page_content = await self._format_confluence_content(report_data)
+            
+            # Создаем или обновляем страницу
+            page_url = await self._create_confluence_page(page_title, page_content)
+            
+            if page_url:
+                logger.info(f"Successfully published weekly report to Confluence: {page_url}")
+                return {
+                    'success': True,
+                    'url': page_url,
+                    'title': page_title
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Failed to create Confluence page'
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to publish to Confluence: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def _format_confluence_content(self, report_data: Dict[str, Any]) -> str:
+        """Форматирование контента для Confluence."""
+        try:
+            content_parts = [
+                f"h1. Weekly Employee Report - Week {report_data.get('week_number', 'Unknown')}",
+                "",
+                f"*Period:* {report_data.get('period', {}).get('start', 'Unknown')[:10]} - {report_data.get('period', {}).get('end', 'Unknown')[:10]}",
+                f"*Generated:* {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                "",
+                "h2. Summary Statistics",
+                "",
+                f"* Total Employees: {report_data.get('total_employees', 0)}",
+                f"* Total Tasks Completed: {report_data.get('total_tasks_completed', 0)}",
+                f"* Total Story Points: {report_data.get('total_story_points', 0)}",
+                f"* Average Performance Score: {report_data.get('avg_performance_score', 0):.2f}/10",
+                "",
+                "h2. Top Performers",
+                ""
+            ]
+            
+            # Добавляем топ performers
+            top_performers = report_data.get('top_performers', [])
+            if top_performers:
+                for i, performer in enumerate(top_performers[:5], 1):
+                    content_parts.append(f"# {i}. {performer}")
+                content_parts.append("")
+            else:
+                content_parts.append("No top performers identified this week.")
+                content_parts.append("")
+            
+            content_parts.extend([
+                "h2. Employees Needing Attention",
+                ""
+            ])
+            
+            # Добавляем сотрудников нуждающихся во внимании
+            employees_needing_attention = report_data.get('employees_needing_attention', [])
+            if employees_needing_attention:
+                for employee in employees_needing_attention:
+                    content_parts.append(f"* {employee}")
+                content_parts.append("")
+            else:
+                content_parts.append("All employees performing well this week.")
+                content_parts.append("")
+            
+            content_parts.extend([
+                "h2. Team Achievements",
+                ""
+            ])
+            
+            # Добавляем достижения команды
+            team_achievements = report_data.get('team_achievements', [])
+            if team_achievements:
+                for achievement in team_achievements:
+                    content_parts.append(f"* {achievement}")
+                content_parts.append("")
+            else:
+                content_parts.append("No specific team achievements identified this week.")
+                content_parts.append("")
+            
+            content_parts.extend([
+                "h2. Team Challenges",
+                ""
+            ])
+            
+            # Добавляем проблемы команды
+            team_challenges = report_data.get('team_challenges', [])
+            if team_challenges:
+                for challenge in team_challenges:
+                    content_parts.append(f"* {challenge}")
+                content_parts.append("")
+            else:
+                content_parts.append("No significant team challenges identified this week.")
+                content_parts.append("")
+            
+            content_parts.extend([
+                "h2. Team Recommendations",
+                ""
+            ])
+            
+            # Добавляем рекомендации команде
+            team_recommendations = report_data.get('team_recommendations', [])
+            if team_recommendations:
+                for recommendation in team_recommendations:
+                    content_parts.append(f"* {recommendation}")
+                content_parts.append("")
+            else:
+                content_parts.append("No specific team recommendations for this week.")
+                content_parts.append("")
+            
+            # Добавляем детальную информацию по сотрудникам
+            employees_summaries = report_data.get('employees_summaries', {})
+            if employees_summaries:
+                content_parts.extend([
+                    "h2. Individual Employee Details",
+                    ""
+                ])
+                
+                for employee_name, summary in employees_summaries.items():
+                    content_parts.extend([
+                        f"h3. {employee_name}",
+                        "",
+                        f"* Total Tasks: {summary.get('total_tasks', 0)}",
+                        f"* Completed Tasks: {summary.get('completed_tasks', 0)} ({summary.get('task_completion_rate', 0):.1%})",
+                        f"* Story Points: {summary.get('story_points_completed', 0)}",
+                        f"* Commits: {summary.get('commits_count', 0)}",
+                        f"* Meetings Attended: {summary.get('meetings_attended', 0)}/{summary.get('meetings_total', 0)}",
+                        f"* Speaking Turns: {summary.get('speaking_turns', 0)}",
+                        f"* Action Items Completed: {summary.get('action_items_completed', 0)}",
+                        f"* Suggestions Made: {summary.get('suggestions_made', 0)}",
+                        f"* Overall Performance Score: {summary.get('overall_performance_score', 0):.2f}/10",
+                        ""
+                    ])
+                    
+                    # Ключевые достижения
+                    key_achievements = summary.get('key_achievements', [])
+                    if key_achievements:
+                        content_parts.extend([
+                            "*Key Achievements:*",
+                            ""
+                        ])
+                        for achievement in key_achievements:
+                            content_parts.append(f"** {achievement}")
+                        content_parts.append("")
+                    
+                    # Области для улучшения
+                    areas_for_improvement = summary.get('areas_for_improvement', [])
+                    if areas_for_improvement:
+                        content_parts.extend([
+                            "*Areas for Improvement:*",
+                            ""
+                        ])
+                        for area in areas_for_improvement:
+                            content_parts.append(f"** {area}")
+                        content_parts.append("")
+            
+            return "\n".join(content_parts)
+            
+        except Exception as e:
+            logger.error(f"Failed to format Confluence content: {e}")
+            return "Error formatting report content"
+    
+    async def _create_confluence_page(self, title: str, content: str) -> Optional[str]:
+        """Создание страницы в Confluence."""
+        try:
+            # Используем Bearer токен для авторизации
+            headers = {
+                "Authorization": f"Bearer {self.confluence_api_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Сначала проверяем существует ли страница
+            existing_page = await self._find_existing_page(title)
+            
+            if existing_page:
+                # Обновляем существующую страницу
+                page_data = {
+                    "id": existing_page['id'],
+                    "title": title,
+                    "type": "page",
+                    "space": {"key": self.confluence_space_key},
+                    "body": {
+                        "storage": {
+                            "value": content,
+                            "representation": "wiki"
+                        }
+                    },
+                    "version": {"number": existing_page['version'] + 1}
+                }
+                
+                url = f"{self.confluence_url}/rest/api/content/{existing_page['id']}"
+                method = "PUT"
+            else:
+                # Создаем новую страницу
+                page_data = {
+                    "title": title,
+                    "type": "page",
+                    "space": {"key": self.confluence_space_key},
+                    "ancestors": [{"id": self.confluence_parent_page_id}] if self.confluence_parent_page_id else None,
+                    "body": {
+                        "storage": {
+                            "value": content,
+                            "representation": "wiki"
+                        }
+                    }
+                }
+                
+                url = f"{self.confluence_url}/rest/api/content"
+                method = "POST"
+            
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.request(method, url, json=page_data) as response:
+                    if response.status in [200, 201]:
+                        result = await response.json()
+                        page_id = result.get('id')
+                        return f"{self.confluence_url}/pages/viewpage.action?pageId={page_id}"
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Confluence API error: {response.status} - {error_text}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Failed to create Confluence page: {e}")
+            return None
+    
+    async def _find_existing_page(self, title: str) -> Optional[Dict[str, Any]]:
+        """Поиск существующей страницы по заголовку."""
+        try:
+            # Используем Bearer токен для авторизации
+            headers = {
+                "Authorization": f"Bearer {self.confluence_api_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Ищем страницу по заголовку
+            search_url = f"{self.confluence_url}/rest/api/content"
+            params = {
+                "title": title,
+                "spaceKey": self.confluence_space_key,
+                "expand": "version"
+            }
+            
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(search_url, params=params) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        results = result.get('results', [])
+                        if results:
+                            return results[0]
+                    return None
+                        
+        except Exception as e:
+            logger.error(f"Failed to find existing Confluence page: {e}")
+            return None
+    
+    async def execute(self, input_data: Dict[str, Any] = None, **kwargs) -> AgentResult:
+        """Основной метод выполнения агента."""
+        try:
+            # Handle both old and new calling conventions
+            if input_data is None:
+                input_data = {}
+            
+            week_start = input_data.get('week_start') or kwargs.get('week_start')
+            week_end = input_data.get('week_end') or kwargs.get('week_end')
+            
+            # Generate weekly report
+            report_result = await self.generate_weekly_report(week_start, week_end)
+            
+            if report_result and report_result.quality_score >= self.quality_config.get('threshold', 0.8):
+                # Publish to Confluence if quality is good
+                publication_result = await self.publish_to_confluence(report_result.__dict__)
+                
+                if publication_result.get('success'):
+                    return AgentResult(
+                        success=True,
+                        message=f"Weekly report generated and published to Confluence successfully",
+                        data={
+                            'report': report_result.__dict__,
+                            'publication': publication_result
+                        }
+                    )
+                else:
+                    return AgentResult(
+                        success=False,
+                        message=f"Weekly report generated but publication failed: {publication_result.get('error')}",
+                        data={
+                            'report': report_result.__dict__,
+                            'publication_error': publication_result.get('error')
+                        }
+                    )
+            else:
+                return AgentResult(
+                    success=False,
+                    message="Weekly report generated but quality check failed",
+                    data={'report': report_result.__dict__ if report_result else None}
+                )
+                
+        except Exception as e:
+            logger.error(f"WeeklyReportsAgent execution failed: {e}")
+            return AgentResult(
+                success=False,
+                message=f"Weekly report generation failed: {str(e)}",
+                data={'error': str(e)}
+            )
+    
+    async def generate_weekly_report(self, week_start: datetime = None, week_end: datetime = None) -> WeeklyReportResult:
+        """Генерация еженедельного отчета."""
+        try:
+            # Определяем период отчета
+            if week_end is None:
+                week_end = datetime.now()
+            if week_start is None:
+                # Начало недели (понедельник)
+                days_since_monday = week_end.weekday()
+                week_start = week_end - timedelta(days=days_since_monday)
+            
+            logger.info(f"Generating weekly report for period {week_start.date()} to {week_end.date()}")
+            
+            # Собираем данные из хранилища
+            daily_jira_data = await self._load_daily_jira_data(week_start, week_end)
+            daily_meeting_data = await self._load_daily_meeting_data(week_start, week_end)
+            
+            # Анализируем данные по сотрудникам
+            employees_summaries = await self._analyze_employee_data(daily_jira_data, daily_meeting_data, week_start, week_end)
+            
+            # Формируем статистику
+            total_employees = len(employees_summaries)
+            total_tasks_completed = sum(s.completed_tasks for s in employees_summaries.values())
+            total_story_points = int(sum(s.story_points_completed for s in employees_summaries.values()))
+            total_meetings = sum(s.meetings_attended for s in employees_summaries.values())
+            avg_performance_score = sum(s.overall_performance_score for s in employees_summaries.values()) / total_employees if total_employees > 0 else 0
+            
+            # Генерируем инсайты с помощью LLM
+            team_insights = await self._generate_team_insights(employees_summaries)
+            
+            # Формируем результат
+            report_result = WeeklyReportResult(
+                week_start=week_start,
+                week_end=week_end,
+                employees_summaries=employees_summaries,
+                total_employees=total_employees,
+                total_tasks_completed=total_tasks_completed,
+                total_story_points=total_story_points,
+                total_meetings=total_meetings,
+                avg_performance_score=avg_performance_score,
+                top_performers=team_insights.get('top_performers', []),
+                employees_needing_attention=team_insights.get('employees_needing_attention', []),
+                team_achievements=team_insights.get('team_achievements', []),
+                team_challenges=team_insights.get('team_challenges', []),
+                individual_recommendations=team_insights.get('individual_recommendations', {}),
+                team_recommendations=team_insights.get('team_recommendations', []),
+                quality_score=await self._calculate_report_quality(employees_summaries),
+                report_generated_at=datetime.now()
+            )
+            
+            # Сохраняем отчет в хранилище
+            await self._save_report_to_storage(report_result)
+            
+            logger.info(f"Weekly report generated successfully for {total_employees} employees")
+            return report_result
+            
+        except Exception as e:
+            logger.error(f"Failed to generate weekly report: {e}")
+            raise
+    
+    async def _load_daily_jira_data(self, week_start: datetime, week_end: datetime) -> List[Dict]:
+        """Загрузка ежедневных данных Jira за неделю."""
+        try:
+            jira_data = []
+            current_date = week_start.date()
+            
+            while current_date <= week_end.date():
+                try:
+                    daily_data = await self.memory_store.load_json_data('daily_jira_data', current_date)
+                    jira_data.append(daily_data)
+                except FileNotFoundError:
+                    logger.warning(f"No Jira data found for {current_date}")
+                except Exception as e:
+                    logger.error(f"Error loading Jira data for {current_date}: {e}")
+                
+                current_date += timedelta(days=1)
+            
+            return jira_data
+            
+        except Exception as e:
+            logger.error(f"Failed to load daily Jira data: {e}")
+            return []
+    
+    async def _load_daily_meeting_data(self, week_start: datetime, week_end: datetime) -> List[Dict]:
+        """Загрузка ежедневных данных собраний за неделю."""
+        try:
+            meeting_data = []
+            current_date = week_start.date()
+            
+            while current_date <= week_end.date():
+                try:
+                    daily_data = await self.memory_store.load_json_data('daily_meeting_data', current_date)
+                    meeting_data.append(daily_data)
+                except FileNotFoundError:
+                    logger.warning(f"No meeting data found for {current_date}")
+                except Exception as e:
+                    logger.error(f"Error loading meeting data for {current_date}: {e}")
+                
+                current_date += timedelta(days=1)
+            
+            return meeting_data
+            
+        except Exception as e:
+            logger.error(f"Failed to load daily meeting data: {e}")
+            return []
+    
+    async def _analyze_employee_data(self, jira_data: List[Dict], meeting_data: List[Dict], week_start: datetime, week_end: datetime) -> Dict[str, EmployeeWeeklySummary]:
+        """Анализ данных по сотрудникам."""
+        try:
+            employees_summaries = {}
+            
+            # Собираем всех сотрудников из данных Jira
+            for daily_jira in jira_data:
+                employees = daily_jira.get('employees', {})
+                for employee_name, employee_tasks in employees.items():
+                    if employee_name not in employees_summaries:
+                        employees_summaries[employee_name] = EmployeeWeeklySummary(
+                            employee_name=employee_name,
+                            week_start=week_start,
+                            week_end=week_end
+                        )
+                    
+                    summary = employees_summaries[employee_name]
+                    
+                    # Обновляем метрики задач
+                    summary.total_tasks += len(employee_tasks.get('tasks', []))
+                    summary.completed_tasks += len([t for t in employee_tasks.get('tasks', []) if t.get('status') == 'Done'])
+                    summary.in_progress_tasks += len([t for t in employee_tasks.get('tasks', []) if t.get('status') == 'In Progress'])
+                    summary.story_points_completed += sum(t.get('story_points', 0) for t in employee_tasks.get('tasks', []) if t.get('status') == 'Done')
+                    summary.commits_count += employee_tasks.get('commits_count', 0)
+            
+            # Собираем данные из протоколов собраний
+            for daily_meeting in meeting_data:
+                meeting_analyses = daily_meeting.get('meeting_analyses', [])
+                for analysis in meeting_analyses:
+                    participant_insights = analysis.get('participant_insights', {})
+                    for employee_name, insights in participant_insights.items():
+                        if employee_name not in employees_summaries:
+                            employees_summaries[employee_name] = EmployeeWeeklySummary(
+                                employee_name=employee_name,
+                                week_start=week_start,
+                                week_end=week_end
+                            )
+                        
+                        summary = employees_summaries[employee_name]
+                        
+                        # Обновляем метрики собраний
+                        if insights.get('attended'):
+                            summary.meetings_attended += 1
+                        summary.meetings_total += 1
+                        summary.speaking_turns += insights.get('speaking_turns', 0)
+                        summary.action_items_completed += insights.get('action_items_completed', 0)
+                        summary.suggestions_made += insights.get('suggestions_made', 0)
+            
+            # Рассчитываем производные метрики
+            for summary in employees_summaries.values():
+                summary.task_completion_rate = summary.completed_tasks / summary.total_tasks if summary.total_tasks > 0 else 0
+                summary.meeting_engagement_score = min(10, (summary.speaking_turns + summary.suggestions_made) / max(1, summary.meetings_attended))
+                
+                # Генерируем инсайты с помощью LLM
+                await self._generate_employee_insights(summary)
+            
+            return employees_summaries
+            
+        except Exception as e:
+            logger.error(f"Failed to analyze employee data: {e}")
+            return {}
+    
+    async def _generate_employee_insights(self, summary: EmployeeWeeklySummary):
+        """Генерация инсайтов по сотруднику с помощью LLM."""
+        try:
+            llm_available = await self.llm_client.is_available()
+            if not llm_available:
+                # Базовая логика без LLM
+                if summary.task_completion_rate >= 0.9:
+                    summary.key_achievements.append("Excellent task completion rate")
+                    summary.overall_performance_score = 9.0
+                elif summary.task_completion_rate >= 0.7:
+                    summary.key_achievements.append("Good task completion rate")
+                    summary.overall_performance_score = 7.0
+                else:
+                    summary.areas_for_improvement.append("Task completion needs improvement")
+                    summary.overall_performance_score = 5.0
+                return
+            
+            # Запрос к LLM для генерации инсайтов
+            prompt = f"""
+            Analyze employee performance for the week and provide insights:
+            
+            Employee: {summary.employee_name}
+            Week: {summary.week_start.date()} to {summary.week_end.date()}
+            
+            Task Metrics:
+            - Total tasks: {summary.total_tasks}
+            - Completed tasks: {summary.completed_tasks} ({summary.task_completion_rate:.1%})
+            - In progress tasks: {summary.in_progress_tasks}
+            - Story points completed: {summary.story_points_completed}
+            - Commits: {summary.commits_count}
+            
+            Meeting Metrics:
+            - Meetings attended: {summary.meetings_attended}/{summary.meetings_total}
+            - Speaking turns: {summary.speaking_turns}
+            - Action items completed: {summary.action_items_completed}
+            - Suggestions made: {summary.suggestions_made}
+            
+            Please provide:
+            1. Key achievements (max 3)
+            2. Areas for improvement (max 3)
+            3. Overall performance score (0-10)
+            4. Brief insights comment
+            
+            Format as JSON:
+            {{
+                "key_achievements": ["achievement1", "achievement2"],
+                "areas_for_improvement": ["area1", "area2"],
+                "overall_performance_score": 8.5,
+                "insights_comment": "Brief comment about performance"
+            }}
+            """
+            
+            response = await self.llm_client.generate_response(prompt)
+            
+            if response:
+                # Парсим JSON ответ
+                try:
+                    import json
+                    insights_data = json.loads(response)
+                    
+                    summary.key_achievements = insights_data.get('key_achievements', [])
+                    summary.areas_for_improvement = insights_data.get('areas_for_improvement', [])
+                    summary.overall_performance_score = insights_data.get('overall_performance_score', 5.0)
+                    summary.llm_insights = insights_data.get('insights_comment', '')
+                    
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse LLM response for {summary.employee_name}")
+                    # Используем базовую логику
+                    summary.overall_performance_score = min(10, summary.task_completion_rate * 10)
+            
+        except Exception as e:
+            logger.error(f"Failed to generate insights for {summary.employee_name}: {e}")
+            # Базовая оценка
+            summary.overall_performance_score = min(10, summary.task_completion_rate * 10)
+    
+    async def _generate_team_insights(self, employees_summaries: Dict[str, EmployeeWeeklySummary]) -> Dict[str, Any]:
+        """Генерация командных инсайтов."""
+        try:
+            if not employees_summaries:
+                return {}
+            
+            # Сортируем сотрудников по производительности
+            sorted_employees = sorted(
+                employees_summaries.items(),
+                key=lambda x: x[1].overall_performance_score,
+                reverse=True
+            )
+            
+            # Топ performers (топ 20%)
+            top_performers = [name for name, _ in sorted_employees[:max(1, len(sorted_employees) // 5)]]
+            
+            # Сотрудники нуждающиеся во внимании (низкие показатели)
+            employees_needing_attention = [
+                name for name, summary in employees_summaries.items()
+                if summary.overall_performance_score < 6.0 or summary.task_completion_rate < 0.7
+            ]
+            
+            # Генерируем достижения и проблемы команды
+            total_tasks = sum(s.total_tasks for s in employees_summaries.values())
+            completed_tasks = sum(s.completed_tasks for s in employees_summaries.values())
+            avg_completion_rate = completed_tasks / total_tasks if total_tasks > 0 else 0
+            
+            team_achievements = []
+            team_challenges = []
+            
+            if avg_completion_rate >= 0.9:
+                team_achievements.append("Excellent overall task completion rate")
+            elif avg_completion_rate >= 0.7:
+                team_achievements.append("Good team task completion rate")
+            else:
+                team_challenges.append("Low overall task completion rate")
+            
+            # Рекомендации команде
+            team_recommendations = []
+            if employees_needing_attention:
+                team_recommendations.append("Provide additional support and training for underperforming employees")
+            if avg_completion_rate < 0.8:
+                team_recommendations.append("Review and optimize task assignment process")
+            
+            # Индивидуальные рекомендации
+            individual_recommendations = {}
+            for name, summary in employees_summaries.items():
+                recommendations = []
+                if summary.task_completion_rate < 0.7:
+                    recommendations.append("Focus on completing assigned tasks on time")
+                if summary.meeting_engagement_score < 5:
+                    recommendations.append("Increase participation in team meetings")
+                if recommendations:
+                    individual_recommendations[name] = recommendations
+            
+            return {
+                'top_performers': top_performers,
+                'employees_needing_attention': employees_needing_attention,
+                'team_achievements': team_achievements,
+                'team_challenges': team_challenges,
+                'team_recommendations': team_recommendations,
+                'individual_recommendations': individual_recommendations
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to generate team insights: {e}")
+            return {}
+    
+    async def _calculate_report_quality(self, employees_summaries: Dict[str, EmployeeWeeklySummary]) -> float:
+        """Расчет качества отчета."""
+        try:
+            if not employees_summaries:
+                return 0.0
+            
+            # Базовые метрики качества
+            completeness = min(1.0, len(employees_summaries) / 5.0)  # Ожидаем минимум 5 сотрудников
+            
+            # Средняя полнота данных
+            avg_completeness = 0.0
+            for summary in employees_summaries.values():
+                employee_completeness = 0.0
+                if summary.total_tasks > 0:
+                    employee_completeness += 0.3  # Есть данные по задачам
+                if summary.meetings_total > 0:
+                    employee_completeness += 0.3  # Есть данные по собраниям
+                if summary.key_achievements or summary.areas_for_improvement:
+                    employee_completeness += 0.4  # Есть инсайты
+                
+                avg_completeness += employee_completeness
+            
+            if employees_summaries:
+                avg_completeness /= len(employees_summaries)
+            
+            # Итоговый скор качества
+            quality_score = (completeness * 0.4) + (avg_completeness * 0.6)
+            return min(1.0, quality_score)
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate report quality: {e}")
+            return 0.0
+    
+    async def _save_report_to_storage(self, report_result: WeeklyReportResult):
+        """Сохранение отчета в хранилище."""
+        try:
+            report_data = report_result.__dict__
+            
+            # Убираем не-сериализуемые объекты
+            report_data['employees_summaries'] = {
+                name: summary.__dict__ 
+                for name, summary in report_result.employees_summaries.items()
+            }
+            
+            # Сохраняем в JSON memory store
+            await self.memory_store.persist_json_data(
+                'weekly_summary_data', 
+                report_data,
+                report_result.week_start.date()
+            )
+            
+            # Также сохраняем локально
+            filename = f"weekly_report_{report_result.week_start.strftime('%Y-%m-%d')}.json"
+            file_path = self.weekly_reports_dir / filename
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(report_data, f, indent=2, ensure_ascii=False, default=str)
+            
+            logger.info(f"Weekly report saved to {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Failed to save weekly report to storage: {e}")
+            raise
+    
+    async def collect_weekly_data(self, week_start: datetime = None, week_end: datetime = None) -> Dict[str, Any]:
+        """
+        Collect weekly data for analysis and reporting.
+        
+        This method provides a simplified interface for collecting weekly data
+        that can be used by other components in the system.
+        
+        Args:
+            week_start: Start of the week (defaults to Monday of current week)
+            week_end: End of the week (defaults to current time)
+            
+        Returns:
+            Dictionary containing collected weekly data with task and meeting metrics
+        """
+        try:
+            logger.info("Starting weekly data collection")
+            
+            # Define week period if not provided
+            if week_end is None:
+                week_end = datetime.now()
+            if week_start is None:
+                # Start of week (Monday)
+                days_since_monday = week_end.weekday()
+                week_start = week_end - timedelta(days=days_since_monday)
+            
+            # Load daily Jira data for the week
+            daily_jira_data = await self._load_daily_jira_data(week_start, week_end)
+            
+            # Load daily meeting data for the week
+            daily_meeting_data = await self._load_daily_meeting_data(week_start, week_end)
+            
+            # Analyze employee data from both sources
+            employees_summaries = await self._analyze_employee_data(
+                daily_jira_data, 
+                daily_meeting_data, 
+                week_start, 
+                week_end
+            )
+            
+            # Calculate weekly statistics
+            total_employees = len(employees_summaries)
+            total_tasks_completed = sum(s.completed_tasks for s in employees_summaries.values())
+            total_story_points = int(sum(s.story_points_completed for s in employees_summaries.values()))
+            total_commits = sum(s.commits_count for s in employees_summaries.values())
+            total_meetings_attended = sum(s.meetings_attended for s in employees_summaries.values())
+            avg_performance_score = sum(s.overall_performance_score for s in employees_summaries.values()) / total_employees if total_employees > 0 else 0
+            
+            # Prepare employee details for output
+            employees_data = {}
+            for name, summary in employees_summaries.items():
+                employees_data[name] = {
+                    'total_tasks': summary.total_tasks,
+                    'completed_tasks': summary.completed_tasks,
+                    'completion_rate': summary.task_completion_rate,
+                    'story_points_completed': summary.story_points_completed,
+                    'commits_count': summary.commits_count,
+                    'meetings_attended': summary.meetings_attended,
+                    'meetings_total': summary.meetings_total,
+                    'meeting_engagement_score': summary.meeting_engagement_score,
+                    'speaking_turns': summary.speaking_turns,
+                    'action_items_completed': summary.action_items_completed,
+                    'suggestions_made': summary.suggestions_made,
+                    'overall_performance_score': summary.overall_performance_score,
+                    'key_achievements': summary.key_achievements,
+                    'areas_for_improvement': summary.areas_for_improvement,
+                    'llm_insights': summary.llm_insights
+                }
+            
+            # Generate team insights
+            team_insights = await self._generate_team_insights(employees_summaries)
+            
+            # Prepare result data
+            weekly_data = {
+                'collection_metadata': {
+                    'week_start': week_start.isoformat(),
+                    'week_end': week_end.isoformat(),
+                    'collection_time': datetime.now().isoformat(),
+                    'total_days_analyzed': (week_end - week_start).days + 1,
+                    'agent_name': self.config.name
+                },
+                'weekly_summary': {
+                    'total_employees': total_employees,
+                    'total_tasks_completed': total_tasks_completed,
+                    'total_story_points': total_story_points,
+                    'total_commits': total_commits,
+                    'total_meetings_attended': total_meetings_attended,
+                    'avg_performance_score': round(avg_performance_score, 2),
+                    'quality_score': await self._calculate_report_quality(employees_summaries)
+                },
+                'employees_data': employees_data,
+                'team_insights': {
+                    'top_performers': team_insights.get('top_performers', []),
+                    'employees_needing_attention': team_insights.get('employees_needing_attention', []),
+                    'team_achievements': team_insights.get('team_achievements', []),
+                    'team_challenges': team_insights.get('team_challenges', []),
+                    'team_recommendations': team_insights.get('team_recommendations', []),
+                    'individual_recommendations': team_insights.get('individual_recommendations', {})
+                },
+                'data_sources': {
+                    'jira_data_days': len(daily_jira_data),
+                    'meeting_data_days': len(daily_meeting_data),
+                    'data_quality': 'good' if len(daily_jira_data) > 0 and len(daily_meeting_data) > 0 else 'limited'
+                }
+            }
+            
+            logger.info(f"Weekly data collection completed: {total_employees} employees, "
+                       f"{total_tasks_completed} tasks completed, {total_commits} commits")
+            
+            return weekly_data
+            
+        except Exception as e:
+            logger.error(f"Failed to collect weekly data: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'collection_metadata': {
+                    'collection_time': datetime.now().isoformat(),
+                    'agent_name': self.config.name
+                }
+            }
+    
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Проверка состояния агента."""
+        try:
+            llm_available = await self.llm_client.is_available()
+            memory_available = self.memory_store.is_healthy()
+            confluence_configured = bool(self.confluence_url and self.confluence_api_token)
+            
+            return {
+                'agent_name': self.config.name,
+                'status': 'healthy' if llm_available and memory_available else 'degraded',
+                'llm_client': 'available' if llm_available else 'unavailable',
+                'memory_store': 'healthy' if memory_available else 'unhealthy',
+                'confluence_configured': confluence_configured,
+                'reports_directory': str(self.weekly_reports_dir),
+                'last_check': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return {
+                'agent_name': self.config.name,
+                'status': 'error',
+                'error': str(e),
+                'last_check': datetime.now().isoformat()
+            }

@@ -170,13 +170,13 @@ class SchedulerManager:
             
             # Configure job stores
             jobstores = {
-                'default': SQLAlchemyJobStore(url='sqlite:///jobs.sqlite'),
+                'default': MemoryJobStore(),
                 'memory': MemoryJobStore()
             }
             
             # Configure executors
             executors = {
-                'default': AsyncIOExecutor(max_workers=20)
+                'default': AsyncIOExecutor()
             }
             
             # Create scheduler

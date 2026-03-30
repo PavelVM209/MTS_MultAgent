@@ -8,6 +8,7 @@ Includes retry logic, error handling, and response validation.
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
@@ -105,33 +106,46 @@ class LLMClient:
         try:
             # Get configuration
             app_config = get_config()
-            llm_config = self.config.get('llm', app_config.get('llm', {}))
             
-            # Initialize client
-            api_key = llm_config.get('api_key')
-            base_url = llm_config.get('base_url')
-            organization = llm_config.get('organization')
+            # Get LLM configuration from environment variables
+            api_key = os.getenv('OPENAI_API_KEY')
+            base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+            model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            max_tokens = int(os.getenv('OPENAI_MAX_TOKENS', '2000'))
+            
+            if not api_key or api_key == "your-opencode-api-key":
+                logger.warning("OPENAI_API_KEY not configured or using placeholder")
+                # Initialize client anyway for testing - will fail gracefully
+                pass
             
             self._client = AsyncOpenAI(
                 api_key=api_key,
-                base_url=base_url,
-                organization=organization
+                base_url=base_url
             )
             
             # Set default model
-            self.default_model = llm_config.get('model', 'gpt-3.5-turbo')
-            self.max_tokens = llm_config.get('max_tokens', 2000)
-            self.temperature = llm_config.get('temperature', 0.7)
+            self.default_model = model
+            self.max_tokens = max_tokens
+            self.temperature = 0.7
             
             # Retry configuration
-            self.max_retries = llm_config.get('max_retries', 3)
-            self.retry_delay = llm_config.get('retry_delay', 1.0)
+            self.max_retries = 3
+            self.retry_delay = 1.0
             
             logger.info(f"LLM client initialized with model: {self.default_model}")
+            
+            # Add model alias for compatibility
+            self.model = self.default_model
+            
+            # Add base_url for compatibility
+            self.base_url = base_url
             
         except Exception as e:
             logger.error(f"Failed to initialize LLM client: {e}")
             self._client = None
+            self.default_model = "unknown"
+            self.model = "unknown"
+            self.base_url = "unknown"
     
     async def is_available(self) -> bool:
         """Check if LLM client is available."""
@@ -430,6 +444,56 @@ async def analyze_jira_data(jira_data: str, context: str = "") -> Dict[str, Any]
     return await client.generate_structured_response(prompt, schema)
 
 
+async def analyze_task_progress(task_data: str, context: str = "") -> Dict[str, Any]:
+    """
+    Analyze task progress using LLM.
+    
+    Args:
+        task_data: Raw task data
+        context: Additional context for analysis
+        
+    Returns:
+        Analysis results
+    """
+    client = get_llm_client()
+    
+    prompt = f"""
+    Analyze the following task data and extract progress insights:
+    
+    Task Data:
+    {task_data}
+    
+    Context: {context}
+    
+    Please provide analysis in JSON format with the following structure:
+    {{
+        "task_progress": {{
+            "total_tasks": number,
+            "completed_tasks": number,
+            "in_progress_tasks": number,
+            "blocked_tasks": number,
+            "overdue_tasks": number
+        }},
+        "employee_performance": {{
+            "employee_name": "name",
+            "task_completion_rate": number,
+            "productivity_score": number,
+            "quality_rating": number,
+            "key_achievements": ["achievement 1", "achievement 2"],
+            "areas_for_improvement": ["area 1", "area 2"]
+        }},
+        "insights": ["key insight 1", "key insight 2"],
+        "recommendations": ["recommendation 1", "recommendation 2"]
+    }}
+    """
+    
+    schema = {
+        "required": ["task_progress", "employee_performance", "insights", "recommendations"]
+    }
+    
+    return await client.generate_structured_response(prompt, schema)
+
+
 async def analyze_meeting_protocol(protocol_text: str) -> Dict[str, Any]:
     """
     Analyze meeting protocol using LLM.
@@ -471,6 +535,50 @@ async def analyze_meeting_protocol(protocol_text: str) -> Dict[str, Any]:
     
     schema = {
         "required": ["meeting_info", "action_items", "decisions", "key_topics", "next_steps"]
+    }
+    
+    return await client.generate_structured_response(prompt, schema)
+
+
+async def analyze_meeting_content(meeting_data: str) -> Dict[str, Any]:
+    """
+    Analyze meeting content using LLM.
+    
+    Args:
+        meeting_data: Meeting data/content
+        
+    Returns:
+        Analysis results
+    """
+    client = get_llm_client()
+    
+    prompt = f"""
+    Analyze the following meeting data and extract participation insights:
+    
+    Meeting Data:
+    {meeting_data}
+    
+    Please provide analysis in JSON format with the following structure:
+    {{
+        "participation_analysis": {{
+            "total_participants": number,
+            "active_participants": number,
+            "participation_rate": number,
+            "speaker_distribution": [{{"participant": "name", "speaking_turns": number}}]
+        }},
+        "employee_insights": {{
+            "participant_name": "name",
+            "analysis": "detailed analysis of participation",
+            "participation_rating": number,
+            "engagement_level": "high/medium/low"
+        }},
+        "team_insights": ["team insight 1", "team insight 2"],
+        "recommendations": ["recommendation 1", "recommendation 2"]
+    }}
+    """
+    
+    schema = {
+        "required": ["participation_analysis", "employee_insights", "team_insights", "recommendations"]
     }
     
     return await client.generate_structured_response(prompt, schema)

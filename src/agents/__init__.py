@@ -10,10 +10,5 @@ This module contains all specialized agents for the multi-agent system:
 
 __version__ = "0.1.0"
 
-from agents.jira_agent import JiraAgent
-from agents.context_analyzer import ContextAnalyzer
-
-__all__ = [
-    "JiraAgent",
-    "ContextAnalyzer"
-]
+# No imports to avoid relative import issues
+# Agents should be imported directly from their modules

@@ -1,612 +1,353 @@
-# Technical Context - MTS MultAgent Scheduled Architecture
+# Technical Context - MTS MultAgent Technology Stack
 
-## 🏗️ **Technical Architecture Overview**
+## 🛠️ Используемые технологии
 
-**Phase:** 3 - Scheduled Multi-Agent System  
-**Stack:** Python 3.11+, APScheduler, AsyncIO, OpenAI GPT-4, File-based JSON storage  
-**Pattern:** Event-driven scheduled workflows with orchestrated agent coordination  
+### **Core Technology Stack**
+- **Language:** Python 3.11+
+- **Runtime:** Linux Server (Ubuntu 20.04+ recommended)
+- **Package Management:** pip + requirements.txt + pyproject.toml
+- **Virtual Environment:** venv_py311/
 
----
-
-## 🔧 **Core Technology Stack**
-
-### **Runtime & Foundation**
+### **Key Libraries & Frameworks**
 ```python
-# Core Runtime
-Python: 3.11.5
-AsyncIO: Built-in asyncio for concurrent operations
-Type Hints: Full type annotations for code reliability
-Environment Management: python-dotenv with .env configuration
+# Core dependencies
+asyncio                 # Асинхронное выполнение
+aiohttp                # HTTP клиент для API запросов
+pydantic               # Валидация данных и модели
+pyyaml                 # Работа с YAML конфигурацией
+python-dotenv          # Управление environment variables
+click                  # CLI интерфейс
 
-# Scheduling & Orchestration
-APScheduler: 3.10+ for cron-based scheduling
-AsyncIOScheduler: Async-compatible scheduler implementation
-Circuit Breaker: Custom implementation for fault tolerance
-```
+# LLM Integration
+openai                 # OpenAI API клиент
+# yandexgpt            # Yandex GPT (опционально)
 
-### **LLM & AI Integration**
-```python
-# OpenAI Integration
-OpenAI API: GPT-4-turbo-preview for intelligent analysis
-LangChain: 0.1.0+ for LLM orchestration and prompt management
-Token Management: tiktoken for efficient API usage
-Caching: In-memory LLM response caching with TTL
-
-# Quality Validation
-Custom Quality Metrics: Multi-dimensional scoring system
-Iterative Improvement: Auto-refinement loops with convergence detection
-```
-
-### **Data Processing & Storage**
-```python
 # Data Processing
-Pandas: Data manipulation and analysis
-JSON Schema: Data validation and structure enforcement
-Pydantic: Type-safe data models with validation
+pandas                 # Обработка данных
+openpyxl               # Excel файлы (legacy support)
+python-docx            # Word документы
+python-multipart       # Multipart form data
 
-# File Processing
-PyPDF2: PDF document parsing
-python-docx: DOCX document processing
-Pathlib: Advanced file system operations
+# Web & API
+fastapi                # REST API сервер
+uvicorn                # ASGI сервер
 
-# Storage Architecture
-File-based JSON: Persistent memory store with 365-day retention
-Structured Directories: Hierarchical data organization
-Backup Systems: Automatic archival and compression
+# Testing
+pytest                 # Unit тесты
+pytest-asyncio         # Async тесты
+pytest-cov             # Coverage отчеты
 ```
 
-### **External APIs & Integration**
-```python
-# Jira Integration
-jira: Python Jira client library
-REST API: Direct API calls for advanced features
-Rate Limiting: Custom throttling implementation
-Authentication: API token-based auth
-
-# Confluence Integration
-atlassian-python-api: Confluence REST client
-Markdown Processing: Confluence-compatible formatting
-Page Management: Hierarchical page creation and updates
-
-# Git Integration
-GitPython: Repository interaction and commit analysis
-API Integration: GitLab/GitHub API for commit data
-Branch Analysis: Development activity tracking
-```
-
----
-
-## 🏛️ **Architecture Patterns**
-
-### **1. Scheduled Agent Architecture**
-```python
-# Master-Slave Pattern with Orchestration
-class ScheduledAgentSystem:
-    """
-    Scheduled multi-agent system with orchestrated workflows
-    """
-    
-    # Core Components
-    scheduler: AsyncIOScheduler          # Time-based execution
-    orchestrator: OrchestratorAgent      # Central coordination
-    agents: Dict[str, BaseAgent]         # Specialized agents
-    memory_store: JSONMemoryStore       # Persistent state
-    
-    # Execution Patterns
-    async def execute_scheduled_workflow(self, workflow_type: str):
-        """Orchestrated workflow execution"""
-        
-    async def coordinate_parallel_execution(self, agent_ids: List[str]):
-        """Parallel agent coordination"""
-        
-    async def validate_quality_gates(self, results: List[AgentResult]):
-        """Quality control validation"""
-```
-
-### **2. JSON-First Data Architecture**
-```python
-# Event Sourcing with JSON Persistence
-class JSONMemoryStore:
-    """
-    JSON-based event sourcing and state management
-    """
-    
-    # Data Patterns
-    event_stream: List[JSONEvent]        # Immutable event log
-    state_snapshots: Dict[str, JSONState] # Periodic state captures
-    indexes: Dict[str, JSONIndex]        # Fast lookup indexes
-    
-    # Operations
-    async def append_event(self, event: JSONEvent) -> None:
-        """Append new event to stream"""
-        
-    async def get_state(self, timestamp: datetime) -> JSONState:
-        """Reconstruct state at specific time"""
-        
-    async def query_events(self, filter: EventFilter) -> List[JSONEvent]:
-        """Query events with filters"""
-```
-
-### **3. Circuit Breaker Resilience Pattern**
-```python
-# Fault-Tolerant External API Access
-class CircuitBreaker:
-    """
-    Circuit breaker for external service resilience
-    """
-    
-    # States
-    CLOSED: "Normal operation"
-    OPEN: "Service unavailable, fail fast"
-    HALF_OPEN: "Testing service recovery"
-    
-    # Configuration
-    failure_threshold: int = 5          # Failures before opening
-    recovery_timeout: int = 300         # Seconds before testing
-    success_threshold: int = 2          # Successes to close
-    
-    # Implementation
-    async def execute_with_protection(self, operation: Callable) -> Any:
-        """Execute operation with circuit protection"""
-```
-
-### **4. Quality Control Pipeline Pattern**
-```python
-# Multi-Stage Quality Validation
-class QualityController:
-    """
-    LLM-based quality control with iterative improvement
-    """
-    
-    # Validation Stages
-    completeness_check: CompletenessValidator
-    accuracy_check: AccuracyValidator
-    format_check: FormatValidator
-    
-    # Improvement Loop
-    async def validate_and_improve(self, data: Any) -> QualityValidated:
-        """Validate quality and auto-improve if needed"""
-        
-    async def llm_quality_assessment(self, data: Any) -> QualityMetrics:
-        """LLM-based quality scoring"""
-        
-    async def apply_improvements(self, data: Any, feedback: str) -> Any:
-        """Apply LLM-suggested improvements"""
-```
-
----
-
-## 🔌 **Integration Architecture**
-
-### **External API Integration Strategy**
-```python
-# Unified API Client Pattern
-class APIClient:
-    """
-    Unified client for all external API integrations
-    """
-    
-    # Common Features
-    rate_limiter: RateLimiter            # API rate limiting
-    retry_handler: RetryHandler          # Exponential backoff
-    auth_manager: AuthenticationManager  # Token management
-    logger: StructuredLogger            # Request/response logging
-    
-    # Service-Specific Clients
-    jira_client: JiraAPIClient
-    confluence_client: ConfluenceAPIClient
-    git_client: GitAPIClient
-    
-    # Implementation
-    async def make_request(self, service: str, endpoint: str, **kwargs) -> Response:
-        """Unified request handling with all cross-cutting concerns"""
-```
-
-### **Data Flow Integration Pattern**
-```python
-# Pipeline-Based Data Processing
-class DataPipeline:
-    """
-    Configurable data processing pipeline
-    """
-    
-    # Pipeline Stages
-    stages: List[StageInterface]         # Processing stages
-    transformers: List[Transformer]      # Data transformers
-    validators: List[Validator]          # Data validation
-    
-    # Execution Patterns
-    async def execute_pipeline(self, input_data: Any) -> ProcessedData:
-        """Execute complete data pipeline"""
-        
-    async def execute_stage(self, stage: StageInterface, data: Any) -> Any:
-        """Execute individual pipeline stage"""
-        
-    async def handle_stage_failure(self, stage: StageInterface, error: Exception):
-        """Handle processing failures with recovery"""
-```
-
----
-
-## 📊 **Data Architecture**
-
-### **JSON Schema Design**
-```python
-# Unified Data Models
-class JiraAnalysisResult(BaseModel):
-    """Jira analysis data structure"""
-    date: datetime
-    timestamp: datetime
-    projects: Dict[str, ProjectData]
-    employees: Dict[str, EmployeeData]
-    system_metrics: SystemMetrics
-    
-    # Validation
-    @validator('projects')
-    def validate_project_keys(cls, v):
-        return {k: ProjectData(**data) for k, data in v.items()}
-
-class MeetingAnalysisResult(BaseModel):
-    """Meeting protocol analysis data structure"""
-    date: datetime
-    processed_files: List[str]
-    meetings: List[MeetingData]
-    employee_actions: List[EmployeeAction]
-    participation_metrics: ParticipationMetrics
-
-class DailySummaryResult(BaseModel):
-    """Daily consolidated summary data structure"""
-    date: datetime
-    consolidation_timestamp: datetime
-    employee_summary: Dict[str, EmployeeSummary]
-    project_summary: Dict[str, ProjectSummary]
-    performance_scores: Dict[str, PerformanceScore]
-    trend_analysis: TrendAnalysis
-```
-
-### **File System Organization**
-```
-/data/
-├── memory/json/                    # JSON Memory Store
-│   ├── daily_jira_data_YYYY-MM-DD.json
-│   ├── daily_meeting_data_YYYY-MM-DD.json
-│   ├── daily_summary_data_YYYY-MM-DD.json
-│   ├── weekly_summary_data_YYYY-MM-DD.json
-│   ├── employee_metrics_YYYY-MM-DD.json
-│   ├── system_state.json
-│   └── history/                   # 365-day archive
-│       ├── 2025/
-│       ├── 2024/
-│       └── archived/
-├── reports/human/                 # Human-Readable Reports
-│   ├── YYYY/
-│   │   ├── MM/
-│   │   │   ├── DD/
-│   │   │   │   ├── daily_summary_YYYY-MM-DD.txt
-│   │   │   │   ├── employees_analysis_YYYY-MM-DD.txt
-│   │   │   │   └── weekly_summary_YYYY-MM-DD.txt
-│   │   │   └── archived/
-│   │   └── archived/
-│   └── archived/
-├── meetings/                      # Meeting Protocol File Store
-│   ├── daily_standup/
-│   ├── sprint_planning/
-│   ├── retrospectives/
-│   └── archived/
-└── system/                        # System Runtime Data
-    ├── logs/
-    ├── cache/
-    ├── temp/
-    └── backups/
-```
-
-### **Data Retention Policy**
-```python
-class DataRetentionPolicy:
-    """
-    Automated data lifecycle management
-    """
-    
-    # Retention Periods
-    json_data_retention_days: int = 365      # JSON memory store
-    human_reports_retention_days: int = 90   # Human-readable reports
-    meeting_files_retention_days: int = 180  # Meeting protocols
-    logs_retention_days: int = 30            # System logs
-    
-    # Archival Strategy
-    async def archive_old_data(self, older_than_days: int) -> None:
-        """Compress and archive old data"""
-        
-    async def cleanup_expired_data(self, older_than_days: int) -> None:
-        """Permanently delete expired data"""
-        
-    async def optimize_storage(self) -> None:
-        """Optimize file system storage"""
-```
-
----
-
-## 🔄 **Execution Architecture**
-
-### **Scheduled Execution Pattern**
-```python
-# Time-Based Workflow Orchestration
-class ScheduledWorkflow:
-    """
-    Time-based workflow execution with dependencies
-    """
-    
-    # Workflow Definition
-    workflow_id: str
-    schedule: ScheduleDefinition
-    agents: List[AgentDefinition]
-    dependencies: Dict[str, List[str]]    # Agent dependencies
-    quality_gates: List[QualityGate]      # Quality checkpoints
-    
-    # Execution Logic
-    async def execute_workflow(self) -> WorkflowResult:
-        """Execute complete scheduled workflow"""
-        
-    async def execute_parallel_phase(self, phase: List[str]) -> Dict[str, AgentResult]:
-        """Execute agents in parallel"""
-        
-    async def execute_sequential_phase(self, phase: List[str]) -> Dict[str, AgentResult]:
-        """Execute agents sequentially"""
-        
-    async def validate_phase_quality(self, phase_results: Dict[str, AgentResult]) -> bool:
-        """Validate quality phase results"""
-```
-
-### **AsyncIO Concurrency Pattern**
-```python
-# High-Performance Async Processing
-class AsyncProcessor:
-    """
-    Async processing with controlled concurrency
-    """
-    
-    # Concurrency Control
-    semaphore: asyncio.Semaphore          # Concurrency limiting
-    task_queue: asyncio.Queue            # Task queue management
-    worker_pool: List[asyncio.Task]      # Worker tasks
-    
-    # Execution Patterns
-    async def process_with_concurrency(self, tasks: List[Task], max_workers: int) -> List[Result]:
-        """Process tasks with controlled concurrency"""
-        
-    async def worker_loop(self, worker_id: int) -> None:
-        """Worker processing loop"""
-        
-    async def graceful_shutdown(self) -> None:
-        """Graceful shutdown of processing"""
-```
-
----
-
-## 🛡️ **Security Architecture**
-
-### **API Security Management**
-```python
-# Secure Credential Management
-class SecurityManager:
-    """
-    Centralized security and credential management
-    """
-    
-    # Credential Storage
-    encrypted_secrets: Dict[str, str]     # Encrypted API keys
-    token_cache: Dict[str, Token]         # OAuth token cache
-    certificate_store: Certificates       # SSL certificates
-    
-    # Security Features
-    async def encrypt_sensitive_data(self, data: str) -> str:
-        """Encrypt sensitive data"""
-        
-    async def rotate_api_credentials(self) -> None:
-        """Rotate API credentials"""
-        
-    async def validate_api_permissions(self, service: str, required_scopes: List[str]) -> bool:
-        """Validate API token permissions"""
-```
-
-### **Data Privacy & Compliance**
-```python
-# Privacy-First Data Handling
-class PrivacyManager:
-    """
-    Data privacy and compliance management
-    """
-    
-    # Privacy Features
-    data_anonymization: bool = True       # Anonymize personal data
-    audit_logging: bool = True            # Audit all data access
-    retention_compliance: bool = True     # Compliance retention
-    
-    # Implementation
-    async def anonymize_employee_data(self, employee_data: dict) -> dict:
-        """Anonymize sensitive employee information"""
-        
-    async def log_data_access(self, user: str, data_type: str, operation: str) -> None:
-        """Log data access for audit"""
-        
-    async def validate_gdpr_compliance(self, data: dict) -> bool:
-        """Validate GDPR compliance"""
-```
-
----
-
-## 🔍 **Monitoring & Observability**
-
-### **Structured Logging Architecture**
-```python
-# Comprehensive Logging System
-class StructuredLogger:
-    """
-    Structured logging with correlation and context
-    """
-    
-    # Log Structure
-    log_entry: LogEntryTemplate
-    correlation_id: str                   # Request correlation
-    context: Dict[str, Any]              # Additional context
-    severity: LogSeverity                 # Log level
-    
-    # Log Destinations
-    file_logger: FileBasedLogger
-    syslog_logger: SyslogLogger
-    external_logger: ExternalLogService
-    
-    # Implementation
-    async def log_structured(self, event: str, level: LogSeverity, **kwargs) -> None:
-        """Log structured event with context"""
-        
-    async def log_workflow_execution(self, workflow_id: str, phase: str, status: str) -> None:
-        """Log workflow execution events"""
-        
-    async def log_quality_metrics(self, agent: str, quality_score: float) -> None:
-        """Log quality metrics"""
-```
-
-### **Metrics Collection System**
-```python
-# Performance & Health Metrics
-class MetricsCollector:
-    """
-    Comprehensive metrics collection and reporting
-    """
-    
-    # Metric Types
-    counter_metrics: Dict[str, Counter]   # Event counters
-    gauge_metrics: Dict[str, Gauge]       # Current values
-    histogram_metrics: Dict[str, Histogram] # Value distributions
-    timer_metrics: Dict[str, Timer]       # Duration measurements
-    
-    # Collection Points
-    agent_execution_times: Timer
-    api_response_times: Histogram
-    quality_scores: Gauge
-    error_rates: Counter
-    
-    # Implementation
-    async def record_agent_execution(self, agent: str, duration: float, success: bool) -> None:
-        """Record agent execution metrics"""
-        
-    async def get_system_health_snapshot(self) -> HealthSnapshot:
-        """Get current system health metrics"""
-        
-    async def export_metrics(self, format: str) -> str:
-        """Export metrics in specified format"""
-```
-
----
-
-## 🚀 **Performance Optimization**
-
-### **Caching Strategy**
-```python
-# Multi-Level Caching System
-class CacheManager:
-    """
-    Multi-tier caching with TTL and invalidation
-    """
-    
-    # Cache Tiers
-    l1_cache: Dict[str, CacheEntry]      # In-memory L1 cache
-    l2_cache: FileBasedCache             # File-based L2 cache
-    l3_cache: RedisCache                  # External L3 cache (optional)
-    
-    # Cache Policies
-    default_ttl: int = 3600              # 1 hour default TTL
-    max_memory_usage: int = 100 * 1024 * 1024  # 100MB max
-    invalidation_strategy: InvalidationStrategy
-    
-    # Implementation
-    async def get_cached(self, key: str) -> Optional[Any]:
-        """Get value from cache hierarchy"""
-        
-    async def set_cached(self, key: str, value: Any, ttl: int = None) -> None:
-        """Set value in cache hierarchy"""
-        
-    async def invalidate_pattern(self, pattern: str) -> None:
-        """Invalidate cache entries matching pattern"""
-```
-
-### **Resource Management**
-```python
-# Efficient Resource Utilization
-class ResourceManager:
-    """
-    System resource management and optimization
-    """
-    
-    # Resource Pools
-    connection_pool: ConnectionPool        # Database/API connections
-    thread_pool: ThreadPoolExecutor       # Thread management
-    memory_pool: MemoryPool              # Memory allocation
-    
-    # Optimization Strategies
-    connection_scaling: bool = True       # Auto-scale connections
-    memory_gc_threshold: float = 0.8     # GC trigger threshold
-    cpu_utilization_target: float = 0.7  # Target CPU usage
-    
-    # Implementation
-    async def optimize_resource_usage(self) -> OptimizationReport:
-        """Optimize system resource usage"""
-        
-    async def handle_memory_pressure(self) -> None:
-        """Handle memory pressure scenarios"""
-        
-    async def scale_connection_pool(self, demand: int) -> None:
-        """Dynamically scale connection pool"""
-```
-
----
-
-## 🔧 **Development & Deployment**
+## 🔧 Настройка разработки
 
 ### **Development Environment Setup**
 ```bash
-# Python Environment
-python -m venv venv_py311
+# 1. Создание виртуального окружения
+python3.11 -m venv venv_py311
+
+# 2. Активация (ВАЖНО: всегда делать первой командой)
 source venv_py311/bin/activate
+
+# 3. Установка зависимостей
 pip install -r requirements.txt
 
-# Development Dependencies
-pip install -r requirements-dev.txt  # Testing, linting, profiling
-pip install pre-commit                 # Git hooks
-pip install black isort mypy          # Code formatting and type checking
-
-# Development Tools
-poetry install                         # Alternative dependency management
-docker-compose up -d                  # Local development environment
+# 4. Настройка переменных окружения
+cp .env.example .env
+# Редактировать .env с реальными токенами
 ```
 
-### **Code Quality Standards**
+### **Configuration Structure**
+```yaml
+# config/base.yaml - базовая конфигурация
+agents:
+  task_analyzer:
+    enabled: true
+    schedule: "0 9 * * *"
+  meeting_analyzer:
+    enabled: true
+    schedule: "0 10 * * *"
+  weekly_reports:
+    enabled: true
+    schedule: "0 17 * * 5"
+
+# config/development.yaml - dev настройки
+# config/production.yaml - prod настройки
+# config/employee_monitoring.yaml - текущая конфигурация
+```
+
+### **Environment Variables**
+```bash
+# .env файл (не в Git)
+JIRA_BASE_URL=https://jira.mts.ru
+JIRA_TOKEN=your_personal_token
+CONFLUENCE_BASE_URL=https://confluence.mts.ru
+CONFLUENCE_TOKEN=your_personal_token
+OPENAI_API_KEY=your_openai_key
+LOG_LEVEL=INFO
+ENVIRONMENT=production
+```
+
+## ⚠️ Технические ограничения
+
+### **API Limitations**
+- **Jira API:** 1000 requests/hour per token
+- **Confluence API:** 1000 requests/hour per token  
+- **OpenAI API:** Rate limits по тарифному плану
+- **Workers Memory:** 512MB limit в некоторых environments
+
+### **File System Limitations**
+- **Protocol Files:** Максимальный размер 50MB
+- **Memory Store:** JSON файл до 100MB перед оптимизацией
+- **Log Files:** Автоматическая ротация каждые 100MB
+
+### **Network Constraints**
+- **VPN Required:** Доступ к MTS сетям через VPN
+- **Internal DNS:** jira.mts.ru, confluence.mts.ru
+- **Firewall:** HTTPS-only коммуникации
+
+## 📦 Зависимости и их влияние
+
+### **Critical Dependencies**
+1. **aiohttp** - Асинхронные HTTP запросы
+   - *Почему:* Блокирующие запросы не работают в async среде
+   - *Риск:* Connection pooling требует настройки
+
+2. **pydantic** - Валидация данных
+   - *Почему:* Type safety и automatic validation
+   - *Риск:* Strict typing может ломать backward compatibility
+
+3. **openai** - LLM интеграция
+   - *Почему:* Core functionality для анализа
+   - *Риск:* Rate limiting и costs
+
+### **Optional Dependencies**
 ```python
-# Type Safety & Code Quality
-typing: Full type hints for all functions
-pydantic: Data validation and models
-mypy: Static type checking
-black: Code formatting
-isort: Import organization
-flake8: Linting
-pytest: Testing framework
-coverage: Coverage reporting
-
-# Development Patterns
-async/await: All I/O operations must be async
-error_handling: Comprehensive exception management
-logging: Structured logging with context
-documentation: Comprehensive docstrings
-testing: 80%+ code coverage requirement
+# Для расширенной функциональности
+matplotlib             # Графики в отчетах
+seaborn                # Statistical visualization
+plotly                 # Interactive charts
+sentence-transformers  # Alternative embeddings
 ```
 
-### **Deployment Architecture**
-```dockerfile
-# Docker Multi-stage Build
-FROM python:3.11-slim as builder
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+### **Development Dependencies**
+```python
+# Для разработки и тестирования
+black                  # Code formatting
+flake8                 # Linting
+mypy                   # Type checking
+pre-commit             # Git hooks
+coverage               # Test coverage
+```
 
-FROM
+## 🔍 Паттерны использования инструментов
+
+### **LLM Integration Patterns**
+```python
+# Wrapper pattern для LLM провайдеров
+class LLMClient:
+    def __init__(self, provider: str, api_key: str):
+        self.provider = provider
+        self.api_key = api_key
+    
+    async def analyze(self, prompt: str) -> str:
+        if self.provider == "openai":
+            return await self._openai_analyze(prompt)
+        elif self.provider == "yandex":
+            return await self._yandex_analyze(prompt)
+
+# Prompt engineering pattern
+TASK_ANALYSIS_PROMPT = """
+Проанализируй следующие задачи Jira:
+{tasks}
+
+Оцени по метрикам:
+1. Completion rate (0-100%)
+2. Productivity score (1-10)
+3. Performance rating (1-10)
+
+Формат ответа: JSON
+"""
+```
+
+### **API Client Patterns**
+```python
+# Retry pattern с exponential backoff
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type(ConnectionError)
+)
+async def get_jira_tasks(self, jql: str) -> List[JiraTask]:
+    # API call logic
+
+# Circuit breaker pattern
+class CircuitBreaker:
+    def __init__(self, failure_threshold: int = 5):
+        self.failure_threshold = failure_threshold
+        self.failure_count = 0
+        self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+```
+
+### **Configuration Management Patterns**
+```python
+# Hierarchical configuration with overrides
+@dataclass
+class AgentConfig:
+    enabled: bool = True
+    schedule: str = ""
+    timeout: int = 300
+    retry_attempts: int = 3
+
+def load_config(env: str = "development") -> Config:
+    base_config = load_yaml("config/base.yaml")
+    env_config = load_yaml(f"config/{env}.yaml")
+    runtime_overrides = load_env_overrides()
+    
+    return merge_configs([base_config, env_config, runtime_overrides])
+```
+
+### **Error Handling Patterns**
+```python
+# Structured error handling
+class EmployeeMonitoringError(Exception):
+    def __init__(self, message: str, agent: str, context: Dict = None):
+        self.message = message
+        self.agent = agent
+        self.context = context or {}
+        super().__init__(f"{agent}: {message}")
+
+# Logging pattern for debugging
+logger = logging.getLogger(__name__)
+logger.info(
+    "Agent execution started",
+    extra={
+        "agent": "TaskAnalyzer",
+        "execution_id": execution_id,
+        "employee_count": len(employees),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+)
+```
+
+### **Testing Patterns**
+```python
+# Async testing pattern
+@pytest.mark.asyncio
+async def test_task_analyzer_success():
+    # Arrange
+    mock_jira_client = AsyncMock()
+    mock_llm_client = AsyncMock()
+    
+    # Act
+    analyzer = TaskAnalyzerAgent(
+        jira_client=mock_jira_client,
+        llm_client=mock_llm_client,
+        config=test_config
+    )
+    result = await analyzer.analyze_tasks()
+    
+    # Assert
+    assert result.success is True
+    assert len(result.analyzed_employees) > 0
+
+# Integration testing pattern
+@pytest.mark.integration
+async def test_full_workflow():
+    # Test real API integration
+    pass
+```
+
+## 🚀 Performance Considerations
+
+### **Memory Management**
+```python
+# Context manager for memory cleanup
+class MemoryAwareAgent:
+    async def __aenter__(self):
+        # Resource allocation
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Resource cleanup
+        await self.cleanup()
+
+# Generator pattern for large datasets
+def process_large_dataset(data_stream):
+    for batch in chunked(data_stream, size=1000):
+        yield process_batch(batch)
+```
+
+### **Async Best Practices**
+```python
+# Proper async context management
+async def analyze_with_timeout(agent: BaseAgent, data: Dict, timeout: int = 300):
+    try:
+        return await asyncio.wait_for(agent.analyze(data), timeout=timeout)
+    except asyncio.TimeoutError:
+        logger.warning(f"Agent {agent.__class__.__name__} timed out")
+        raise
+
+# Concurrent execution with semaphore
+async def run_concurrent_agents(agents: List[BaseAgent], max_concurrent: int = 5):
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def run_with_semaphore(agent):
+        async with semaphore:
+            return await agent.execute()
+    
+    return await asyncio.gather(*[run_with_semaphore(agent) for agent in agents])
+```
+
+## 📊 Monitoring и Observability
+
+### **Logging Configuration**
+```python
+# Structured JSON logging
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s"
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout"
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "json",
+            "filename": "logs/employee_monitoring.log",
+            "maxBytes": 104857600,  # 100MB
+            "backupCount": 5
+        }
+    }
+}
+```
+
+### **Health Checks**
+```python
+# Health check endpoints
+async def health_check():
+    checks = {
+        "jira_api": await check_jira_connection(),
+        "confluence_api": await check_confluence_connection(),
+        "llm_service": await check_llm_service(),
+        "memory_store": await check_memory_store(),
+        "disk_space": check_disk_space()
+    }
+    
+    return {
+        "status": "healthy" if all(checks.values()) else "unhealthy",
+        "checks": checks,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+```
+
+---
+
+*Этот технический контекст обеспечивает понимание всех участников проекта о технологическом стеке, ограничениях и паттернах использования инструментов*

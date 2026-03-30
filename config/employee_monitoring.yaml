@@ -44,9 +44,10 @@ employee_monitoring:
     
   # Scheduler Configuration
   scheduler:
-    daily_analysis_time: "09:00"
-    weekly_report_time: "17:00"
-    weekly_report_day: "friday"
+    daily_analysis_time: "23:08"
+    daily_meeting_analysis_time: "23:10"
+    weekly_report_time: "23:12"
+    weekly_report_day: "sunday"
     timezone: "Europe/Moscow"
     enabled: true
     

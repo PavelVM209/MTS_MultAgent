@@ -10,15 +10,15 @@ import logging
 import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
 
-from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
-from ..core.llm_client import LLMClient
-from ..core.json_memory_store import JSONMemoryStore
-from ..core.quality_metrics import QualityMetrics
-from ..core.config import get_employee_monitoring_config
+from core.base_agent import BaseAgent, AgentConfig, AgentResult
+from core.llm_client import LLMClient
+from core.json_memory_store import JSONMemoryStore
+from core.quality_metrics import QualityMetrics as CoreQualityMetrics
+from core.config import get_employee_monitoring_config
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class QualityValidatorAgent(BaseAgent):
         # Initialize components
         self.llm_client = LLMClient()
         self.memory_store = JSONMemoryStore()
-        self.quality_metrics = QualityMetrics()
+        self.quality_metrics = CoreQualityMetrics()
         
         # Load employee monitoring configuration
         self.emp_config = get_employee_monitoring_config()
@@ -842,6 +842,87 @@ class QualityValidatorAgent(BaseAgent):
             
         except Exception as e:
             logger.error(f"Failed to update memory store: {e}")
+    
+    async def validate_analysis(self, analysis_data: Dict[str, Any], analysis_type: str = "unknown", validation_level: str = "standard") -> Dict[str, Any]:
+        """
+        Validate analysis data and return validation results.
+        
+        This method provides a simplified interface for validation that can be used
+        by other agents in the system.
+        
+        Args:
+            analysis_data: Analysis data to validate
+            analysis_type: Type of analysis (task_analysis, meeting_analysis, weekly_report)
+            validation_level: Validation level (basic, standard, strict, comprehensive)
+            
+        Returns:
+            Dictionary with validation results
+        """
+        try:
+            logger.info(f"Starting analysis validation for type: {analysis_type}")
+            
+            # Convert object to dict if needed
+            if hasattr(analysis_data, '__dict__'):
+                # Handle dataclass objects
+                analysis_dict = asdict(analysis_data) if hasattr(analysis_data, '__dataclass_fields__') else analysis_data.__dict__
+            elif hasattr(analysis_data, 'get'):
+                # Already a dict-like object
+                analysis_dict = analysis_data
+            else:
+                # Try to convert to dict
+                try:
+                    analysis_dict = dict(analysis_data)
+                except (TypeError, ValueError):
+                    # Last resort - wrap in dict
+                    analysis_dict = {'data': analysis_data}
+            
+            # Prepare input data for validation
+            input_data = {
+                'analysis_data': analysis_dict,
+                'analysis_type': analysis_type,
+                'validation_level': validation_level
+            }
+            
+            # Execute validation
+            result = await self.execute(input_data)
+            
+            if result.success:
+                validation_result = result.data['validation_result']
+                quality_metrics = result.data['quality_metrics']
+                actions = result.data['recommended_actions']
+                
+                return {
+                    'success': True,
+                    'validation_status': validation_result.status.value,
+                    'overall_score': validation_result.overall_score,
+                    'quality_metrics': {
+                        'completeness_score': quality_metrics.completeness_score,
+                        'accuracy_score': quality_metrics.accuracy_score,
+                        'consistency_score': quality_metrics.consistency_score,
+                        'insight_quality_score': quality_metrics.insight_quality_score,
+                        'data_integrity_score': quality_metrics.data_integrity_score,
+                        'overall_quality_score': quality_metrics.overall_quality_score
+                    },
+                    'issues_found': validation_result.issues_found,
+                    'recommendations': validation_result.recommendations,
+                    'recommended_actions': actions,
+                    'execution_time': result.metadata.get('execution_time', 0),
+                    'rule_results': validation_result.rule_results
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result.message,
+                    'error_details': result.error
+                }
+                
+        except Exception as e:
+            logger.error(f"Analysis validation failed: {e}")
+            return {
+                'success': False,
+                'error': f"Validation failed: {str(e)}",
+                'error_details': str(e)
+            }
     
     async def get_health_status(self) -> Dict[str, Any]:
         """Get agent health status."""

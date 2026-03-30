@@ -1,0 +1,582 @@
+# -*- coding: utf-8 -*-
+"""
+QualityOrchestrator - Главный оркестратор с контролем качества на каждом этапе
+
+Этот агент является главным оркестратором всей системы Employee Monitoring.
+Он координирует работу всех агентов и контролирует качество результатов на каждом этапе.
+
+Автор: AI Assistant
+Дата: 2026-03-27
+Версия: 1.0.0
+"""
+
+import logging
+import asyncio
+import json
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+from pathlib import Path
+
+from .task_analyzer_agent import TaskAnalyzerAgent
+from .meeting_analyzer_agent_auto import MeetingAnalyzerAgent
+from .weekly_reports_agent_complete import WeeklyReportsAgentComplete
+from .quality_validator_agent import QualityValidatorAgent
+from core.config import get_employee_monitoring_config
+from core.json_memory_store import JSONMemoryStore
+
+logger = logging.getLogger(__name__)
+
+
+class QualityOrchestrator:
+    """
+    Главный оркестратор с контролем качества на каждом этапе.
+    
+    Реализует паттерн "Quality Control Loop" - после каждого агента
+    проверяется качество результатов и при необходимости отправляется на доработку.
+    """
+    
+    def __init__(self):
+        """Инициализация оркестратора и подчиненных агентов."""
+        self.emp_config = get_employee_monitoring_config()
+        self.memory_store = JSONMemoryStore()
+        
+        # Подчиненные агенты
+        self.task_analyzer = TaskAnalyzerAgent()
+        self.meeting_analyzer = MeetingAnalyzerAgent()
+        self.weekly_reports = WeeklyReportsAgentComplete()
+        self.quality_validator = QualityValidatorAgent()
+        
+        # Параметры качества
+        self.quality_threshold = self.emp_config.get('quality', {}).get('threshold', 0.9)
+        self.max_revision_attempts = self.emp_config.get('quality', {}).get('max_retries', 3)
+        self.auto_improve = self.emp_config.get('quality', {}).get('auto_improve', True)
+        
+        logger.info(f"QualityOrchestrator initialized: threshold={self.quality_threshold}, max_attempts={self.max_revision_attempts}")
+    
+    async def execute_daily_task_workflow(self) -> Dict[str, Any]:
+        """
+        Ежедневный анализ задач с контролем качества.
+        
+        Returns:
+            Dict[str, Any]: Результат выполнения workflow
+        """
+        workflow_start = datetime.now()
+        logger.info("Starting daily task analysis workflow")
+        
+        for attempt in range(self.max_revision_attempts + 1):
+            try:
+                logger.info(f"Daily task analysis attempt {attempt + 1}/{self.max_revision_attempts + 1}")
+                
+                # 1. Получаем задачи из Jira
+                jira_tasks = await self.task_analyzer.fetch_jira_tasks()
+                if not jira_tasks:
+                    logger.warning("No tasks received from Jira")
+                    return {
+                        'success': False,
+                        'error': 'No tasks from Jira',
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                
+                # 2. Запускаем анализ задач
+                task_result = await self.task_analyzer.execute({'jira_tasks': jira_tasks})
+                
+                if not task_result.success:
+                    logger.error(f"Task analysis failed: {task_result.message}")
+                    if attempt < self.max_revision_attempts:
+                        continue
+                    return {
+                        'success': False,
+                        'error': task_result.message,
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                
+                # 3. Проверяем качество
+                validation = await self.quality_validator.validate_analysis(
+                    task_result.data,
+                    analysis_type="task_analysis"
+                )
+                
+                logger.info(f"Quality validation result: {validation.overall_score:.2f}")
+                
+                # 4. Если качество >= порога - сохраняем и выходим
+                if validation.overall_score >= self.quality_threshold:
+                    await self._save_approved_report(task_result.data, "task_analysis")
+                    
+                    workflow_duration = (datetime.now() - workflow_start).total_seconds()
+                    logger.info(f"Daily task analysis completed successfully in {workflow_duration:.2f}s")
+                    
+                    return {
+                        'success': True,
+                        'quality_score': validation.overall_score,
+                        'attempts': attempt + 1,
+                        'tasks_analyzed': len(jira_tasks),
+                        'workflow_duration': workflow_duration
+                    }
+                
+                # 5. Если качество < порога и есть попытки - запрашиваем доработку
+                if attempt < self.max_revision_attempts and self.auto_improve:
+                    logger.warning(f"Quality score {validation.overall_score:.2f} < threshold {self.quality_threshold}, requesting improvement")
+                    improved_data = await self._request_improvement(task_result.data, validation, "task_analysis")
+                    if improved_data:
+                        task_result.data = improved_data
+                        continue
+                
+                # 6. Если все попытки исчерпаны или авто-улучшение отключено
+                logger.error(f"Task analysis failed after {attempt + 1} attempts")
+                await self._save_with_warning(task_result.data, "task_analysis", validation)
+                
+                return {
+                    'success': False,
+                    'quality_score': validation.overall_score,
+                    'attempts': attempt + 1,
+                    'tasks_analyzed': len(jira_tasks),
+                    'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
+                    'warning': 'Saved with quality issues'
+                }
+                    
+            except Exception as e:
+                logger.error(f"Task analysis attempt {attempt + 1} failed with exception: {e}")
+                if attempt == self.max_revision_attempts:
+                    return {
+                        'success': False,
+                        'error': str(e),
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                await asyncio.sleep(1)  # Небольшая пауза между попытками
+                continue
+        
+        return {
+            'success': False,
+            'error': 'Max attempts exceeded',
+            'attempts': self.max_revision_attempts + 1,
+            'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+        }
+    
+    async def execute_daily_meeting_workflow(self) -> Dict[str, Any]:
+        """
+        Ежедневный анализ протоколов с контролем качества.
+        
+        Returns:
+            Dict[str, Any]: Результат выполнения workflow
+        """
+        workflow_start = datetime.now()
+        logger.info("Starting daily meeting analysis workflow")
+        
+        for attempt in range(self.max_revision_attempts + 1):
+            try:
+                logger.info(f"Daily meeting analysis attempt {attempt + 1}/{self.max_revision_attempts + 1}")
+                
+                # 1. Сканируем директорию с протоколами
+                protocols = await self.meeting_analyzer.scan_protocols_directory()
+                if not protocols:
+                    logger.warning("No protocols found in directory")
+                    return {
+                        'success': False,
+                        'error': 'No protocols found',
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                
+                # 2. Запускаем анализ протоколов
+                meeting_result = await self.meeting_analyzer.execute({'meeting_protocols': protocols})
+                
+                if not meeting_result.success:
+                    logger.error(f"Meeting analysis failed: {meeting_result.message}")
+                    if attempt < self.max_revision_attempts:
+                        continue
+                    return {
+                        'success': False,
+                        'error': meeting_result.message,
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                
+                # 3. Проверяем качество
+                validation = await self.quality_validator.validate_analysis(
+                    meeting_result.data,
+                    analysis_type="meeting_analysis"
+                )
+                
+                # Handle both dict and object validation results
+                overall_score = getattr(validation, 'overall_score', validation.get('overall_score', 0) if isinstance(validation, dict) else 0)
+                
+                logger.info(f"Quality validation result: {overall_score:.2f}")
+                
+                # 4. Если качество >= порога - сохраняем и выходим
+                if overall_score >= self.quality_threshold:
+                    await self._save_approved_report(meeting_result.data, "meeting_analysis")
+                    
+                    workflow_duration = (datetime.now() - workflow_start).total_seconds()
+                    logger.info(f"Daily meeting analysis completed successfully in {workflow_duration:.2f}s")
+                    
+                    return {
+                        'success': True,
+                        'quality_score': validation.overall_score,
+                        'attempts': attempt + 1,
+                        'protocols_analyzed': len(protocols),
+                        'workflow_duration': workflow_duration
+                    }
+                
+                # 5. Если качество < порога и есть попытки - запрашиваем доработку
+                if attempt < self.max_revision_attempts and self.auto_improve:
+                    logger.warning(f"Quality score {validation.overall_score:.2f} < threshold {self.quality_threshold}, requesting improvement")
+                    improved_data = await self._request_improvement(meeting_result.data, validation, "meeting_analysis")
+                    if improved_data:
+                        meeting_result.data = improved_data
+                        continue
+                
+                # 6. Если все попытки исчерпаны
+                logger.error(f"Meeting analysis failed after {attempt + 1} attempts")
+                await self._save_with_warning(meeting_result.data, "meeting_analysis", validation)
+                
+                return {
+                    'success': False,
+                    'quality_score': validation.overall_score,
+                    'attempts': attempt + 1,
+                    'protocols_analyzed': len(protocols),
+                    'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
+                    'warning': 'Saved with quality issues'
+                }
+                    
+            except Exception as e:
+                logger.error(f"Meeting analysis attempt {attempt + 1} failed with exception: {e}")
+                if attempt == self.max_revision_attempts:
+                    return {
+                        'success': False,
+                        'error': str(e),
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                await asyncio.sleep(1)
+                continue
+        
+        return {
+            'success': False,
+            'error': 'Max attempts exceeded',
+            'attempts': self.max_revision_attempts + 1,
+            'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+        }
+    
+    async def execute_weekly_workflow(self) -> Dict[str, Any]:
+        """
+        Еженедельный отчет с контролем качества и публикацией в Confluence.
+        
+        Returns:
+            Dict[str, Any]: Результат выполнения workflow
+        """
+        workflow_start = datetime.now()
+        logger.info("Starting weekly report workflow")
+        
+        for attempt in range(self.max_revision_attempts + 1):
+            try:
+                logger.info(f"Weekly report attempt {attempt + 1}/{self.max_revision_attempts + 1}")
+                
+                # 1. Собираем данные за неделю
+                report_period_end = datetime.now()
+                report_period_start = report_period_end - timedelta(days=7)
+                
+                weekly_data = await self.weekly_reports.collect_weekly_data(
+                    report_period_start, report_period_end
+                )
+                
+                # 2. Генерируем отчет
+                weekly_result = await self.weekly_reports.execute(weekly_data)
+                
+                if not weekly_result.success:
+                    logger.error(f"Weekly report generation failed: {weekly_result.message}")
+                    if attempt < self.max_revision_attempts:
+                        continue
+                    return {
+                        'success': False,
+                        'error': weekly_result.message,
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                
+                # 3. Проверяем качество
+                validation = await self.quality_validator.validate_analysis(
+                    weekly_result.data,
+                    analysis_type="weekly_report"
+                )
+                
+                logger.info(f"Quality validation result: {validation.overall_score:.2f}")
+                
+                # 4. Если качество >= порога - публикуем в Confluence
+                if validation.overall_score >= self.quality_threshold:
+                    confluence_result = await self.weekly_reports.publish_to_confluence(weekly_result.data)
+                    
+                    workflow_duration = (datetime.now() - workflow_start).total_seconds()
+                    logger.info(f"Weekly report completed successfully in {workflow_duration:.2f}s")
+                    
+                    return {
+                        'success': True,
+                        'quality_score': validation.overall_score,
+                        'attempts': attempt + 1,
+                        'published_to_confluence': confluence_result.get('success', False),
+                        'confluence_url': confluence_result.get('url'),
+                        'workflow_duration': workflow_duration
+                    }
+                
+                # 5. Если качество < порога и есть попытки - запрашиваем доработку
+                if attempt < self.max_revision_attempts and self.auto_improve:
+                    logger.warning(f"Quality score {validation.overall_score:.2f} < threshold {self.quality_threshold}, requesting improvement")
+                    improved_data = await self._request_improvement(weekly_result.data, validation, "weekly_report")
+                    if improved_data:
+                        weekly_result.data = improved_data
+                        continue
+                
+                # 6. Если все попытки исчерпаны - все равно публикуем с предупреждением
+                logger.error(f"Weekly report quality issues after {attempt + 1} attempts, publishing anyway")
+                confluence_result = await self.weekly_reports.publish_to_confluence(weekly_result.data)
+                
+                return {
+                    'success': False,
+                    'quality_score': validation.overall_score,
+                    'attempts': attempt + 1,
+                    'published_to_confluence': confluence_result.get('success', False),
+                    'confluence_url': confluence_result.get('url'),
+                    'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
+                    'warning': 'Published with quality issues'
+                }
+                    
+            except Exception as e:
+                logger.error(f"Weekly report attempt {attempt + 1} failed with exception: {e}")
+                if attempt == self.max_revision_attempts:
+                    return {
+                        'success': False,
+                        'error': str(e),
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+                await asyncio.sleep(1)
+                continue
+        
+        return {
+            'success': False,
+            'error': 'Max attempts exceeded',
+            'attempts': self.max_revision_attempts + 1,
+            'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+        }
+    
+    async def _request_improvement(self, data: Dict[str, Any], validation: Any, analysis_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Запрос улучшения данных через LLM.
+        
+        Args:
+            data: Исходные данные
+            validation: Результат валидации
+            analysis_type: Тип анализа
+            
+        Returns:
+            Optional[Dict[str, Any]]: Улучшенные данные или None
+        """
+        try:
+            logger.info(f"Requesting improvement for {analysis_type}")
+            
+            # Формируем промпт для улучшения
+            improvement_prompt = self._create_improvement_prompt(data, validation, analysis_type)
+            
+            # Вызываем LLM для улучшения
+            improved_response = await self.quality_validator.llm_client.analyze_async(improvement_prompt)
+            
+            if improved_response and improved_response.strip():
+                # Парсим улучшенные данные
+                improved_data = self._parse_improved_response(improved_response, data)
+                if improved_data:
+                    logger.info(f"Successfully improved {analysis_type} data")
+                    return improved_data
+            
+            logger.warning(f"Failed to improve {analysis_type} data")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error during improvement request: {e}")
+            return None
+    
+    def _create_improvement_prompt(self, data: Dict[str, Any], validation: Any, analysis_type: str) -> str:
+        """Создание промпта для улучшения данных."""
+        suggestions = getattr(validation, 'revision_suggestions', [])
+        issues = getattr(validation, 'identified_issues', [])
+        
+        prompt = f"""
+Проанализируй и улучи следующие данные для {analysis_type}:
+
+ИСХОДНЫЕ ДАННЫЕ:
+{json.dumps(data, ensure_ascii=False, indent=2)}
+
+ПРОБЛЕМЫ КАЧЕСТВА:
+{chr(10).join(f"- {issue}" for issue in issues)}
+
+РЕКОМЕНДАЦИИ ПО УЛУЧШЕНИЮ:
+{chr(10).join(f"- {suggestion}" for suggestion in suggestions)}
+
+ТРЕБОВАНИЯ:
+- Сохраняй структуру данных
+- Улучши полноту и точность анализа
+- Добавь недостающие инсайты
+- Исправь выявленные проблемы
+- Верни результат в формате JSON
+
+УЛУЧШЕННЫЕ ДАННЫЕ:
+"""
+        return prompt
+    
+    def _parse_improved_response(self, response: str, original_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Парсинг ответа LLM с улучшенными данными."""
+        try:
+            # Пытаемся извлечь JSON из ответа
+            if '```json' in response:
+                json_start = response.find('```json') + 7
+                json_end = response.find('```', json_start)
+                json_str = response[json_start:json_end].strip()
+            else:
+                json_str = response.strip()
+            
+            improved_data = json.loads(json_str)
+            
+            # Проверяем, что структура совпадает
+            if isinstance(improved_data, dict) and improved_data:
+                # Объединяем с оригинальными данными для сохранения полноты
+                merged_data = original_data.copy()
+                merged_data.update(improved_data)
+                return merged_data
+            
+            return None
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse improved JSON: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error parsing improved response: {e}")
+            return None
+    
+    async def _save_approved_report(self, data: Dict[str, Any], analysis_type: str):
+        """Сохранение утвержденного отчета."""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d")
+            
+            if analysis_type == "task_analysis":
+                filename = f"task-analysis_{timestamp}.json"
+                directory = Path("reports/daily")
+            elif analysis_type == "meeting_analysis":
+                filename = f"meeting-analysis_{timestamp}.json"
+                directory = Path("reports/daily")
+            else:
+                logger.warning(f"Unknown analysis type: {analysis_type}")
+                return
+            
+            directory.mkdir(parents=True, exist_ok=True)
+            filepath = directory / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            
+            logger.info(f"Approved report saved: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Error saving approved report: {e}")
+    
+    async def _save_with_warning(self, data: Dict[str, Any], analysis_type: str, validation: Any):
+        """Сохранение отчета с предупреждением о низком качестве."""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d")
+            
+            if analysis_type == "task_analysis":
+                filename = f"task-analysis_{timestamp}_quality_warning.json"
+                directory = Path("reports/daily")
+            elif analysis_type == "meeting_analysis":
+                filename = f"meeting-analysis_{timestamp}_quality_warning.json"
+                directory = Path("reports/daily")
+            elif analysis_type == "weekly_report":
+                week_number = datetime.now().isocalendar()[1]
+                filename = f"weekly-report_{week_number}_quality_warning.json"
+                directory = Path("reports/weekly")
+            else:
+                logger.warning(f"Unknown analysis type: {analysis_type}")
+                return
+            
+            directory.mkdir(parents=True, exist_ok=True)
+            filepath = directory / filename
+            
+            # Добавляем информацию о качестве
+            warning_data = data.copy()
+            warning_data['_quality_warning'] = {
+                'quality_score': getattr(validation, 'overall_score', 0),
+                'identified_issues': getattr(validation, 'identified_issues', []),
+                'revision_suggestions': getattr(validation, 'revision_suggestions', []),
+                'saved_at': datetime.now().isoformat()
+            }
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(warning_data, f, ensure_ascii=False, indent=2, default=str)
+            
+            logger.warning(f"Report saved with quality warning: {filepath}")
+            
+        except Exception as e:
+            logger.error(f"Error saving report with warning: {e}")
+    
+    async def get_system_status(self) -> Dict[str, Any]:
+        """Получение статуса системы и всех компонентов."""
+        try:
+            status = {
+                'orchestrator': {
+                    'status': 'active',
+                    'quality_threshold': self.quality_threshold,
+                    'max_revision_attempts': self.max_revision_attempts,
+                    'auto_improve': self.auto_improve
+                },
+                'agents': {
+                    'task_analyzer': 'ready',
+                    'meeting_analyzer': 'ready',
+                    'weekly_reports': 'ready',
+                    'quality_validator': 'ready'
+                },
+                'last_runs': await self._get_last_run_info(),
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            return status
+            
+        except Exception as e:
+            logger.error(f"Error getting system status: {e}")
+            return {
+                'status': 'error',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    async def _get_last_run_info(self) -> Dict[str, Any]:
+        """Получение информации о последних запусках."""
+        try:
+            last_runs = {}
+            
+            # Проверяем последние ежедневные отчеты
+            daily_dir = Path("reports/daily")
+            if daily_dir.exists():
+                daily_files = list(daily_dir.glob("*.json"))
+                if daily_files:
+                    latest_daily = max(daily_files, key=lambda f: f.stat().st_mtime)
+                    last_runs['daily_analysis'] = {
+                        'last_file': latest_daily.name,
+                        'last_run': datetime.fromtimestamp(latest_daily.stat().st_mtime).isoformat()
+                    }
+            
+            # Проверяем последние еженедельные отчеты
+            weekly_dir = Path("reports/weekly")
+            if weekly_dir.exists():
+                weekly_files = list(weekly_dir.glob("*.json"))
+                if weekly_files:
+                    latest_weekly = max(weekly_files, key=lambda f: f.stat().st_mtime)
+                    last_runs['weekly_report'] = {
+                        'last_file': latest_weekly.name,
+                        'last_run': datetime.fromtimestamp(latest_weekly.stat().st_mtime).isoformat()
+                    }
+            
+            return last_runs
+            
+        except Exception as e:
+            logger.error(f"Error getting last run info: {e}")
+            return {}

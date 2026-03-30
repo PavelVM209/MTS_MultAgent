@@ -129,7 +129,21 @@ class ConfigManager:
         Args:
             env_file: Optional path to .env file
         """
-        self.env_file = env_file or ".env"
+        # Try to find .env file in current directory, parent directory, or project root
+        if env_file:
+            self.env_file = env_file
+        else:
+            # Look for .env in current directory, then parent, then project root
+            current_dir = Path.cwd()
+            parent_dir = current_dir.parent
+            
+            if (current_dir / ".env").exists():
+                self.env_file = str(current_dir / ".env")
+            elif (parent_dir / ".env").exists():
+                self.env_file = str(parent_dir / ".env")
+            else:
+                self.env_file = ".env"
+        
         self._config: Optional[AppConfig] = None
         self._load_config()
     
@@ -342,5 +356,40 @@ def get_employee_monitoring_config() -> Dict[str, Any]:
     Returns:
         Employee monitoring configuration dictionary
     """
-    from ..core.config_manager import get_employee_monitoring_config as get_emp_config
-    return get_emp_config()
+    try:
+        from core.config_manager import get_employee_monitoring_config as get_emp_config
+        return get_emp_config()
+    except Exception:
+        # Fallback to default configuration
+        return {
+            "jira": {
+                "base_url": "",
+                "username": "",
+                "api_token": "",
+                "project_key": ""
+            },
+            "confluence": {
+                "url": "",
+                "username": "",
+                "api_token": "",
+                "space_key": "",
+                "parent_page_id": ""
+            },
+            "reports": {
+                "daily_reports_dir": "./reports/daily",
+                "weekly_reports_dir": "./reports/weekly",
+                "quality_reports_dir": "./reports/quality"
+            },
+            "quality": {
+                "threshold": 0.9,
+                "validation_level": "standard",
+                "auto_revision": True,
+                "max_revision_attempts": 3
+            },
+            "scheduling": {
+                "daily_task_time": os.getenv("DAILY_ANALYSIS_TIME", "22:55"),
+                "daily_meeting_time": os.getenv("DAILY_MEETING_ANALYSIS_TIME", "22:57"),
+                "weekly_report_time": os.getenv("WEEKLY_REPORT_TIME", "22:58"),
+                "weekly_report_day": os.getenv("WEEKLY_REPORT_DAY", "sunday")
+            }
+        }

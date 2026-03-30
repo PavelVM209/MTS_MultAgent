@@ -15,11 +15,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
-from ..core.llm_client import LLMClient, analyze_jira_data
-from ..core.json_memory_store import JSONMemoryStore
-from ..core.quality_metrics import QualityMetrics
-from ..core.config import get_employee_monitoring_config
+from core.base_agent import BaseAgent, AgentConfig, AgentResult
+from core.llm_client import LLMClient, analyze_task_progress
+from core.json_memory_store import JSONMemoryStore
+from core.quality_metrics import QualityMetrics
+from core.config import get_employee_monitoring_config
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,18 @@ class TaskAnalyzerAgent(BaseAgent):
         
         # Load employee monitoring configuration
         self.emp_config = get_employee_monitoring_config()
-        self.jira_config = self.emp_config.get('jira', {})
+        
+        # Load Jira configuration from environment variables
+        import os
+        self.jira_config = {
+            'base_url': os.getenv('JIRA_BASE_URL', ''),
+            'username': os.getenv('JIRA_USERNAME', ''),
+            'api_token': os.getenv('JIRA_ACCESS_TOKEN', ''),  # Маппинг с .env
+            'project_key': os.getenv('JIRA_PROJECT_KEYS', '').split(',')[0] if os.getenv('JIRA_PROJECT_KEYS') else '',
+            'query_filter': os.getenv('JIRA_QUERY_FILTER', 'status IN ("In Progress", "Done", "To Do") AND updated >= -7d'),
+            'max_results': int(os.getenv('JIRA_MAX_RESULTS', '100')),
+            'fields': ['assignee', 'status', 'summary', 'description', 'created', 'updated', 'priority', 'project']
+        }
         self.reports_config = self.emp_config.get('reports', {})
         self.quality_config = self.emp_config.get('quality', {})
         self.employees_config = self.emp_config.get('employees', {})
@@ -151,6 +162,274 @@ class TaskAnalyzerAgent(BaseAgent):
         
         logger.info("TaskAnalyzerAgent initialized for employee monitoring")
     
+    async def fetch_jira_tasks(self) -> List[Dict[str, Any]]:
+        """
+        Получение задач напрямую из Jira API.
+        
+        Returns:
+            List[Dict[str, Any]]: Список задач из Jira
+        """
+        try:
+            logger.info("Fetching tasks from Jira API")
+            
+            # Используем существующий Jira клиент
+            from core.jira_client import JiraClient
+            jira_client = JiraClient()
+            
+            # Проверяем доступность
+            if not await jira_client.test_connection():
+                logger.error("Jira API connection failed")
+                return []
+            
+            # Получаем конфигурацию запроса
+            jql = self.jira_config.get('query_filter', 'status in (In Progress, Done, To Do) AND updated >= -7d')
+            fields = self.jira_config.get('fields', ['assignee', 'status', 'summary', 'description', 'created', 'updated', 'priority', 'project'])
+            max_results = self.jira_config.get('max_results', 100)
+            
+            logger.info(f"Using JQL: {jql}")
+            
+            # Выполняем запрос
+            tasks = await jira_client.search_issues(
+                jql=jql,
+                fields=fields,
+                max_results=max_results
+            )
+            
+            if not tasks:
+                logger.warning("No tasks returned from Jira API")
+                return []
+            
+            # Обрабатываем и нормализуем данные
+            processed_tasks = []
+            for task in tasks:
+                try:
+                    fields = task.get('fields', {})
+                    
+                    # Извлекаем информацию о коммитах и PR из Jira полей
+                    commits_count = self._extract_commits_from_task(fields)
+                    prs_count = self._extract_prs_from_task(fields)
+                    
+                    processed_task = {
+                        'id': task.get('id'),
+                        'key': task.get('key'),
+                        'summary': fields.get('summary', ''),
+                        'status': fields.get('status', {}).get('name', ''),
+                        'assignee': self._extract_assignee(fields.get('assignee')),
+                        'created': fields.get('created'),
+                        'updated': fields.get('updated'),
+                        'due_date': fields.get('duedate'),
+                        'priority': fields.get('priority', {}).get('name', 'Medium'),
+                        'description': fields.get('description', ''),
+                        'project': fields.get('project', {}).get('key', ''),
+                        'story_points': self._extract_story_points(fields),
+                        'labels': fields.get('labels', []),
+                        'issuetype': fields.get('issuetype', {}).get('name', ''),
+                        # Добавляем метрики коммитов и PR
+                        'commits_count': commits_count,
+                        'pull_requests_count': prs_count,
+                        'components': [comp.get('name', '') for comp in fields.get('components', [])],
+                        'fix_versions': [ver.get('name', '') for ver in fields.get('fixVersions', [])],
+                        'environment': fields.get('environment', ''),
+                        'resolution': fields.get('resolution', {}).get('name', '') if fields.get('resolution') else None,
+                        'resolution_date': fields.get('resolutiondate')
+                    }
+                    
+                    processed_tasks.append(processed_task)
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to process Jira task {task.get('key', 'unknown')}: {e}")
+                    continue
+            
+            logger.info(f"Successfully processed {len(processed_tasks)} tasks from Jira")
+            
+            # Логируем статистику
+            if processed_tasks:
+                total_commits = sum(task.get('commits_count', 0) for task in processed_tasks)
+                total_prs = sum(task.get('pull_requests_count', 0) for task in processed_tasks)
+                
+                logger.info(f"Jira statistics: {len(processed_tasks)} tasks, {total_commits} commits, {total_prs} PRs")
+                
+                # Статистика по статусам
+                status_counts = {}
+                for task in processed_tasks:
+                    status = task.get('status', 'Unknown')
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                
+                logger.info(f"Task status distribution: {status_counts}")
+                
+                # Статистика по сотрудникам
+                assignee_counts = {}
+                for task in processed_tasks:
+                    assignee = task.get('assignee', 'Unassigned')
+                    if assignee not in self.excluded_users:
+                        assignee_counts[assignee] = assignee_counts.get(assignee, 0) + 1
+                
+                logger.info(f"Tasks per employee: {assignee_counts}")
+            
+            return processed_tasks
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch Jira tasks: {e}")
+            return []
+    
+    def _extract_assignee(self, assignee_field: Any) -> str:
+        """Извлечение имени сотрудника из поля assignee."""
+        if not assignee_field:
+            return 'Unassigned'
+        
+        # Jira API возвращает разные форматы
+        if isinstance(assignee_field, dict):
+            # Ищем имя в разных полях
+            return (
+                assignee_field.get('displayName') or 
+                assignee_field.get('name') or 
+                assignee_field.get('emailAddress') or 
+                'Unknown'
+            )
+        
+        return str(assignee_field)
+    
+    def _extract_story_points(self, fields: Dict[str, Any]) -> Optional[float]:
+        """Извлечение story points из полей задачи."""
+        try:
+            # Популярные имена полей для story points в Jira
+            story_point_fields = [
+                'customfield_10002',  # Standard story points field
+                'customfield_10004',  # Another common variant
+                'story_points',
+                'storyPoint',
+                'Story Points'
+            ]
+            
+            for field_name in story_point_fields:
+                if field_name in fields:
+                    sp_value = fields[field_name]
+                    if sp_value is not None:
+                        return float(sp_value)
+            
+            # Проверяем все custom fields на наличие story points
+            for field_name, field_value in fields.items():
+                if field_name.startswith('customfield_') and field_value is not None:
+                    # Ищем поля где в названии есть "story" или "point"
+                    if 'story' in field_name.lower() or 'point' in field_name.lower():
+                        try:
+                            return float(field_value)
+                        except (ValueError, TypeError):
+                            continue
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract story points: {e}")
+            return None
+    
+    def _extract_commits_from_task(self, fields: Dict[str, Any]) -> int:
+        """Извлечение количества коммитов из задачи Jira."""
+        try:
+            # Это зависит от того как настроена ваша Jira
+            # Обычно коммиты хранятся в кастомных полях или в development panel
+            
+            # Пример для Development panel (если доступно через API)
+            development = fields.get('development', {})
+            if development:
+                pull_requests = development.get('pullRequests', [])
+                # Из PR извлекаем количество коммитов
+                total_commits = 0
+                for pr in pull_requests:
+                    pr_commits = pr.get('commitCount', 0)
+                    total_commits += pr_commits
+                return total_commits
+            
+            # Пример для кастомных полей
+            commit_fields = [
+                'customfield_commit_count',
+                'customfield_commits',
+                'commit_count'
+            ]
+            
+            for field_name in commit_fields:
+                if field_name in fields:
+                    commit_value = fields[field_name]
+                    if commit_value is not None:
+                        try:
+                            return int(commit_value)
+                        except (ValueError, TypeError):
+                            continue
+            
+            # Ищем в description упоминания коммитов
+            description = fields.get('description', '')
+            if description:
+                import re
+                # Ищем паттерны вроде "commit: abc123" или хэши коммитов
+                commit_patterns = [
+                    r'commit[:\s]+([a-f0-9]{6,40})',
+                    r'hash[:\s]+([a-f0-9]{6,40})',
+                    r'([a-f0-9]{8,40})'  # просто хэши
+                ]
+                
+                commit_count = 0
+                for pattern in commit_patterns:
+                    matches = re.findall(pattern, description, re.IGNORECASE)
+                    commit_count += len(matches)
+                
+                return commit_count
+            
+            return 0
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract commits from task: {e}")
+            return 0
+    
+    def _extract_prs_from_task(self, fields: Dict[str, Any]) -> int:
+        """Извлечение количества Pull Request из задачи Jira."""
+        try:
+            # Development panel - основной источник PR
+            development = fields.get('development', {})
+            if development:
+                pull_requests = development.get('pullRequests', [])
+                return len(pull_requests)
+            
+            # Кастомные поля для PR
+            pr_fields = [
+                'customfield_pr_count',
+                'customfield_pull_requests',
+                'pull_request_count'
+            ]
+            
+            for field_name in pr_fields:
+                if field_name in fields:
+                    pr_value = fields[field_name]
+                    if pr_value is not None:
+                        try:
+                            return int(pr_value)
+                        except (ValueError, TypeError):
+                            continue
+            
+            # Ищем PR в description
+            description = fields.get('description', '')
+            if description:
+                import re
+                # Ищем паттерны PR ссылок
+                pr_patterns = [
+                    r'pull request[:\s]+#?(\d+)',
+                    r'pr[:\s]+#?(\d+)',
+                    r'github\.com.*pull/(\d+)',
+                    r'bitbucket\.org.*pull-requests/(\d+)'
+                ]
+                
+                pr_count = 0
+                for pattern in pr_patterns:
+                    matches = re.findall(pattern, description, re.IGNORECASE)
+                    pr_count += len(matches)
+                
+                return pr_count
+            
+            return 0
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract PRs from task: {e}")
+            return 0
+    
     async def execute(self, input_data: Dict[str, Any]) -> AgentResult:
         """
         Execute task analysis for employee monitoring.
@@ -165,15 +444,21 @@ class TaskAnalyzerAgent(BaseAgent):
             logger.info("Starting Task Analysis for Employee Monitoring")
             start_time = datetime.now()
             
-            # Extract JIRA tasks from input
-            jira_tasks_data = input_data.get('jira_tasks', [])
+            # Extract JIRA tasks from input or fetch automatically
+            jira_tasks_data = input_data.get('jira_tasks')
             
             if not jira_tasks_data:
-                return AgentResult(
-                    success=False,
-                    message="No JIRA tasks found for analysis",
-                    data={}
-                )
+                logger.info("No tasks provided in input_data, fetching from Jira API automatically")
+                jira_tasks_data = await self.fetch_jira_tasks()
+                
+                if not jira_tasks_data:
+                    return AgentResult(
+                        success=False,
+                        message="No JIRA tasks found for analysis (neither in input nor from API)",
+                        data={}
+                    )
+            else:
+                logger.info(f"Using {len(jira_tasks_data)} tasks from input_data")
             
             # Parse and validate tasks
             tasks = await self._parse_jira_tasks(jira_tasks_data)
