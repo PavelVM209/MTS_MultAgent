@@ -21,7 +21,7 @@ async def test_jira_connection():
     config = {
         'base_url': 'https://jira.mts.ru',
         'username': 'sa0000openbdrnd',
-        'api_token': 'NDg0NDQ2ODIwNzA0Onj7dh98baq+jI5A6wvKRbCWvgDJ',
+        'api_token': 'REDACTED',
         'project_key': 'TEST'
     }
     
@@ -34,7 +34,7 @@ async def test_jira_connection():
     jira_client = JiraClient(config)
     
     # Тестируем подключение
-    print("\n🔄 Тестирование базового подключения...")
+    print("\n� Тестирование базового подключения...")
     connection_result = await jira_client.test_connection()
     
     if connection_result:
