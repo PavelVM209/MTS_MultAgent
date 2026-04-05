@@ -847,24 +847,158 @@ class MeetingAnalyzerAgent(BaseAgent):
             # Готовим данные для LLM
             summary_data = self._prepare_meeting_data_for_llm(employees_participation)
             
-            # Получаем LLM анализ
-            llm_analysis = await analyze_meeting_protocol(summary_data)
+            # Log full meeting data being sent to LLM
+            logger.info("=== FULL MEETING DATA BEING SENT TO LLM ===")
+            logger.info(f"Total employees: {len(employees_participation)}")
+            for employee, participation in employees_participation.items():
+                employee_data = {
+                    'employee_name': participation.employee_name,
+                    'total_meetings': participation.total_meetings,
+                    'meetings_attended': participation.meetings_attended,
+                    'attendance_rate': participation.attendance_rate,
+                    'speaking_turns': participation.speaking_turns,
+                    'action_items_assigned': participation.action_items_assigned,
+                    'action_items_completed': participation.action_items_completed,
+                    'questions_asked': participation.questions_asked,
+                    'suggestions_made': participation.suggestions_made,
+                    'engagement_score': participation.engagement_score,
+                    'contribution_quality': participation.contribution_quality,
+                    'leadership_indicators': participation.leadership_indicators,
+                    'concerns': participation.concerns,
+                    'meeting_type_participation': participation.meeting_type_participation
+                }
+                logger.info(f"Employee {employee}: {json.dumps(employee_data, ensure_ascii=False, indent=2)}")
+            logger.info("=== END MEETING DATA ===")
             
-            # Распределяем инсайты по сотрудникам
-            if 'employee_insights' in llm_analysis:
-                for employee_name, insights in llm_analysis['employee_insights'].items():
-                    if employee_name in employees_participation:
-                        employees_participation[employee_name].llm_insights = insights.get('analysis', '')
-                        # Обновляем рейтинг на основе LLM оценки
-                        if 'participation_rating' in insights:
-                            employees_participation[employee_name].participation_rating = insights['participation_rating']
+            # Создаем промпт для LLM с строгим JSON форматом
+            llm_prompt = f"""
+Ты - аналитик протоколов собраний для системы мониторинга сотрудников. Проанализируй следующие данные о участии в собраниях и предоставь СТРОГО ВАЛИДНЫЙ JSON ответ.
+
+ДАННЫЕ О УЧАСТИИ В СОБРАНИЯХ:
+{json.dumps(summary_data, ensure_ascii=False, indent=2)}
+
+ВАЖНО: Верни ТОЛЬКО JSON объект, без дополнительного текста, markdown форматирования или объяснений.
+
+Формат ответа:
+{{
+    "employee_analysis": {{
+        "ИмяСотрудника1": {{
+            "attendance_rate": число от 0 до 1,
+            "engagement_level": "high/medium/low",
+            "participation_rating": число от 1 до 10,
+            "leadership_indicators": ["признак1", "признак2"],
+            "collaboration_insights": "детальный анализ участия",
+            "concerns": ["проблема1", "проблема2"],
+            "recommendations": ["рекомендация1", "рекомендация2"]
+        }}
+    }},
+    "team_insights": ["инсайт1", "инсайт2"],
+    "recommendations": ["рекомендация1", "рекомендация2"]
+}}
+
+Анализируй:
+1. Уровень участия и вовлеченности каждого сотрудника
+2. Лидерские качества и инициативность
+3. Качество вклада в командную работу
+4. Проблемы и области для улучшения
+5. Командные паттерны взаимодействия
+
+СТРОГО СЛЕДУЙ ФОРМАТУ JSON БЕЗ ОТКЛОНЕНИЙ!
+"""
             
-            # Добавляем командные инсайты
-            if 'team_insights' in llm_analysis:
-                analysis_result.team_collaboration_insights.extend(llm_analysis['team_insights'])
+            # Send to LLM using correct API
+            logger.info("Sending comprehensive meeting analysis to LLM")
+            from core.llm_client import LLMRequest
             
-            if 'recommendations' in llm_analysis:
-                analysis_result.recommendations.extend(llm_analysis['recommendations'])
+            llm_request = LLMRequest(
+                prompt=llm_prompt,
+                system_prompt="Ты - эксперт по анализу протоколов собраний и мониторингу командной работы. Предоставляй детальный анализ в формате JSON.",
+                max_tokens=4000,
+                temperature=0.7
+            )
+            
+            llm_response_obj = await self.llm_client.generate_response(llm_request)
+            llm_response = llm_response_obj.content
+            
+            if llm_response:
+                logger.info("Received LLM analysis response")
+                # Try to parse JSON response with improved error handling
+                try:
+                    # First, try to parse as-is
+                    try:
+                        analysis_result_llm = json.loads(llm_response)
+                    except json.JSONDecodeError:
+                        pass
+                    
+                    # Extract JSON from response (handle markdown and extra text)
+                    json_patterns = [
+                        r'```json\s*(\{.*?\})\s*```',  # JSON in code blocks
+                        r'```\s*(\{.*?\})\s*```',      # JSON in code blocks without language
+                        r'(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})',  # Simple JSON
+                    ]
+                    
+                    import re
+                    for pattern in json_patterns:
+                        matches = re.findall(pattern, llm_response, re.DOTALL | re.IGNORECASE)
+                        for match in matches:
+                            try:
+                                # Clean up the JSON string
+                                json_content = match.strip()
+                                # Fix common JSON issues
+                                json_content = re.sub(r',\s*}', '}', json_content)  # Remove trailing commas
+                                json_content = re.sub(r',\s*]', ']', json_content)  # Remove trailing commas in arrays
+                                
+                                analysis_result_llm = json.loads(json_content)
+                                logger.info(f"Successfully parsed JSON using pattern: {pattern}")
+                                break
+                            except json.JSONDecodeError as e:
+                                logger.debug(f"Pattern {pattern} failed: {e}")
+                                continue
+                        else:
+                            continue
+                        break
+                    else:
+                        # Try to find JSON between first { and last }
+                        json_start = llm_response.find('{')
+                        json_end = llm_response.rfind('}') + 1
+                        
+                        if json_start != -1 and json_end > json_start:
+                            json_content = llm_response[json_start:json_end]
+                            # Clean up common issues
+                            json_content = re.sub(r',\s*}', '}', json_content)
+                            json_content = re.sub(r',\s*]', ']', json_content)
+                            
+                            try:
+                                analysis_result_llm = json.loads(json_content)
+                                logger.info("Successfully parsed JSON using fallback method")
+                            except json.JSONDecodeError as e:
+                                logger.debug(f"Fallback JSON parse failed: {e}")
+                                logger.warning("No valid JSON found in LLM response")
+                                logger.debug(f"LLM response preview: {llm_response[:500]}...")
+                                return
+                    
+                    # Распределяем инсайты по сотрудникам
+                    if 'employee_analysis' in analysis_result_llm:
+                        for employee_name, insights in analysis_result_llm['employee_analysis'].items():
+                            if employee_name in employees_participation:
+                                employees_participation[employee_name].llm_insights = insights.get('collaboration_insights', '')
+                                # Обновляем рейтинг на основе LLM оценки
+                                if 'participation_rating' in insights:
+                                    employees_participation[employee_name].participation_rating = insights['participation_rating']
+                    
+                    # Добавляем командные инсайты
+                    if 'team_insights' in analysis_result_llm:
+                        analysis_result.team_collaboration_insights.extend(analysis_result_llm['team_insights'])
+                    
+                    if 'recommendations' in analysis_result_llm:
+                        analysis_result.recommendations.extend(analysis_result_llm['recommendations'])
+                    
+                except Exception as e:
+                    logger.error(f"Failed to parse LLM response: {e}")
+                    logger.warning("Failed to add LLM insights: Invalid JSON response")
+            else:
+                logger.warning("Empty LLM response")
+                logger.warning("Failed to add LLM insights: Invalid JSON response")
                 
         except Exception as e:
             logger.warning(f"Failed to add LLM insights: {e}")
@@ -992,9 +1126,52 @@ class MeetingAnalyzerAgent(BaseAgent):
     async def _update_employee_memory_store(self, employees_participation) -> None:
         """Обновление memory store с данными о сотрудниках."""
         try:
+            from datetime import date
+            
             for employee, participation in employees_participation.items():
-                # Save employee state to memory store
+                # Save employee state to memory store with required schema fields
                 employee_data = {
+                    # Required fields for schema validation
+                    'date': participation.analysis_date.date().isoformat(),
+                    'generated_at': participation.analysis_date.isoformat(),
+                    'data_sources': {
+                        'meeting_data': {
+                            'last_updated': participation.analysis_date.isoformat(),
+                            'quality_score': participation.contribution_quality * 100,
+                            'record_count': participation.total_meetings
+                        }
+                    },
+                    'employee_performance': {
+                        employee: {
+                            'collaboration': {
+                                'score': participation.engagement_score * 10,
+                                'meetings_attended': participation.meetings_attended,
+                                'meetings_total': participation.total_meetings,
+                                'speaking_turns': participation.speaking_turns,
+                                'suggestions_made': participation.suggestions_made,
+                                'action_items_completed': participation.action_items_completed
+                            }
+                        }
+                    },
+                    'project_health': {
+                        'team_collaboration': {
+                            'overall_health': participation.engagement_score * 10,
+                            'team_utilization': participation.attendance_rate * 100
+                        }
+                    },
+                    'system_metrics': {
+                        'data_processing_time': 0.0,
+                        'quality_score': participation.contribution_quality * 100,
+                        'insights_generated': len(participation.leadership_indicators) + len(participation.concerns)
+                    },
+                    '_metadata': {
+                        'data_type': 'daily_summary_data',
+                        'persisted_at': participation.analysis_date.isoformat(),
+                        'persisted_by': 'meeting_analyzer_agent',
+                        'version': '1.0.0'
+                    },
+                    
+                    # Original data for compatibility
                     'employee_name': participation.employee_name,
                     'analysis_date': participation.analysis_date.isoformat(),
                     'participation_metrics': {
@@ -1021,7 +1198,7 @@ class MeetingAnalyzerAgent(BaseAgent):
                 
                 await self.memory_store.save_record(
                     data=employee_data,
-                    record_type='employee_meeting_state',
+                    record_type='daily_summary_data',
                     record_id=employee,
                     source='meeting_analyzer_agent'
                 )
@@ -1035,14 +1212,15 @@ class MeetingAnalyzerAgent(BaseAgent):
         """Проверка состояния агента."""
         try:
             llm_available = await self.llm_client.is_available()
-            memory_available = self.memory_store.is_healthy()
+            memory_health = await self.memory_store.health_check()
+            memory_available = memory_health.get('status') == 'healthy'
             protocols_dir_exists = self.protocols_dir.exists()
             
             return {
                 'agent_name': self.config.name,
                 'status': 'healthy' if llm_available and memory_available and protocols_dir_exists else 'degraded',
                 'llm_client': 'available' if llm_available else 'unavailable',
-                'memory_store': 'healthy' if memory_available else 'unhealthy',
+                'memory_store': memory_health.get('status', 'unknown'),
                 'protocols_directory': 'exists' if protocols_dir_exists else 'missing',
                 'config_loaded': bool(self.emp_config),
                 'reports_directory': str(self.daily_reports_dir),

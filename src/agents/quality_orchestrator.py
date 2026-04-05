@@ -201,7 +201,10 @@ class QualityOrchestrator:
                 )
                 
                 # Handle both dict and object validation results
-                overall_score = getattr(validation, 'overall_score', validation.get('overall_score', 0) if isinstance(validation, dict) else 0)
+                if isinstance(validation, dict):
+                    overall_score = validation.get('overall_score', 0)
+                else:
+                    overall_score = getattr(validation, 'overall_score', 0)
                 
                 logger.info(f"Quality validation result: {overall_score:.2f}")
                 
@@ -214,7 +217,7 @@ class QualityOrchestrator:
                     
                     return {
                         'success': True,
-                        'quality_score': validation.overall_score,
+                        'quality_score': overall_score,
                         'attempts': attempt + 1,
                         'protocols_analyzed': len(protocols),
                         'workflow_duration': workflow_duration

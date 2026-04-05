@@ -395,7 +395,7 @@ class DailySummarySchema(BaseSchema):
         expected_type: str, 
         result: ValidationResult
     ):
-        """Validate metadata structure"""
+        """Validate metadata structure for weekly summary"""
         required_metadata = ["data_type", "persisted_at", "persisted_by", "version"]
         self._validate_required_fields(metadata, required_metadata, result)
         
@@ -403,7 +403,7 @@ class DailySummarySchema(BaseSchema):
             if metadata["data_type"] != expected_type:
                 result.add_error(
                     field="_metadata.data_type",
-                    message=f"Incorrect data type for daily summary",
+                    message=f"Incorrect data type for weekly summary",
                     value=metadata["data_type"],
                     expected_type=expected_type
                 )

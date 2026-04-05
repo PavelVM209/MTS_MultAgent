@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-04-03T18:54:02.665445",
+  "report_quality": 0.5,
+  "calculated_quality": 0.6666666666666666,
+  "quality_level": "acceptable",
+  "factors": {
+    "employee_coverage": {
+      "value": 1.0,
+      "threshold": 0.8,
+      "description": "Покрытие сотрудников (ожидаем минимум 5)"
+    },
+    "data_completeness": {
+      "value": 1.0,
+      "threshold": 0.8,
+      "description": "Полнота данных сотрудников"
+    },
+    "insight_quality": {
+      "value": 0.0,
+      "threshold": 0.8,
+      "description": "Качество инсайтов (0/3)"
+    },
+    "recommendation_quality": {
+      "value": 0.0,
+      "threshold": 0.8,
+      "description": "Качество рекомендаций (0/2)"
+    },
+    "task_count": {
+      "value": 1.0,
+      "threshold": 0.7,
+      "description": "Количество задач (100/10)"
+    },
+    "employee_data_quality": {
+      "value": 1.0,
+      "threshold": 0.9,
+      "description": "Качество данных сотрудников"
+    }
+  },
+  "issues": [
+    "Качество инсайтов (0/3): 0.000 < 0.800",
+    "Качество рекомендаций (0/2): 0.000 < 0.800"
+  ],
+  "basic_info": {
+    "analysis_date": "2026-04-03T18:53:30.878641",
+    "total_employees": 12,
+    "total_tasks_analyzed": 100,
+    "quality_score_from_report": 0.5,
+    "avg_completion_rate": 0.34252506752506756,
+    "top_performers_count": 2,
+    "employees_need_attention_count": 2,
+    "team_insights_count": 0,
+    "recommendations_count": 0
+  },
+  "recommendations": [
+    "Добавьте минимум 3 качественных инсайта команды",
+    "Добавьте минимум 2 конкретные рекомендации",
+    "Добавьте LLM инсайты для всех сотрудников",
+    "Исправьте расхождение в расчете качества"
+  ]
+}

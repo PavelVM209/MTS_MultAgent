@@ -4,7 +4,7 @@
 employee_monitoring:
   # Jira Configuration
   jira:
-    project_keys: "ROOBY,0BF,DEV"
+    project_keys: "OPENBD,0BF,DEV"
     query_filter: "status in (In Progress, Done, To Do) AND updated >= -7d"
     fields: 
       - "assignee"
@@ -44,10 +44,10 @@ employee_monitoring:
     
   # Scheduler Configuration
   scheduler:
-    daily_analysis_time: "23:08"
-    daily_meeting_analysis_time: "23:10"
-    weekly_report_time: "23:12"
-    weekly_report_day: "sunday"
+    daily_analysis_time: "09:00"
+    daily_meeting_analysis_time: "10:00"
+    weekly_report_time: "17:00"
+    weekly_report_day: "friday"
     timezone: "Europe/Moscow"
     enabled: true
     
@@ -63,24 +63,10 @@ employee_monitoring:
       standards_weight: 0.2
       llm_quality_weight: 0.2
       
-  # Git Integration Configuration
-  git:
-    enabled: true
-    repositories:
-      - "https://github.com/company/project1.git"
-      - "https://github.com/company/project2.git"
-    commit_analysis_days: 7
-    exclude_patterns:
-      - "merge"
-      - "bot"
-      - "automated"
-    git_metrics:
-      - "commits_count"
-      - "pull_requests"
-      - "code_reviews"
-      - "lines_added"
-      - "lines_deleted"
-      
+  # Git Integration Configuration - REMOVED
+  # Git data is now sourced from Jira tasks instead
+  # This eliminates the need for direct Git repository access
+  
   # Employee Configuration
   employees:
     tracking_enabled: true
@@ -90,7 +76,7 @@ employee_monitoring:
       - "automation"
       - "service-account"
     department_mapping:
-      "ROOBY": "CloudBilling"
+      "OPENBD": "BigData"
       "0BF": "B2B"
       "DEV": "Development"
     min_activity_threshold: 0.1

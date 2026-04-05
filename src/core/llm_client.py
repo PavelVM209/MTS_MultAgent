@@ -14,6 +14,25 @@ from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
 
+# Load .env file FIRST before everything else
+try:
+    from dotenv import load_dotenv
+    # Try to load .env from current directory
+    env_path = os.path.join(os.getcwd(), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        print(f"✅ Loaded .env from {env_path}")
+    else:
+        # Try parent directory
+        parent_env_path = os.path.join(os.path.dirname(os.getcwd()), '.env')
+        if os.path.exists(parent_env_path):
+            load_dotenv(parent_env_path)
+            print(f"✅ Loaded .env from {parent_env_path}")
+        else:
+            print("⚠️  .env file not found")
+except ImportError:
+    print("⚠️  python-dotenv not installed, .env files won't be loaded")
+
 try:
     import openai
     from openai import AsyncOpenAI
@@ -104,13 +123,11 @@ class LLMClient:
             return
             
         try:
-            # Get configuration
-            app_config = get_config()
-            
-            # Get LLM configuration from environment variables
-            api_key = os.getenv('OPENAI_API_KEY')
-            base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
-            model = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+            # Get LLM configuration from environment variables directly
+            # (don't depend on get_config() which requires CONFLUENCE_SPACE)
+            api_key = os.getenv('LLM_API_KEY') or os.getenv('OPENAI_API_KEY')
+            base_url = os.getenv('LLM_API_BASE_URL') or os.getenv('OPENAI_BASE_URL', 'https://devx-copilot.tech/v1')
+            model = os.getenv('LLM_MODEL') or os.getenv('OPENAI_MODEL', 'glm-4.6-357b')
             max_tokens = int(os.getenv('OPENAI_MAX_TOKENS', '2000'))
             
             if not api_key or api_key == "your-opencode-api-key":

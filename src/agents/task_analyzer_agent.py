@@ -16,7 +16,7 @@ from enum import Enum
 from pathlib import Path
 
 from core.base_agent import BaseAgent, AgentConfig, AgentResult
-from core.llm_client import LLMClient, analyze_task_progress
+from core.llm_client import LLMClient, analyze_task_progress, analyze_jira_data
 from core.json_memory_store import JSONMemoryStore
 from core.quality_metrics import QualityMetrics
 from core.config import get_employee_monitoring_config
@@ -138,15 +138,20 @@ class TaskAnalyzerAgent(BaseAgent):
         
         # Load Jira configuration from environment variables
         import os
+        analysis_depth_days = os.getenv('JIRA_ANALYSIS_DEPTH_DAYS', '20')
         self.jira_config = {
             'base_url': os.getenv('JIRA_BASE_URL', ''),
             'username': os.getenv('JIRA_USERNAME', ''),
             'api_token': os.getenv('JIRA_ACCESS_TOKEN', ''),  # Маппинг с .env
             'project_key': os.getenv('JIRA_PROJECT_KEYS', '').split(',')[0] if os.getenv('JIRA_PROJECT_KEYS') else '',
-            'query_filter': os.getenv('JIRA_QUERY_FILTER', 'status IN ("In Progress", "Done", "To Do") AND updated >= -7d'),
+            'query_filter': os.getenv('JIRA_QUERY_FILTER', f'project = "OPENBD" AND status IN (11115, 3, 10100, 6, 14301, 14500, 13821, 10207, 1) AND updated >= -{analysis_depth_days}d'),
             'max_results': int(os.getenv('JIRA_MAX_RESULTS', '100')),
-            'fields': ['assignee', 'status', 'summary', 'description', 'created', 'updated', 'priority', 'project']
+            'fields': ['assignee', 'status', 'summary', 'description', 'comment', 'created', 'updated', 'priority', 'project']
         }
+        
+        # Сохраняем глубину анализа для логирования
+        self.analysis_depth_days = int(analysis_depth_days)
+        logger.info(f"Task Analyzer configured with {self.analysis_depth_days} days analysis depth")
         self.reports_config = self.emp_config.get('reports', {})
         self.quality_config = self.emp_config.get('quality', {})
         self.employees_config = self.emp_config.get('employees', {})
@@ -220,6 +225,7 @@ class TaskAnalyzerAgent(BaseAgent):
                         'due_date': fields.get('duedate'),
                         'priority': fields.get('priority', {}).get('name', 'Medium'),
                         'description': fields.get('description', ''),
+                        'comments': self._extract_comments(fields),
                         'project': fields.get('project', {}).get('key', ''),
                         'story_points': self._extract_story_points(fields),
                         'labels': fields.get('labels', []),
@@ -430,6 +436,36 @@ class TaskAnalyzerAgent(BaseAgent):
             logger.warning(f"Failed to extract PRs from task: {e}")
             return 0
     
+    def _extract_comments(self, fields: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Извлечение комментариев из задачи Jira."""
+        try:
+            comments = []
+            
+            # Jira API возвращает комментарии в поле comment
+            comment_field = fields.get('comment', {})
+            if comment_field and isinstance(comment_field, dict):
+                comments_list = comment_field.get('comments', [])
+                
+                for comment in comments_list:
+                    try:
+                        comment_data = {
+                            'author': self._extract_assignee(comment.get('author')),
+                            'body': comment.get('body', ''),
+                            'created': comment.get('created'),
+                            'updated': comment.get('updated'),
+                            'id': comment.get('id')
+                        }
+                        comments.append(comment_data)
+                    except Exception as e:
+                        logger.debug(f"Failed to process comment: {e}")
+                        continue
+            
+            return comments
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract comments from task: {e}")
+            return []
+    
     async def execute(self, input_data: Dict[str, Any]) -> AgentResult:
         """
         Execute task analysis for employee monitoring.
@@ -473,19 +509,30 @@ class TaskAnalyzerAgent(BaseAgent):
             # Group tasks by employee
             employee_tasks = await self._group_tasks_by_employee(tasks)
             
-            # Analyze each employee's performance
-            employees_progress = {}
-            for employee, emp_tasks in employee_tasks.items():
-                if employee not in self.excluded_users:
-                    progress = await self._analyze_employee_performance(employee, emp_tasks)
-                    employees_progress[employee] = progress
+            # Send tasks data to LLM for comprehensive analysis
+            logger.info("Sending tasks data to LLM for comprehensive analysis")
+            llm_analysis_result = await self._analyze_tasks_with_llm(tasks, employee_tasks)
             
-            # Generate team-level insights
-            analysis_result = await self._generate_team_analysis(employees_progress, tasks)
-            
-            # Add LLM insights if quality threshold requires
-            if self.quality_threshold > 0.7:
-                await self._add_llm_insights(analysis_result, employees_progress)
+            if llm_analysis_result:
+                # Parse LLM response and create employees_progress
+                employees_progress = await self._parse_llm_task_analysis(llm_analysis_result, employee_tasks)
+                
+                # Generate team-level insights from LLM analysis
+                analysis_result = await self._generate_team_analysis_from_llm(llm_analysis_result, employees_progress, tasks)
+            else:
+                # Fallback to basic analysis if LLM fails
+                logger.warning("LLM analysis failed, using basic analysis as fallback")
+                employees_progress = {}
+                for employee, emp_tasks in employee_tasks.items():
+                    if employee not in self.excluded_users:
+                        progress = await self._analyze_employee_performance(employee, emp_tasks)
+                        employees_progress[employee] = progress
+                
+                analysis_result = await self._generate_team_analysis(employees_progress, tasks)
+                
+                # Add basic LLM insights if quality threshold requires
+                if self.quality_threshold > 0.7:
+                    await self._add_llm_insights(analysis_result, employees_progress)
             
             # Calculate final quality score
             analysis_result.quality_score = await self._calculate_analysis_quality(analysis_result)
@@ -976,8 +1023,40 @@ class TaskAnalyzerAgent(BaseAgent):
             daily_dir = self.daily_reports_dir / date_str
             daily_dir.mkdir(parents=True, exist_ok=True)
             
-            # Prepare data for serialization
+            # Prepare data for serialization with required schema fields
+            from datetime import date
+            
             analysis_data = {
+                # Required schema fields
+                'date': analysis_result.analysis_date.date().isoformat(),
+                'generated_at': analysis_result.analysis_date.isoformat(),
+                'data_sources': {
+                    'jira_data': {
+                        'last_updated': analysis_result.analysis_date.isoformat(),
+                        'quality_score': analysis_result.quality_score * 100,
+                        'record_count': analysis_result.total_tasks_analyzed
+                    }
+                },
+                'employee_performance': {},
+                'project_health': {
+                    'overall': {
+                        'overall_health': analysis_result.avg_completion_rate * 10,
+                        'velocity': analysis_result.avg_completion_rate * 100
+                    }
+                },
+                'system_metrics': {
+                    'data_processing_time': analysis_result.analysis_duration.total_seconds(),
+                    'quality_score': analysis_result.quality_score * 100,
+                    'insights_generated': len(analysis_result.team_insights)
+                },
+                '_metadata': {
+                    'data_type': 'daily_summary_data',
+                    'persisted_at': analysis_result.analysis_date.isoformat(),
+                    'persisted_by': 'task_analyzer_agent',
+                    'version': '1.0.0'
+                },
+                
+                # Original fields
                 'analysis_date': analysis_result.analysis_date.isoformat(),
                 'total_employees': analysis_result.total_employees,
                 'total_tasks_analyzed': analysis_result.total_tasks_analyzed,
@@ -1031,8 +1110,47 @@ class TaskAnalyzerAgent(BaseAgent):
         """Update memory store with employee state."""
         try:
             for employee, progress in employees_progress.items():
-                # Save employee state to memory store
+                # Save employee state to memory store with required schema fields
                 employee_data = {
+                    # Required fields for schema validation
+                    'date': progress.analysis_date.date().isoformat(),
+                    'generated_at': progress.analysis_date.isoformat(),
+                    'data_sources': {
+                        'jira_data': {
+                            'last_updated': progress.analysis_date.isoformat(),
+                            'quality_score': progress.productivity_score * 100,
+                            'record_count': progress.total_tasks
+                        }
+                    },
+                    'employee_performance': {
+                        employee: {
+                            'task_performance': {
+                                'score': progress.performance_rating,
+                                'tasks_completed': progress.completed_tasks,
+                                'tasks_total': progress.total_tasks,
+                                'story_points': progress.completed_story_points
+                            }
+                        }
+                    },
+                    'project_health': {
+                        'productivity': {
+                            'overall_health': progress.productivity_score * 10,
+                            'velocity': progress.completion_rate * 100
+                        }
+                    },
+                    'system_metrics': {
+                        'data_processing_time': 0.0,
+                        'quality_score': progress.productivity_score * 100,
+                        'insights_generated': len(progress.key_achievements) + len(progress.bottlenecks)
+                    },
+                    '_metadata': {
+                        'data_type': 'daily_summary_data',
+                        'persisted_at': progress.analysis_date.isoformat(),
+                        'persisted_by': 'task_analyzer_agent',
+                        'version': '1.0.0'
+                    },
+                    
+                    # Original data for compatibility
                     'employee_name': progress.employee_name,
                     'analysis_date': progress.analysis_date.isoformat(),
                     'performance_metrics': {
@@ -1058,7 +1176,7 @@ class TaskAnalyzerAgent(BaseAgent):
                 
                 await self.memory_store.save_record(
                     data=employee_data,
-                    record_type='employee_task_state',
+                    record_type='daily_summary_data',
                     record_id=employee,
                     source='task_analyzer_agent'
                 )
@@ -1068,17 +1186,346 @@ class TaskAnalyzerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Failed to update employee memory store: {e}")
     
+    async def _analyze_tasks_with_llm(self, tasks: List[Dict[str, Any]], employee_tasks: Dict[str, List[Dict[str, Any]]]) -> Optional[Dict[str, Any]]:
+        """Send tasks to LLM for comprehensive analysis."""
+        try:
+            # Prepare tasks data for LLM including comments
+            tasks_data = []
+            for task in tasks:
+                # Format comments for LLM analysis
+                comments_text = ""
+                if task.get('comments'):
+                    comments_list = []
+                    for comment in task['comments']:
+                        author = comment.get('author', 'Unknown')
+                        body = comment.get('body', '')
+                        if body.strip():
+                            comments_list.append(f"{author}: {body.strip()}")
+                    comments_text = " | ".join(comments_list)
+                
+                tasks_data.append({
+                    'key': task.get('key', ''),
+                    'summary': task.get('summary', ''),
+                    'description': task.get('description', ''),
+                    'comments': comments_text,  # Добавляем комментарии
+                    'status': task.get('status', ''),
+                    'priority': task.get('priority', ''),
+                    'assignee': task.get('assignee', ''),
+                    'story_points': task.get('story_points', 0),
+                    'created': task.get('created', ''),
+                    'updated': task.get('updated', ''),
+                    'labels': task.get('labels', [])
+                })
+            
+            # Log full tasks data being sent to LLM
+            logger.info("=== FULL JIRA TASKS DATA BEING SENT TO LLM ===")
+            logger.info(f"Total tasks: {len(tasks_data)}")
+            for i, task in enumerate(tasks_data, 1):
+                logger.info(f"Task {i}: {json.dumps(task, ensure_ascii=False, indent=2)}")
+            logger.info("=== END JIRA TASKS DATA ===")
+            
+            # Create comprehensive prompt for LLM with strict JSON format and INSIGHT FOCUS
+            llm_prompt = f"""
+Ты - СТАРШИЙ АНАЛИТИК ПРОИЗВОДИТЕЛЬНОСТИ КОМАНДЫ для системы мониторинга сотрудников. Твоя задача - предоставить ГЛУБОКИЙ АНАЛИТИЧЕСКИЙ ОТЧЕТ на основе задач Jira.
+
+ЗАДАЧИ ДЛЯ АНАЛИЗА ({len(tasks_data)} штук):
+{json.dumps(tasks_data, ensure_ascii=False, indent=2)}
+
+КРИТИЧЕСКИ ВАЖНЫЕ ТРЕБОВАНИЯ:
+1. СГЕНЕРИРУЙ МИНИМУМ 5 КОМАНДНЫХ ИНСАЙТОВ - глубокие наблюдения о производительности команды
+2. СГЕНЕРИРУЙ МИНИМУМ 4 КОНКРЕТНЫЕ РЕКОМЕНДАЦИИ - actionable советы для улучшения
+3. ПРЕДОСТАВЬ ДЕТАЛЬНЫЙ АНАЛИЗ КАЖДОГО СОТРУДНИКА с учетом КОММЕНТАРИЕВ
+4. ИСПОЛЬЗУЙ ДАННЫЕ ИЗ КОММЕНТАРИЕВ для определения реального прогресса и проблем
+
+ЧЕМ АНАЛИЗИРОВАТЬ:
+• ПРОИЗВОДИТЕЛЬНОСТЬ: скорость выполнения задач, качество работы
+• КОЛЛАБОРАЦИЯ: активность в комментариях, помощь коллегам
+• ПРОБЛЕМЫ: блокеры, задержки, сложности
+• ДОСТИЖЕНИЯ: успешные задачи, упоминания в комментариях
+• НАГРУЗКА: количество задач, story points, сложность
+• КОММУНИКАЦИЯ: качество и количество комментариев
+
+ТРЕБОВАНИЯ К ИНСАЙТАМ КОМАНДЫ (минимум 5):
+- Анализ общей производительности команды
+- Выявление паттернов в работе
+- Проблемы в процессах или коммуникации
+- Сильные стороны и лучшие практики
+- Риски и возможности для улучшения
+
+ТРЕБОВАНИЯ К РЕКОМЕНДАЦИЯМ (минимум 4):
+- Конкретные действия для менеджеров
+- Советы по оптимизации процессов
+- Рекомендации по распределению нагрузки
+- Предложения по обучению и развитию
+
+СТРОГИЙ ФОРМАТ JSON ОТВЕТА:
+{{
+    "employee_analysis": {{
+        "ИмяСотрудника1": {{
+            "total_tasks": число,
+            "completed_tasks": число,
+            "in_progress_tasks": число,
+            "performance_rating": число от 1 до 10,
+            "keywords": ["ключевое1", "ключевое2", "ключевое3"],
+            "achievements": ["конкретное достижение1", "достижение2"],
+            "bottlenecks": ["проблема1", "проблема2"],
+            "insights": "детальный анализ сотрудника с учетом комментариев и активности",
+            "communication_activity": "активность в комментариях (высокая/средняя/низкая)",
+            "collaboration_score": число от 1 до 10,
+            "task_complexity": "низкая/средняя/высокая",
+            "workload_balance": "сбалансирована/высокая/низкая"
+        }}
+    }},
+    "team_insights": [
+        "Инсайт 1: анализ производительности команды на основе...",
+        "Инсайт 2: выявленные паттерны в поведении сотрудников...",
+        "Инсайт 3: проблемы в коммуникации или процессах...",
+        "Инсайт 4: сильные стороны и лучшие практики...",
+        "Инсайт 5: риски и возможности для улучшения..."
+    ],
+    "recommendations": [
+        "Рекомендация 1: конкретные действия для менеджеров...",
+        "Рекомендация 2: оптимизация процессов и рабочих flows...",
+        "Рекомендация 3: перераспределение нагрузки и ресурсы...",
+        "Рекомендация 4: обучение и развитие команды..."
+    ]
+}}
+
+ЗАПРЕЩЕНО:
+- Использовать markdown форматирование
+- Добавлять текст вне JSON
+- Генерировать меньше 5 инсайтов
+- Генерировать меньше 4 рекомендаций
+- Использовать общие фразы без конкретики
+
+ОБЯЗАТЕЛЬНО:
+- Проанализируй КОММЕНТАРИИ для получения контекста
+- Используй КОНКРЕТНЫЕ данные из задач
+- Предоставь ACTIONABLE инсайты и рекомендации
+- Следуй ТОЧНО формату JSON
+"""
+            
+            # Send to LLM using correct API
+            logger.info("Sending comprehensive task analysis to LLM")
+            from core.llm_client import LLMRequest
+            
+            llm_request = LLMRequest(
+                prompt=llm_prompt,
+                system_prompt="Ты - эксперт по анализу задач Jira и мониторингу производительности команды. Предоставляй детальный анализ в формате JSON.",
+                max_tokens=4000,
+                temperature=0.7
+            )
+            
+            llm_response_obj = await self.llm_client.generate_response(llm_request)
+            llm_response = llm_response_obj.content
+            
+            if llm_response:
+                logger.info("Received LLM analysis response")
+                # Try to parse JSON response with improved error handling
+                try:
+                    # First, try to parse as-is
+                    try:
+                        analysis_result = json.loads(llm_response)
+                        return analysis_result
+                    except json.JSONDecodeError:
+                        pass
+                    
+                    # Extract JSON from response (handle markdown and extra text)
+                    json_patterns = [
+                        r'```json\s*(\{.*?\})\s*```',  # JSON in code blocks
+                        r'```\s*(\{.*?\})\s*```',      # JSON in code blocks without language
+                        r'(\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\})',  # Simple JSON
+                    ]
+                    
+                    import re
+                    for pattern in json_patterns:
+                        matches = re.findall(pattern, llm_response, re.DOTALL | re.IGNORECASE)
+                        for match in matches:
+                            try:
+                                # Clean up the JSON string
+                                json_content = match.strip()
+                                # Fix common JSON issues
+                                json_content = re.sub(r',\s*}', '}', json_content)  # Remove trailing commas
+                                json_content = re.sub(r',\s*]', ']', json_content)  # Remove trailing commas in arrays
+                                
+                                analysis_result = json.loads(json_content)
+                                logger.info(f"Successfully parsed JSON using pattern: {pattern}")
+                                return analysis_result
+                            except json.JSONDecodeError as e:
+                                logger.debug(f"Pattern {pattern} failed: {e}")
+                                continue
+                    
+                    # Try to find JSON between first { and last }
+                    json_start = llm_response.find('{')
+                    json_end = llm_response.rfind('}') + 1
+                    
+                    if json_start != -1 and json_end > json_start:
+                        json_content = llm_response[json_start:json_end]
+                        # Clean up common issues
+                        json_content = re.sub(r',\s*}', '}', json_content)
+                        json_content = re.sub(r',\s*]', ']', json_content)
+                        
+                        try:
+                            analysis_result = json.loads(json_content)
+                            logger.info("Successfully parsed JSON using fallback method")
+                            return analysis_result
+                        except json.JSONDecodeError as e:
+                            logger.debug(f"Fallback JSON parse failed: {e}")
+                    
+                    logger.warning("No valid JSON found in LLM response")
+                    logger.debug(f"LLM response preview: {llm_response[:500]}...")
+                    return None
+                        
+                except Exception as e:
+                    logger.error(f"Unexpected error parsing LLM response: {e}")
+                    return None
+            else:
+                logger.warning("Empty LLM response")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to analyze tasks with LLM: {e}")
+            return None
+    
+    async def _parse_llm_task_analysis(self, llm_analysis: Dict[str, Any], employee_tasks: Dict[str, List[Dict[str, Any]]]) -> Dict[str, EmployeeTaskProgress]:
+        """Parse LLM analysis results and create EmployeeTaskProgress objects."""
+        try:
+            employees_progress = {}
+            
+            # Extract employee analysis from LLM response
+            employee_analysis = llm_analysis.get('employee_analysis', {})
+            
+            for employee, emp_task_list in employee_tasks.items():
+                if employee in self.excluded_users:
+                    continue
+                
+                # Get employee data from LLM analysis or fallback
+                llm_employee_data = employee_analysis.get(employee, {})
+                
+                # Calculate basic metrics
+                total_tasks = len(emp_task_list)
+                completed_tasks = sum(1 for task in emp_task_list if task['status'] in ['done', 'completed', 'closed', 'закрыт'])
+                in_progress_tasks = sum(1 for task in emp_task_list if task['status'] in ['in_progress', 'progress', 'в_работе'])
+                blocked_tasks = sum(1 for task in emp_task_list if task['status'] in ['blocked', 'blocked_issue'])
+                todo_tasks = sum(1 for task in emp_task_list if task['status'] in ['to_do', 'todo', 'бэклог'])
+                
+                # Calculate overdue tasks
+                now = datetime.now()
+                overdue_tasks = sum(1 for task in emp_task_list 
+                                   if task['due_date'] and task['due_date'] < now and task['status'] not in ['done', 'completed', 'closed'])
+                
+                # Story points
+                total_story_points = sum(task.get('story_points', 0) or 0 for task in emp_task_list)
+                completed_story_points = sum(task.get('story_points', 0) or 0 
+                                           for task in emp_task_list if task['status'] in ['done', 'completed', 'closed'])
+                in_progress_story_points = sum(task.get('story_points', 0) or 0 
+                                              for task in emp_task_list if task['status'] in ['in_progress', 'progress'])
+                
+                # Performance metrics
+                completion_rate = completed_tasks / max(total_tasks, 1)
+                productivity_score = min(1.0, (completed_story_points / max(total_story_points, 1)) * 10) if total_story_points > 0 else 0.0
+                
+                # Use LLM rating if available, otherwise calculate
+                performance_rating = llm_employee_data.get('performance_rating', 0.0)
+                if performance_rating == 0.0:
+                    performance_rating = await self._calculate_performance_rating(completion_rate, productivity_score, blocked_tasks)
+                
+                # Extract keywords from LLM analysis
+                keywords = llm_employee_data.get('keywords', [])
+                
+                # Extract achievements and bottlenecks from LLM
+                key_achievements = llm_employee_data.get('achievements', [])
+                bottlenecks = llm_employee_data.get('bottlenecks', [])
+                
+                # Create EmployeeTaskProgress object
+                employee_progress = EmployeeTaskProgress(
+                    employee_name=employee,
+                    analysis_date=datetime.now(),
+                    total_tasks=total_tasks,
+                    completed_tasks=completed_tasks,
+                    in_progress_tasks=in_progress_tasks,
+                    blocked_tasks=blocked_tasks,
+                    todo_tasks=todo_tasks,
+                    overdue_tasks=overdue_tasks,
+                    total_story_points=total_story_points,
+                    completed_story_points=completed_story_points,
+                    in_progress_story_points=in_progress_story_points,
+                    completion_rate=completion_rate,
+                    productivity_score=productivity_score,
+                    active_projects={task.get('project', 'OPENBD') for task in emp_task_list if task.get('project')},
+                    key_achievements=key_achievements,
+                    bottlenecks=bottlenecks,
+                    performance_rating=performance_rating,
+                    llm_insights=llm_employee_data.get('insights', '')
+                )
+                
+                employees_progress[employee] = employee_progress
+            
+            return employees_progress
+            
+        except Exception as e:
+            logger.error(f"Failed to parse LLM task analysis: {e}")
+            # Return empty dict to trigger fallback
+            return {}
+    
+    async def _generate_team_analysis_from_llm(self, llm_analysis: Dict[str, Any], employees_progress: Dict[str, EmployeeTaskProgress], all_tasks: List[Dict[str, Any]]) -> DailyTaskAnalysisResult:
+        """Generate team analysis from LLM results."""
+        try:
+            analysis_date = datetime.now()
+            
+            # Extract team-level insights from LLM
+            team_insights = llm_analysis.get('team_insights', [])
+            team_recommendations = llm_analysis.get('recommendations', [])
+            
+            # Generate basic statistics
+            total_employees = len(employees_progress)
+            total_tasks_analyzed = len(all_tasks)
+            
+            # Calculate average completion rate
+            if employees_progress:
+                avg_completion_rate = sum(progress.completion_rate for progress in employees_progress.values()) / total_employees
+            else:
+                avg_completion_rate = 0.0
+            
+            # Identify top performers and those needing attention
+            sorted_employees = sorted(employees_progress.items(), key=lambda x: x[1].performance_rating, reverse=True)
+            top_20_percent_count = max(1, total_employees // 5)
+            top_performers = [emp for emp, _ in sorted_employees[:top_20_percent_count]]
+            
+            bottom_20_percent_count = max(1, total_employees // 5)
+            employees_needing_attention = [emp for emp, _ in sorted_employees[-bottom_20_percent_count:]]
+            
+            return DailyTaskAnalysisResult(
+                analysis_date=analysis_date,
+                employees_progress=employees_progress,
+                total_employees=total_employees,
+                total_tasks_analyzed=total_tasks_analyzed,
+                avg_completion_rate=avg_completion_rate,
+                top_performers=top_performers,
+                employees_needing_attention=employees_needing_attention,
+                team_insights=team_insights,
+                recommendations=team_recommendations,
+                quality_score=0.0,  # Will be calculated later
+                analysis_duration=timedelta()  # Will be set later
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to generate team analysis from LLM: {e}")
+            # Return basic analysis
+            return await self._generate_team_analysis(employees_progress, all_tasks)
+    
     async def get_health_status(self) -> Dict[str, Any]:
         """Get agent health status."""
         try:
             llm_available = await self.llm_client.is_available()
-            memory_available = self.memory_store.is_healthy()
+            memory_health = await self.memory_store.health_check()
+            memory_available = memory_health.get('status') == 'healthy'
             
             return {
                 'agent_name': self.config.name,
                 'status': 'healthy' if llm_available and memory_available else 'degraded',
                 'llm_client': 'available' if llm_available else 'unavailable',
-                'memory_store': 'healthy' if memory_available else 'unhealthy',
+                'memory_store': memory_health.get('status', 'unknown'),
                 'config_loaded': bool(self.emp_config),
                 'reports_directory': str(self.daily_reports_dir),
                 'last_check': datetime.now().isoformat()

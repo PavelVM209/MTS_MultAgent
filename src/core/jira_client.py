@@ -48,6 +48,9 @@ class JiraClient:
                 'api_token': os.getenv('JIRA_ACCESS_TOKEN', ''),  # Маппинг с .env
                 'project_key': os.getenv('JIRA_PROJECT_KEYS', '').split(',')[0] if os.getenv('JIRA_PROJECT_KEYS') else ''
             }
+            
+        # Debug: Print configuration loading
+        logger.info(f"Loading Jira config: base_url={self.config.get('base_url')}, username={self.config.get('username')}, token_configured={'Yes' if self.config.get('api_token') else 'No'}")
         
         # Jira configuration
         self.base_url = self.config.get('base_url', '')
@@ -72,25 +75,30 @@ class JiraClient:
             logger.error("aiohttp not available")
             return False
         
-        if not all([self.base_url, self.username, self.api_token]):
-            logger.error("Jira configuration incomplete")
+        if not all([self.base_url, self.api_token]):
+            logger.error(f"Jira configuration incomplete - base_url: {bool(self.base_url)}, api_token: {bool(self.api_token)}")
             return False
         
         try:
             headers = {
-                "Authorization": f"Bearer {self.api_token}"
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json"
             }
             
             async with aiohttp.ClientSession(headers=headers) as session:
-                # Тестовый запрос к myself endpoint
-                url = f"{self.base_url}/rest/api/latest/myself"
+                # Тестовый запрос к myself endpoint - используем API v2 как в примере
+                url = f"{self.base_url}/rest/api/2/myself"
+                
+                logger.info(f"Testing connection to: {url}")
                 
                 async with session.get(url) as response:
                     if response.status == 200:
-                        logger.info("Jira API connection successful")
+                        user_data = await response.json()
+                        logger.info(f"Jira API connection successful. User: {user_data.get('displayName', 'Unknown')}")
                         return True
                     else:
-                        logger.error(f"Jira API connection failed: {response.status}")
+                        error_text = await response.text()
+                        logger.error(f"Jira API connection failed: {response.status} - {error_text}")
                         return False
                         
         except Exception as e:
@@ -114,32 +122,34 @@ class JiraClient:
         Returns:
             List[Dict[str, Any]]: Список задач
         """
+        logger.info(f"Searching Jira issues with JQL: {jql}")
+        
         if not await self.test_connection():
+            logger.error("Cannot search issues - connection test failed")
             return []
         
         if not fields:
             fields = [
-                'assignee', 'status', 'summary', 'description', 
-                'created', 'updated', 'priority', 'project',
-                'duedate', 'fixVersions', 'labels', 'issuetype'
+                'summary', 'status', 'assignee', 'priority', 'created', 'updated', 
+                'project', 'reporter', 'resolution', 'issuetype', 'description'
             ]
         
         try:
             headers = {
-                "Authorization": f"Bearer {self.api_token}"
+                "Authorization": f"Bearer {self.api_token}",
+                "Content-Type": "application/json"
             }
             
-            # Формируем URL запроса
-            url = f"{self.base_url}/rest/api/latest/search"
+            # Формируем URL запроса - используем API v2
+            url = f"{self.base_url}/rest/api/2/search"
             
             params = {
                 'jql': jql,
                 'fields': ','.join(fields),
-                'maxResults': max_results,
-                'expand': 'names,schema'
+                'maxResults': max_results
             }
             
-            issues = []
+            logger.info(f"Making request to: {url}")
             
             async with aiohttp.ClientSession(headers=headers) as session:
                 async with session.get(url, params=params) as response:
@@ -147,23 +157,9 @@ class JiraClient:
                         data = await response.json()
                         issues = data.get('issues', [])
                         
-                        # Обработка пагинации
-                        total = data.get('total', 0)
-                        start_at = data.get('startAt', 0) + len(issues)
+                        logger.info(f"Successfully retrieved {len(issues)} issues from Jira")
+                        logger.info(f"Total available: {data.get('total', 0)} issues")
                         
-                        while start_at < total and len(issues) < max_results:
-                            params['startAt'] = start_at
-                            
-                            async with session.get(url, params=params) as next_response:
-                                if next_response.status == 200:
-                                    next_data = await next_response.json()
-                                    next_issues = next_data.get('issues', [])
-                                    issues.extend(next_issues)
-                                    start_at += len(next_issues)
-                                else:
-                                    break
-                        
-                        logger.info(f"Retrieved {len(issues)} issues from Jira")
                         return issues
                     else:
                         error_text = await response.text()
