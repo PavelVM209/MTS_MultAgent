@@ -1,0 +1,69 @@
+{
+  "week_start": "2026-04-06",
+  "week_end": "2026-04-10",
+  "period": "W15-2026",
+  "generated_at": "2026-04-10 19:34:26.127168",
+  "aggregated_metrics": {
+    "employee_performance": {
+      "average": 0,
+      "min": 0,
+      "max": 0,
+      "trend": "stable"
+    },
+    "project_health": {
+      "average": 7.5,
+      "min": 6.0,
+      "max": 9.0,
+      "trend": "improving"
+    },
+    "productivity": {
+      "average": 0.0,
+      "min": 0,
+      "max": 0,
+      "trend": "stable"
+    }
+  },
+  "trend_analysis": {
+    "employee_trends": {
+      "trends": []
+    },
+    "project_trends": {
+      "trends": []
+    },
+    "productivity_trends": {
+      "trends": []
+    }
+  },
+  "strategic_insights": [],
+  "system_metrics": {
+    "days_processed": 5,
+    "data_processing_time": 0.0,
+    "quality_score": 0.0,
+    "insights_generated": 0
+  },
+  "week_start_dt": "2026-04-06 19:34:26.125127",
+  "week_end_dt": "2026-04-10 19:34:26.125127",
+  "employees_summaries": {},
+  "total_employees": 0,
+  "total_tasks_completed": 0,
+  "total_story_points": 0,
+  "total_meetings": 0,
+  "avg_performance_score": 0,
+  "top_performers": [],
+  "employees_needing_attention": [],
+  "team_achievements": [],
+  "team_challenges": [],
+  "individual_recommendations": {},
+  "team_recommendations": [],
+  "quality_score": 0.0,
+  "report_generated_at": "2026-04-10 19:34:26.127175",
+  "metadata": {},
+  "_metadata": {
+    "data_type": "weekly_summary_data",
+    "persisted_at": "2026-04-10T19:34:26.127517",
+    "persisted_by": "MTS_MultAgent_v3",
+    "version": "1.0.0",
+    "file_id": "20ce6911-63d0-4584-b81c-51c691df7f55",
+    "size_bytes": 1152
+  }
+}

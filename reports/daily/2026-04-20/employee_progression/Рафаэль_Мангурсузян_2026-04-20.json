@@ -1,0 +1,17 @@
+{
+  "employee_name": "Рафаэль Мангурсузян",
+  "analysis_date": "2026-04-20T23:57:36.666939",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.8,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "*   **Корреляция задач и участия в встречах:** Очень высокая. Задачи (разработка витрин, блоков данных) полностью совпадают с темами его выступлений на встречах.\n*   **Последовательность в коммуникаци...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-20T23:57:36.667003",
+  "source": "improved_meeting_analyzer"
+}

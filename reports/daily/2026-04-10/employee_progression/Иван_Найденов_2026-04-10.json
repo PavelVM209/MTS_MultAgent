@@ -1,0 +1,17 @@
+{
+  "employee_name": "Иван Найденов",
+  "analysis_date": "2026-04-10T19:34:22.704258",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.8,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Высокая. Его задачи по ETL и биллингам полностью отражены в его выступлениях. Он — \"решатель\" сложных проблем.\n- **Последовательность в коммуникации:** Выс...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-10T19:34:22.704399",
+  "source": "improved_meeting_analyzer"
+}

@@ -1,0 +1,291 @@
+# Конфигурация ролей и контекста сотрудников MTS MultAgent Project
+# Создан на основе Jira аудита от 13.04.2026 с учетом актуальных ролей в команде
+
+# Метаданные конфигурации
+metadata:
+  version: "1.0.0"
+  created_date: "2026-04-20"
+  source: "Jira OPENBD project audit + role clarification"
+  total_employees: 21
+  active_employees: 11
+  unassigned_percentage: 20.6
+
+# Командная структура
+team_structure:
+  name: "Команда OPENBD"
+  project: "OPENBD"
+  department: "MTS Digital"
+  team_lead: "болотин_андрей"
+  
+# Глобальные настройки анализа
+analysis_settings:
+  default_language: "ru"
+  timezone: "Europe/Moscow"
+  working_hours:
+    start: "10:00"
+    end: "19:00"
+    break_duration: "1h"
+  
+  activity_thresholds:
+    high: 100    # задач total
+    medium: 30   # задач total
+    low: 5       # задач total
+
+# Карта ролей сотрудников
+roles_mapping:
+  tech_lead:
+    description: "Технический лидер"
+    responsibilities: ["техническое лидерство", "архитектура", "code review", "менторство"]
+    decision_authority: "high"
+    focus_areas: ["архитектура", "качество кода", "принятие технических решений"]
+    
+  devops_engineer:
+    description: "DevOps инженер"
+    responsibilities: ["ci/cd", "инфраструктура", "мониторинг", "автоматизация"]
+    decision_authority: "medium"
+    focus_areas: ["инфраструктура", "стабильность", "автоматизация"]
+    
+  data_engineer:
+    description: "Data инженер"
+    responsibilities: ["etl", "базы данных", "аналитические пайплайны", "оптимизация"]
+    decision_authority: "medium"
+    focus_areas: ["данные", "пайплайны", "оптимизация запросов"]
+    
+  product_owner:
+    description: "Product Owner"
+    responsibilities: ["бэклог", "приоритеты", "стейкхолдеры", "принятие решений"]
+    decision_authority: "high"
+    focus_areas: ["бэклог", "приоритеты", "стейкхолдеры"]
+    
+  analyst:
+    description: "Аналитик"
+    responsibilities: ["анализ", "требования", "спецификации", "исследования"]
+    decision_authority: "medium"
+    focus_areas: ["анализ", "требования", "документация"]
+
+# Профили сотрудников с актуальными ролями
+employees:
+  # Техническое руководство
+  болотин_андрей:
+    full_name: "Болотин Андрей"
+    display_name: "Андрей Болотин"
+    jira_name: "Болотин Андрей"
+    role: "tech_lead"
+    activity_level: "high"
+    task_count: 160
+    email: "andrej.bolotin@mts.ru"
+    skills:
+      primary: ["архитектура", "code_review", "менторство", "техническое лидерство"]
+      secondary: ["разработка", "проектное управление"]
+    specializations: ["system_architecture", "team_leadership", "performance_optimization"]
+    communication_style: "authoritative"
+    decision_making: "strategic"
+    team_influence: "high"
+
+  # DevOps
+  мурзаков_павел:
+    full_name: "Мурзаков Павел"
+    display_name: "Павел Мурзаков"
+    jira_name: "Мурзаков Павел"
+    role: "devops_engineer"
+    activity_level: "high"
+    task_count: 115
+    email: "pavel.murzakov@mts.ru"
+    skills:
+      primary: ["ci/cd", "инфраструктура", "мониторинг", "автоматизация"]
+      secondary: ["контейнеризация", "облачные технологии"]
+    specializations: ["terraform", "kubernetes", "jenkins", "monitoring"]
+    communication_style: "technical"
+    decision_making: "operational"
+    team_influence: "medium"
+
+  # Product Owners
+  стрельченко_святослав:
+    full_name: "Стрельченко Святослав"
+    display_name: "Святослав Стрельченко"
+    jira_name: "Стрельченко Святослав"
+    role: "product_owner"
+    activity_level: "medium_high"
+    task_count: 86
+    email: "svjatoslav.strelchenko@mts.ru"
+    product: "OPENBD"
+    skills:
+      primary: ["управление бэклогом", "приоритизация", "стейкхолдер-менеджмент"]
+      secondary: ["анализ", "принятие решений"]
+    specializations: ["product_strategy", "user_stories", "agile_planning"]
+    communication_style: "business_focused"
+    decision_making: "product_focused"
+    team_influence: "high"
+
+  савенкова_надежда:
+    full_name: "Савенкова Надежда"
+    display_name: "Надежда Савенкова"
+    jira_name: "Савенкова Надежда"
+    role: "product_owner"
+    activity_level: "medium_high"
+    task_count: 72
+    email: "nadezhda.savenkova@mts.ru"
+    product: "дополнительный продукт"
+    skills:
+      primary: ["управление бэклогом", "приоритизация", "стейкхолдер-менеджмент"]
+      secondary: ["анализ", "documentation"]
+    specializations: ["product_strategy", "market_analysis", "requirements_gathering"]
+    communication_style: "consultative"
+    decision_making: "product_focused"
+    team_influence: "high"
+
+  # Data Engineers
+  колобаев_никита:
+    full_name: "Колобаев Никита"
+    display_name: "Никита Колобаев"
+    jira_name: "Колобаев Никита"
+    role: "data_engineer"
+    activity_level: "medium_high"
+    task_count: 86
+    email: "nikita.kolobaev@mts.ru"
+    skills:
+      primary: ["etl", "базы данных", "аналитические пайплайны", "sql"]
+      secondary: ["python", "оптимизация запросов", "data_visualization"]
+    specializations: ["data_warehousing", "etl_design", "big_data", "sql_optimization"]
+    communication_style: "analytical"
+    decision_making: "data_driven"
+    team_influence: "medium"
+
+  найденов_иван_владимирович:
+    full_name: "Найденов Иван Владимирович"
+    display_name: "Иван Найденов"
+    jira_name: "Найденов Иван Владимирович"
+    role: "data_engineer"
+    activity_level: "medium"
+    task_count: 23
+    email: "ivan.najdenov@mts.ru"
+    skills:
+      primary: ["etl", "базы данных", "аналитические пайплайны"]
+      secondary: ["python", "testing"]
+    specializations: ["data_processing", "pipeline_development", "data_quality"]
+    communication_style: "technical"
+    decision_making: "analytical"
+    team_influence: "medium"
+
+  # Аналитики
+  кроткова_наталья_олеговна:
+    full_name: "Кроткова Наталья Олеговна"
+    display_name: "Наталья Кроткова"
+    jira_name: "Кроткова Наталья Олеговна"
+    role: "analyst"
+    activity_level: "medium"
+    task_count: 31
+    email: "natalja.krotkova@mts.ru"
+    skills:
+      primary: ["бизнес-анализ", "требования", "спецификации"]
+      secondary: ["документация", "презентации", "коммуникации"]
+    specializations: ["requirements_analysis", "business_process_modeling", "documentation"]
+    communication_style: "detailed"
+    decision_making: "analytical"
+    team_influence: "medium"
+
+  вощилов_егор:
+    full_name: "Вощилов Егор"
+    display_name: "Егор Вощилов"
+    jira_name: "Вощилов Егор"
+    role: "analyst"
+    activity_level: "medium"
+    task_count: 29
+    email: "egor.voshilov@mts.ru"
+    skills:
+      primary: ["анализ", "исследования", "данные"]
+      secondary: ["документация", "тестирование"]
+    specializations: ["data_analysis", "market_research", "user_research"]
+    communication_style: "research_focused"
+    decision_making: "evidence_based"
+    team_influence: "medium"
+
+  мангурсузян_рафаэль_варушанович:
+    full_name: "Мангурсузян Рафаэль Варушанович"
+    display_name: "Рафаэль Мангурсузян"
+    jira_name: "Мангурсузян Рафаэль Варушанович"
+    role: "analyst"
+    activity_level: "medium"
+    task_count: 29
+    email: "rafail.mangursuzjan@mts.ru"
+    skills:
+      primary: ["анализ", "требования", "тестирование"]
+      secondary: ["документация", "коммуникации"]
+    specializations: ["functional_analysis", "test_scenarios", "validation"]
+    communication_style: "structured"
+    decision_making: "methodical"
+    team_influence: "medium"
+
+  сабадаш_алина:
+    full_name: "Сабадаш Алина"
+    display_name: "Алина Сабадаш"
+    jira_name: "Сабадаш Алина"
+    role: "analyst"
+    activity_level: "medium"
+    task_count: 26
+    email: "alina.sabadash@mts.ru"
+    skills:
+      primary: ["анализ", "документация", "требования"]
+      secondary: ["коммуникации", "презентации"]
+    specializations: ["process_analysis", "documentation", "stakeholder_communication"]
+    communication_style: "collaborative"
+    decision_making: "consensus_building"
+    team_influence: "medium"
+
+  # Остальные члены команды с низкой активностью
+  березин_константин:
+    full_name: "Березин Константин"
+    display_name: "Константин Березин"
+    jira_name: "Березин Константин"
+    role: "analyst"
+    activity_level: "low"
+    task_count: 17
+    email: "konstantin.beriozin@mts.ru"
+    skills:
+      primary: ["анализ", "документация"]
+      secondary: ["тестирование", "поддержка"]
+    specializations: ["documentation", "quality_assurance", "support"]
+    communication_style: "supportive"
+    decision_making: "procedural"
+    team_influence: "low"
+
+# Правила анализа на основе ролей
+analysis_rules:
+  tech_lead:
+    focus_areas: ["архитектурные решения", "качество кода", "менторство", "принятие решений"]
+    expected_behaviors: ["техническое лидерство", "code review", "архитектурное планирование", "управление командой"]
+    communication_indicators: ["директивность", "техническая экспертиза", "менторские советы"]
+    
+  devops_engineer:
+    focus_areas: ["инфраструктура", "автоматизация", "стабильность", "мониторинг"]
+    expected_behaviors: ["настройка CI/CD", "управление инфраструктурой", "решение инцидентов", "автоматизация"]
+    communication_indicators: ["технические детали", "статус систем", "планы улучшений"]
+    
+  data_engineer:
+    focus_areas: ["данные", "пайплайны", "оптимизация", "качество данных"]
+    expected_behaviors: ["разработка ETL", "оптимизация запросов", "анализ данных", "обеспечение качества"]
+    communication_indicators: ["аналитические выводы", "метрики качества", "техническая документация"]
+    
+  product_owner:
+    focus_areas: ["бэклог", "приоритеты", "стейкхолдеры", "продуктовая стратегия"]
+    expected_behaviors: ["управление бэклогом", "приоритизация", "взаимодействие со стейкхолдерами", "принятие продуктовых решений"]
+    communication_indicators: ["бизнес-фокус", "приоритеты", "статус бэклога", "needs стейкхолдеров"]
+    
+  analyst:
+    focus_areas: ["анализ", "требования", "документация", "исследования"]
+    expected_behaviors: ["сбор требований", "анализ процессов", "документация", "исследование"]
+    communication_indicators: ["детальный анализ", "вопросы уточнения", "документация", "результаты исследований"]
+
+# Словарь для маппинга имен из Jira в internal ключи
+name_mapping:
+  "Болотин Андрей": "болотин_андрей"
+  "Мурзаков Павел": "мурзаков_павел"
+  "Стрельченко Святослав": "стрельченко_святослав"
+  "Савенкова Надежда": "савенкова_надежда"
+  "Колобаев Никита": "колобаев_никита"
+  "Найденов Иван Владимирович": "найденов_иван_владимирович"
+  "Кроткова Наталья Олеговна": "кроткова_наталья_олеговна"
+  "Вощилов Егор": "вощилов_егор"
+  "Мангурсузян Рафаэль Варушанович": "мангурсузян_рафаэль_варушанович"
+  "Сабадаш Алина": "сабадаш_алина"
+  "Березин Константин": "березин_константин"

@@ -1,0 +1,468 @@
+{
+  "task_analysis_stage1": [
+    {
+      "file_path": "task_analysis_stage1",
+      "file_hash": "",
+      "processed_at": "2026-04-20T23:17:20.200345",
+      "processing_type": "task_analysis",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/task-analysis/stage1/stage1_task_analysis_20260420_231720.txt",
+      "metadata": {
+        "analysis_type": "stage1",
+        "content_length": 10783
+      }
+    }
+  ],
+  "task_analysis_stage2": [
+    {
+      "file_path": "task_analysis_stage2",
+      "file_hash": "",
+      "processed_at": "2026-04-20T23:17:20.202534",
+      "processing_type": "task_analysis",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/task-analysis/stage2/stage2_task_result_20260420_231720.json",
+      "metadata": {
+        "analysis_type": "stage2",
+        "employees_count": 9
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.07_С®≠™ NPS ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.07_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "1c98bde5bdd9601f0605c5b6e7896901",
+      "processed_at": "2026-04-20T23:12:07.057917",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/cleaned_2026.04.07_С®≠™ NPS ™Ѓђ†≠§л RUN_20260420_231207.txt",
+      "metadata": {
+        "original_filename": "2026.04.07_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.07_С®≠™ NPS ™Ѓђ†≠§л RUN_20260420_231207.txt",
+        "content_length": 7023,
+        "processing_timestamp": "2026-04-20T23:12:07.053200"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11571155.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11571155.txt",
+      "file_hash": "5dd41fe9182b639151e805c631ce9406",
+      "processed_at": "2026-04-20T23:27:42.902632",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_transcript-11571155.txt",
+      "metadata": {
+        "original_filename": "transcript-11571155.txt",
+        "cleaned_filename": "cleaned_transcript-11571155.txt",
+        "content_length": 5581,
+        "processing_timestamp": "2026-04-20T23:27:42.903247",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.15_Status_Tech_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.15_Status_Tech_RUN.txt",
+      "file_hash": "946d6428b97f818227553c7192e71d8d",
+      "processed_at": "2026-04-20T23:27:42.904128",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.15_Status_Tech_RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.15_Status_Tech_RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.15_Status_Tech_RUN.txt",
+        "content_length": 6686,
+        "processing_timestamp": "2026-04-20T23:27:42.904530",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11562065.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11562065.txt",
+      "file_hash": "0c6d4e906630efa9173f649865677ab5",
+      "processed_at": "2026-04-20T23:27:42.905990",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_transcript-11562065.txt",
+      "metadata": {
+        "original_filename": "transcript-11562065.txt",
+        "cleaned_filename": "cleaned_transcript-11562065.txt",
+        "content_length": 10420,
+        "processing_timestamp": "2026-04-20T23:27:42.906450",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.14_Sync_NPS_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.14_Sync_NPS_RUN.txt",
+      "file_hash": "e7d43047334b73f6e6b58d4a5844992f",
+      "processed_at": "2026-04-20T23:27:42.907462",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.14_Sync_NPS_RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.14_Sync_NPS_RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.14_Sync_NPS_RUN.txt",
+        "content_length": 11065,
+        "processing_timestamp": "2026-04-20T23:27:42.907918",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11671015.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11671015.txt",
+      "file_hash": "e34037d20da762c2e0f37837ec69f7ea",
+      "processed_at": "2026-04-20T23:27:42.909776",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_transcript-11671015.txt",
+      "metadata": {
+        "original_filename": "transcript-11671015.txt",
+        "cleaned_filename": "cleaned_transcript-11671015.txt",
+        "content_length": 10244,
+        "processing_timestamp": "2026-04-20T23:27:42.910300",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11463131.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11463131.txt",
+      "file_hash": "afbae4a217b5cc770796fcc83c4deb3d",
+      "processed_at": "2026-04-20T23:27:42.912938",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_transcript-11463131.txt",
+      "metadata": {
+        "original_filename": "transcript-11463131.txt",
+        "cleaned_filename": "cleaned_transcript-11463131.txt",
+        "content_length": 7049,
+        "processing_timestamp": "2026-04-20T23:27:42.913458",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11510575.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/transcript-11510575.txt",
+      "file_hash": "dc144e6203c497b66df0f06bbc32c2e6",
+      "processed_at": "2026-04-20T23:27:42.914790",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_transcript-11510575.txt",
+      "metadata": {
+        "original_filename": "transcript-11510575.txt",
+        "cleaned_filename": "cleaned_transcript-11510575.txt",
+        "content_length": 11974,
+        "processing_timestamp": "2026-04-20T23:27:42.915271",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.14_Sync_LEGO_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.14_Sync_LEGO_RUN.txt",
+      "file_hash": "c3c372f10b46be875829f2dfdf125466",
+      "processed_at": "2026-04-20T23:27:42.917100",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.14_Sync_LEGO_RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.14_Sync_LEGO_RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.14_Sync_LEGO_RUN.txt",
+        "content_length": 11168,
+        "processing_timestamp": "2026-04-20T23:27:42.917639",
+        "migrated": true
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "1489fc9b2fddba63b0ab80068ffba2ff",
+      "processed_at": "2026-04-20T23:38:31.093491",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.27_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.27_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.27_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+        "content_length": 9083,
+        "processing_timestamp": "2026-04-20T23:38:31.092697",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.01_Daily ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.01_Daily ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "f0f473848d9cb962e02aceee2f1330c8",
+      "processed_at": "2026-04-20T23:38:31.097880",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.01_Daily ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.01_Daily ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.01_Daily ™Ѓђ†≠§л RUN.txt",
+        "content_length": 8118,
+        "processing_timestamp": "2026-04-20T23:38:31.096977",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.07_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.07_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "658f39d91eb6e166a4ee8ce4ab20d09c",
+      "processed_at": "2026-04-20T23:38:31.104332",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.07_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.07_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.07_С®≠™ LEGO ™Ѓђ†≠§л RUN.txt",
+        "content_length": 11141,
+        "processing_timestamp": "2026-04-20T23:38:31.103598",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_С®≠™ Detector ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_С®≠™ Detector ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "d2a1ad78eae47baad70a1cd132aa2b2d",
+      "processed_at": "2026-04-20T23:38:31.114165",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.27_С®≠™ Detector ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.27_С®≠™ Detector ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.27_С®≠™ Detector ™Ѓђ†≠§л RUN.txt",
+        "content_length": 8713,
+        "processing_timestamp": "2026-04-20T23:38:31.113564",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.06_Daily ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.06_Daily ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "993cf297fef4da7d8950780af81ba72c",
+      "processed_at": "2026-04-20T23:38:31.117327",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.06_Daily ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.06_Daily ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.06_Daily ™Ѓђ†≠§л RUN.txt",
+        "content_length": 10237,
+        "processing_timestamp": "2026-04-20T23:38:31.116879",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.09_Daily ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.09_Daily ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "495020dbf5ab1dfb9fac42e73cc9a7c0",
+      "processed_at": "2026-04-20T23:38:31.124404",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.09_Daily ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.09_Daily ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.09_Daily ™Ѓђ†≠§л RUN.txt",
+        "content_length": 8728,
+        "processing_timestamp": "2026-04-20T23:38:31.123389",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.30_ПЂ†≠®аЃҐ†≠®• бѓа®≠в† ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.30_ПЂ†≠®аЃҐ†≠®• бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "7721a3c0d97da64063253c5e969262c6",
+      "processed_at": "2026-04-20T23:38:31.129411",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.30_ПЂ†≠®аЃҐ†≠®• бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.30_ПЂ†≠®аЃҐ†≠®• бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.30_ПЂ†≠®аЃҐ†≠®• бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+        "content_length": 10168,
+        "processing_timestamp": "2026-04-20T23:38:31.128046",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.31_С®≠™ NPS ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.31_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "ec4d81be825d1286324cfacc9f8f5f30",
+      "processed_at": "2026-04-20T23:38:31.134985",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.31_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.31_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.31_С®≠™ NPS ™Ѓђ†≠§л RUN.txt",
+        "content_length": 11290,
+        "processing_timestamp": "2026-04-20T23:38:31.134265",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_Retro бѓа®≠в† ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.27_Retro бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "e34037d20da762c2e0f37837ec69f7ea",
+      "processed_at": "2026-04-20T23:38:31.138642",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.27_Retro бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.27_Retro бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.27_Retro бѓа®≠в† ™Ѓђ†≠§л RUN.txt",
+        "content_length": 13106,
+        "processing_timestamp": "2026-04-20T23:38:31.137748",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.31_Tech бв†вгб ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.03.31_Tech бв†вгб ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "e2291b4a36a55afb949842d1582d0ef1",
+      "processed_at": "2026-04-20T23:38:31.142986",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.03.31_Tech бв†вгб ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.03.31_Tech бв†вгб ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.03.31_Tech бв†вгб ™Ѓђ†≠§л RUN.txt",
+        "content_length": 12648,
+        "processing_timestamp": "2026-04-20T23:38:31.142232",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.02_ПЃ§Ґ•§•≠®• ®вЃ£ЃҐ 1 ™Ґ†ав†Ђ† ® ѓЂ†≠®аЃҐ†≠®• 2 ™Ґ†ав†Ђ† ЦАС.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.02_ПЃ§Ґ•§•≠®• ®вЃ£ЃҐ 1 ™Ґ†ав†Ђ† ® ѓЂ†≠®аЃҐ†≠®• 2 ™Ґ†ав†Ђ† ЦАС.txt",
+      "file_hash": "10fc63a23ceec91ed28fdb6cc0347144",
+      "processed_at": "2026-04-20T23:38:31.150809",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.02_ПЃ§Ґ•§•≠®• ®вЃ£ЃҐ 1 ™Ґ†ав†Ђ† ® ѓЂ†≠®аЃҐ†≠®• 2 ™Ґ†ав†Ђ† ЦАС.txt",
+      "metadata": {
+        "original_filename": "2026.04.02_ПЃ§Ґ•§•≠®• ®вЃ£ЃҐ 1 ™Ґ†ав†Ђ† ® ѓЂ†≠®аЃҐ†≠®• 2 ™Ґ†ав†Ђ† ЦАС.txt",
+        "cleaned_filename": "cleaned_2026.04.02_ПЃ§Ґ•§•≠®• ®вЃ£ЃҐ 1 ™Ґ†ав†Ђ† ® ѓЂ†≠®аЃҐ†≠®• 2 ™Ґ†ав†Ђ† ЦАС.txt",
+        "content_length": 10489,
+        "processing_timestamp": "2026-04-20T23:38:31.148475",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.08_Daily ™Ѓђ†≠§л RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.08_Daily ™Ѓђ†≠§л RUN.txt",
+      "file_hash": "8f409744ec50642ad3a722939640170e",
+      "processed_at": "2026-04-20T23:38:31.162253",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_2026.04.08_Daily ™Ѓђ†≠§л RUN.txt",
+      "metadata": {
+        "original_filename": "2026.04.08_Daily ™Ѓђ†≠§л RUN.txt",
+        "cleaned_filename": "cleaned_2026.04.08_Daily ™Ѓђ†≠§л RUN.txt",
+        "content_length": 9900,
+        "processing_timestamp": "2026-04-20T23:38:31.160838",
+        "source": "file_system_sync"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.15_Daily_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.15_Daily_RUN.txt",
+      "file_hash": "59fbf30a4303ccbf68d0f943ac79fce0",
+      "processed_at": "2026-04-20T23:40:58.867609",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260415_Daily_RUN_20260420_234058.txt",
+      "metadata": {
+        "original_filename": "2026.04.15_Daily_RUN.txt",
+        "cleaned_filename": "cleaned_20260415_Daily_RUN_20260420_234058.txt",
+        "content_length": 9152,
+        "processing_timestamp": "2026-04-20T23:40:58.863944"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.16_Daily_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.16_Daily_RUN.txt",
+      "file_hash": "6a1f8991b81b2f6045099819d909e62a",
+      "processed_at": "2026-04-20T23:44:02.005079",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260416_Daily_RUN_20260420_234402.txt",
+      "metadata": {
+        "original_filename": "2026.04.16_Daily_RUN.txt",
+        "cleaned_filename": "cleaned_20260416_Daily_RUN_20260420_234402.txt",
+        "content_length": 4734,
+        "processing_timestamp": "2026-04-20T23:44:02.003278"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.17_Sync_Detector_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.17_Sync_Detector_RUN.txt",
+      "file_hash": "57321582eaad7d34fffd1db19c78f186",
+      "processed_at": "2026-04-20T23:47:20.452517",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260417_Sync_Detector_RUN_20260420_234720.txt",
+      "metadata": {
+        "original_filename": "2026.04.17_Sync_Detector_RUN.txt",
+        "cleaned_filename": "cleaned_20260417_Sync_Detector_RUN_20260420_234720.txt",
+        "content_length": 9280,
+        "processing_timestamp": "2026-04-20T23:47:20.449048"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.17_Sync_NPS_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.17_Sync_NPS_RUN.txt",
+      "file_hash": "b33af73506f962408e8f6ead6184450f",
+      "processed_at": "2026-04-20T23:49:04.758295",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260417_Sync_NPS_RUN_20260420_234904.txt",
+      "metadata": {
+        "original_filename": "2026.04.17_Sync_NPS_RUN.txt",
+        "cleaned_filename": "cleaned_20260417_Sync_NPS_RUN_20260420_234904.txt",
+        "content_length": 7593,
+        "processing_timestamp": "2026-04-20T23:49:04.755245"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.13_Sprint7_Plan_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.13_Sprint7_Plan_RUN.txt",
+      "file_hash": "8342565719a4bc38e2c352f55cfffc5d",
+      "processed_at": "2026-04-20T23:50:48.484342",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260413_Sprint7_Plan_RUN_20260420_235048.txt",
+      "metadata": {
+        "original_filename": "2026.04.13_Sprint7_Plan_RUN.txt",
+        "cleaned_filename": "cleaned_20260413_Sprint7_Plan_RUN_20260420_235048.txt",
+        "content_length": 8705,
+        "processing_timestamp": "2026-04-20T23:50:48.481233"
+      }
+    }
+  ],
+  "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.13_Sprint6_Retro_RUN.txt": [
+    {
+      "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.13_Sprint6_Retro_RUN.txt",
+      "file_hash": "432768893895f5a37243c908e216a6f8",
+      "processed_at": "2026-04-20T23:52:50.308668",
+      "processing_type": "meeting_clean",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260413_Sprint6_Retro_RUN_20260420_235250.txt",
+      "metadata": {
+        "original_filename": "2026.04.13_Sprint6_Retro_RUN.txt",
+        "cleaned_filename": "cleaned_20260413_Sprint6_Retro_RUN_20260420_235250.txt",
+        "content_length": 9918,
+        "processing_timestamp": "2026-04-20T23:52:50.299274"
+      }
+    }
+  ],
+  "reports/daily/2026-04-21/unified-analysis/unified-analysis_2026-04-21.json": [
+    {
+      "file_path": "reports/daily/2026-04-21/unified-analysis/unified-analysis_2026-04-21.json",
+      "file_hash": "a14e4a992796f078c679cd07e99469ba",
+      "processed_at": "2026-04-21T08:41:23.374873",
+      "processing_type": "final_unified_analysis",
+      "result_path": "reports/daily/2026-04-21/unified-analysis/unified-analysis_2026-04-21.json",
+      "metadata": {
+        "analysis_type": "final_unified",
+        "employees_analyzed": 16,
+        "quality_score": 0.0,
+        "data_sources": 3
+      }
+    }
+  ]
+}

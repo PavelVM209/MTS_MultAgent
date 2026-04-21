@@ -1,0 +1,52 @@
+[
+  {
+    "agent_name": "Task Analyzer",
+    "start_time": "2026-04-10T18:07:32.317952",
+    "end_time": "2026-04-10T18:10:56.465227",
+    "duration_seconds": 204.147275,
+    "success": true,
+    "message": "Successfully analyzed task performance for 12 employees using two-stage LLM",
+    "error": null,
+    "metadata": {
+      "execution_time": 203.173308,
+      "employees_analyzed": 12,
+      "tasks_processed": null,
+      "quality_score": 1.0
+    }
+  },
+  {
+    "agent_name": "Meeting Analyzer",
+    "start_time": "2026-04-10T18:10:58.467372",
+    "end_time": "2026-04-10T19:34:22.710932",
+    "duration_seconds": 5004.24356,
+    "success": true,
+    "message": "Successfully completed 3-stage analysis for 9 employees",
+    "error": null,
+    "metadata": {
+      "execution_time": 5003.690111,
+      "protocols_analyzed": 18,
+      "employees_analyzed": 9,
+      "quality_score": 1.0
+    }
+  },
+  {
+    "agent_name": "Weekly Reports",
+    "start_time": "2026-04-10T19:34:24.715507",
+    "end_time": "2026-04-10T19:34:26.134836",
+    "duration_seconds": 1.419329,
+    "success": false,
+    "message": "Weekly report generated but quality check failed",
+    "error": null,
+    "metadata": null
+  },
+  {
+    "agent_name": "Quality Validator",
+    "start_time": "2026-04-10T19:34:28.137625",
+    "end_time": "2026-04-10T19:34:29.629668",
+    "duration_seconds": 1.492043,
+    "success": false,
+    "message": "No analysis data provided for validation",
+    "error": null,
+    "metadata": null
+  }
+]

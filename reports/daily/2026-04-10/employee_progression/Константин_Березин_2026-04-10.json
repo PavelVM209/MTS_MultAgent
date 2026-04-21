@@ -1,0 +1,17 @@
+{
+  "employee_name": "Константин Березин",
+  "analysis_date": "2026-04-10T19:34:22.704258",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.8,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Высокая. Его задачи по визуализации и дашбордам — это то, о чем он говорит. Он мост между данными и бизнес-пользователем.\n- **Последовательность в коммуник...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-10T19:34:22.704408",
+  "source": "improved_meeting_analyzer"
+}

@@ -1,0 +1,17 @@
+{
+  "employee_name": "Святослав",
+  "analysis_date": "2026-04-05T23:16:09.013874",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.8,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Высокая. Низкая загрузка (2 задачи) соответствует его эпизодическому появлению на встречах.\n- **Последовательность в коммуникации:** Эпизодическая.\n- **Эфф...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-05T23:16:09.014066",
+  "source": "improved_meeting_analyzer"
+}

@@ -1,0 +1,534 @@
+{
+  "analysis_date": "2026-04-21T08:40:39.291045",
+  "analysis_type": "final_unified_analysis",
+  "team_metrics": {
+    "overall_team_health": 5.0,
+    "team_dynamics_score": 10.0,
+    "productivity_efficiency": 5.0,
+    "collaboration_quality": 2.1875
+  },
+  "strategic_insights": {
+    "strategic_recommendations": [
+      "[Рекомендация по развитию команды] Внедрить экстренные воркшопы по управлению блокерами и совместному решению проблем.**",
+      "19/10 — это критический показатель, указывающий на то, что команда не умеет работать вместе над преодолением препятствий. Необходимо провести серию практических сессий, на которых сотрудники, особенно те, кто столкнулся с блокерами (Савенкова, Сабадаш, Мурзаков), и те, кто перегружен (Болотин, Мурзаков), будут совместно прорабатывать кейсы. Цель — сместить фокус с индивидуального выполнения задач на коллективную ответственность за результат. Это напрямую повлияет на \"Командную динамику\", которая сейчас выглядит аномально высокой на фоне остальных провальных метрик.",
+      "[Рекомендация по оптимизации процессов] Ввести жесткий процесс управления зависимостями и перераспределения нагрузки.**",
+      "[Рекомендация по управлению талантами] Дифференцированный подход к развитию и мотивации сотрудников.**"
+    ],
+    "risk_factors": [],
+    "growth_opportunities": []
+  },
+  "employees_analysis": {
+    "Савенкова Надежда": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Мангурсузян Рафаэль Варушанович**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Все его задачи (4 шт.) находятся в статусе \"В работе\" или \"Бэклог\". Среди них задачи с высоким и ..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Unassigned**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Ключевая проблема - отсутствие сотрудника. Задача `OPENBD-1428` (\"MVP агента для Confluence\") явл..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Вощилов Егор": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Кроткова Наталья Олеговна": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Вощилов Егор**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Явно недостаточная загрузка. Имеет всего 2 задачи, в то время как команда перегружена. Это может ..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Сабадаш Алина": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Савенкова Надежда**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Задача `OPENBD-1328` заблокирована внешней зависимостью (ожидание FR). Задача в бэклоге (`OPENBD-..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Сабадаш Алина**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Задача `OPENBD-1324` заблокирована ожиданием накопления истории, что является объективной причино..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Мурзаков Павел**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Высокая загрузка (5 задач). Критически важная задача `OPENBD-1441` заблокирована ожиданием доступ..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Болотин Андрей": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Мангурсузян Рафаэль Варушанович": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    },
+    "Кроткова Наталья Олеговна**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** **Критически низкая загрузка.** Имеет всего одну задачу, которая уже выполнена, но не проверена и..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Найденов Иван Владимирович**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** На данный момент явных блокеров нет. Его текущие задачи (`OPENBD-1396`, `OPENBD-1371`) являются с..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Болотин Андрей**": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач",
+        "Требуется развитие коммуникационных навыков",
+        "Проблемы: ** Очень высокая загрузка (6 задач) может привести к снижению качества или выгоранию. Задача `OPENBD..."
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 0.0,
+        "engagement_level": "unknown"
+      }
+    },
+    "Найденов Иван Владимирович": {
+      "overall_performance_score": 5.0,
+      "task_meeting_correlation": 0.5,
+      "consistency_score": 1.0,
+      "growth_potential": 0.7,
+      "key_strengths": [],
+      "development_areas": [
+        "Нуждается в улучшении выполнения задач"
+      ],
+      "action_recommendations": [
+        "Рекомендуется дополнительное обучение и менторство"
+      ],
+      "role_specific_guidance": "",
+      "career_trajectory_insights": [
+        "Требует поддержки и развития для достижения стабильной производительности"
+      ],
+      "confidence_level": 0.6,
+      "analysis_completeness": "comprehensive",
+      "task_performance_metrics": {
+        "performance_rating": 5.0,
+        "completion_rate": 0.0,
+        "total_tasks": 0,
+        "completed_tasks": 0
+      },
+      "meeting_performance_metrics": {
+        "performance_rating": 5.0,
+        "communication_effectiveness": 5.0,
+        "engagement_level": "medium"
+      }
+    }
+  },
+  "quality_metrics": {
+    "analysis_quality_score": 0.0,
+    "data_sources_count": 3,
+    "analysis_duration_seconds": 0.0
+  },
+  "metadata": {
+    "sources_used": {
+      "task_analysis": true,
+      "meeting_analysis": true,
+      "role_context": true
+    },
+    "total_employees": 16,
+    "analysis_completeness": "comprehensive"
+  }
+}

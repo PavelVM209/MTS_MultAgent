@@ -1,0 +1,17 @@
+{
+  "employee_name": "Алина Сабадаш",
+  "analysis_date": "2026-04-05T23:16:09.013874",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.8,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Высокая. Она работает над сложными бизнес-задачами (ТОП-5), и это отражено в ее статусах в Jira и детальных докладах на встречах.\n- **Последовательность в ...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-05T23:16:09.014036",
+  "source": "improved_meeting_analyzer"
+}

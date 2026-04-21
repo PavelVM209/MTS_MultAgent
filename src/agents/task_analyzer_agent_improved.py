@@ -17,12 +17,15 @@ from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from core.base_agent import BaseAgent, AgentConfig, AgentResult
-from core.llm_client import LLMClient, LLMRequest
-from core.json_memory_store import JSONMemoryStore
-from core.quality_metrics import QualityMetrics
-from core.config import get_employee_monitoring_config
-from core.jira_client import JiraClient
+from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
+from ..core.llm_client import LLMClient, LLMRequest
+from ..core.json_memory_store import JSONMemoryStore
+from ..core.quality_metrics import QualityMetrics
+from ..core.config import get_employee_monitoring_config
+from ..core.jira_client import JiraClient
+from ..core.role_context_manager import EmployeeRoleManager
+from ..core.processing_tracker import ProcessingTracker
+from ..core.enhanced_file_manager import EnhancedFileManager
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +113,11 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
         self.llm_client = LLMClient()
         self.memory_store = JSONMemoryStore()
         self.quality_metrics = QualityMetrics()
+        self.role_manager = EmployeeRoleManager()
+        
+        # Initialize processing tracker and file manager
+        self.processing_tracker = ProcessingTracker()
+        self.file_manager = EnhancedFileManager()
         
         # Load configuration
         self.emp_config = get_employee_monitoring_config()
@@ -274,10 +282,162 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
         
         return employee_tasks
     
-    async def stage1_text_analysis(self, tasks: List[Dict[str, Any]], employee_tasks: Dict[str, List[Dict[str, Any]]]) -> Optional[str]:
-        """Stage 1: Generate comprehensive text analysis with LLM."""
+    async def _enhance_task_analysis_with_role_context(self, employee_tasks: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+        """
+        Обогащение анализа задач контекстом ролей сотрудников.
+        
+        Args:
+            employee_tasks: Сгруппированные задачи по сотрудникам
+            
+        Returns:
+            Обогащенные данные с ролевым контекстом
+        """
         try:
-            logger.info("=== STAGE 1: TEXTUAL ANALYSIS ===")
+            role_enhancement = {
+                "enhanced_employees": {},
+                "team_context": {},
+                "role_statistics": {}
+            }
+            
+            # Получаем контекст команды
+            team_context = self.role_manager.get_team_context()
+            role_enhancement["team_context"] = team_context
+            
+            # Обогащаем каждого сотрудника ролевым контекстом
+            for employee_name, tasks in employee_tasks.items():
+                role_context = self.role_manager.enhance_task_analysis(employee_name)
+                role_enhancement["enhanced_employees"][employee_name] = {
+                    "tasks_count": len(tasks),
+                    "role_context": role_context,
+                    "task_summaries": [
+                        {
+                            "key": task.get("key", ""),
+                            "summary": task.get("summary", ""),
+                            "status": task.get("status", ""),
+                            "priority": task.get("priority", "")
+                        }
+                        for task in tasks[:5]  # Топ 5 задач для анализа
+                    ]
+                }
+            
+            # Собираем статистику по ролям
+            role_stats = {}
+            for employee_name, enhancement in role_enhancement["enhanced_employees"].items():
+                role_info = enhancement["role_context"]
+                if role_info.get("assignee_identified"):
+                    activity_level = role_info.get("activity_level", "unknown")
+                    role_stats[activity_level] = role_stats.get(activity_level, 0) + 1
+            
+            role_enhancement["role_statistics"] = role_stats
+            
+            logger.info(f"Role context enhancement completed for {len(employee_tasks)} employees")
+            
+            return role_enhancement
+            
+        except Exception as e:
+            logger.error(f"Failed to enhance task analysis with role context: {e}")
+            return {
+                "enhanced_employees": {},
+                "team_context": {},
+                "role_statistics": {},
+                "error": str(e)
+            }
+    
+    def _format_role_context_for_prompt(self, role_context_data: Dict[str, Any]) -> str:
+        """
+        Форматирует контекст ролей для включения в LLM промпт.
+        
+        Args:
+            role_context_data: Данные ролевого контекст
+            
+        Returns:
+            Отформатированный текст для промпта
+        """
+        try:
+            context_parts = []
+            
+            # Заголовок секции
+            context_parts.append("=== КОНТЕКСТ РОЛЕЙ И ДОЛЖНОСТЕЙ ===")
+            
+            # Общая информация о команде
+            team_context = role_context_data.get("team_context", {})
+            if team_context:
+                context_parts.append(f"Всего сотрудников в команде: {team_context.get('total_employees', 'N/A')}")
+                context_parts.append(f"Выявленные сотрудники: {team_context.get('identified_employees', 'N/A')}")
+                context_parts.append(f"Текучесть кадров: {team_context.get('turnover_rate', 'N/A')}")
+                context_parts.append("")
+            
+            # Детальная информация по сотрудникам
+            enhanced_employees = role_context_data.get("enhanced_employees", {})
+            if enhanced_employees:
+                context_parts.append("ИНФОРМАЦИЯ О СОТРУДНИКАХ:")
+                
+                for employee_name, emp_data in enhanced_employees.items():
+                    role_context = emp_data.get("role_context", {})
+                    
+                    # Формируем информацию о сотруднике
+                    emp_info = []
+                    emp_info.append(f"Сотрудник: {employee_name}")
+                    
+                    # Должность и роль
+                    if role_context.get("assignee_identified"):
+                        emp_info.append(f"Должность: {role_context.get('role_level', 'N/A')}")
+                        emp_info.append(f"Ответственность: {role_context.get('responsibility_level', 'N/A')}")
+                        emp_info.append(f"Активность: {role_context.get('activity_level', 'N/A')}")
+                        emp_info.append(f"Статус: {role_context.get('current_status', 'N/A')}")
+                        emp_info.append(f"Направление: {role_context.get('specialization', 'N/A')}")
+                    else:
+                        emp_info.append("Должность: Не определена")
+                        emp_info.append("Статус: Новый или незарегистрированный сотрудник")
+                    
+                    # Количество задач
+                    tasks_count = emp_data.get("tasks_count", 0)
+                    emp_info.append(f"Текущих задач: {tasks_count}")
+                    
+                    # Последние задачи для контекста
+                    task_summaries = emp_data.get("task_summaries", [])
+                    if task_summaries:
+                        emp_info.append("Последние задачи:")
+                        for task in task_summaries[:3]:  # Только топ 3
+                            emp_info.append(f"  - {task.get('key', '')}: {task.get('summary', '')} ({task.get('status', '')})")
+                    
+                    context_parts.append("\n".join(emp_info))
+                    context_parts.append("")  # Пустая строка между сотрудниками
+            
+            # Статистика по ролям
+            role_stats = role_context_data.get("role_statistics", {})
+            if role_stats:
+                context_parts.append("СТАТИСТИКА ПО РОЛЯМ:")
+                for activity_level, count in role_stats.items():
+                    context_parts.append(f"- {activity_level}: {count} сотрудников")
+                context_parts.append("")
+            
+            # Важные инструкции для LLM
+            context_parts.append("=== ИНСТРУКЦИИ ДЛЯ АНАЛИЗА С УЧЕТОМ РОЛЕЙ ===")
+            context_parts.append("1. Учитывай должности и ответственность при формировании рекомендаций")
+            context_parts.append("2. Product Owner не может выполнять технические задачи разработчика")
+            context_parts.append("3. Рекомендации должны соответствовать уровню должности")
+            context_parts.append("4. Учитывай специализацию сотрудника при распределении задач")
+            context_parts.append("5. Новым сотрудникам требуются задачи с наставничеством")
+            context_parts.append("")
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            logger.error(f"Failed to format role context for prompt: {e}")
+            return "=== КОНТЕКСТ РОЛЕЙ И ДОЛЖНОСТЕЙ ===\nОшибка форматирования контекста ролей\n"
+    
+    async def stage1_text_analysis(self, tasks: List[Dict[str, Any]], employee_tasks: Dict[str, List[Dict[str, Any]]]) -> Optional[str]:
+        """Stage 1: Generate comprehensive text analysis with LLM and Role Context."""
+        try:
+            logger.info("=== STAGE 1: TEXTUAL ANALYSIS WITH ROLE CONTEXT ===")
+            
+            # P6-10: Load Role Context FIRST - это критически важно!
+            logger.info("Loading Role Context for all employees...")
+            role_context_data = await self._enhance_task_analysis_with_role_context(employee_tasks)
+            
+            # Extract role context for prompt
+            role_context_text = self._format_role_context_for_prompt(role_context_data)
             
             # Prepare tasks data
             tasks_summary = []
@@ -314,9 +474,11 @@ Recent tasks:
             # Get all employees for mandatory analysis
             all_employees = list(employee_tasks.keys())
             
-            # Comprehensive prompt with mandatory employee analysis - REQUIRED RUSSIAN LANGUAGE
+            # Comprehensive prompt with mandatory employee analysis and Role Context - REQUIRED RUSSIAN LANGUAGE
             prompt = f"""
 Вы - СТАРШИЙ АНАЛИТИК ПРОИЗВОДИТЕЛЬНОСТИ КОМАНДЫ для мониторинга сотрудников. Проанализируйте следующие задачи и предоставьте ДЕТАЛЬНЫЙ текстовый анализ НА РУССКОМ ЯЗЫКЕ.
+
+{role_context_text}
 
 ЗАДАЧИ ДЛЯ АНАЛИЗА:
 {chr(10).join(tasks_summary)}
@@ -436,10 +598,10 @@ Recent tasks:
                         problems_match = re.search(r'(?:Проблемы и блокеры|Problems and blockers):\s*(.*?)(?=(?:Рекомендации|Recommendations):|$)', emp_details, re.DOTALL | re.IGNORECASE)
                         workload_match = re.search(r'(?:Уровень загрузки|Workload level):\s*(.*)', emp_details, re.IGNORECASE)
                         
-                        # Default values
+                        # Default values - P6-5, P6-6: Увеличиваем лимит с 100 до 2000 символов
                         rating = int(rating_match.group(1)) if rating_match else 5
-                        achievements = [achievements_match.group(1).strip()[:100] + "..."] if achievements_match else ["No data"]
-                        bottlenecks = [problems_match.group(1).strip()[:100] + "..."] if problems_match else ["No issues identified"]
+                        achievements = [achievements_match.group(1).strip()[:2000] + ("..." if len(achievements_match.group(1).strip()) > 2000 else "")] if achievements_match else ["No data"]
+                        bottlenecks = [problems_match.group(1).strip()[:2000] + ("..." if len(problems_match.group(1).strip()) > 2000 else "")] if problems_match else ["No issues identified"]
                         workload = workload_match.group(1).strip() if workload_match else "Medium"
                         
                         # Calculate task metrics
@@ -510,7 +672,17 @@ Recent tasks:
             
             logger.info(f"Retrieved {len(tasks)} tasks for {len(employee_tasks)} employees")
             
-            # Stage 1: Text analysis
+            # Enhanced role context analysis
+            logger.info("\n" + "="*60)
+            logger.info("ROLE CONTEXT ENHANCEMENT")
+            logger.info("="*60)
+            
+            role_enhancement = await self._enhance_task_analysis_with_role_context(employee_tasks)
+            identified_count = sum(1 for emp in role_enhancement.get("enhanced_employees", {}).values() 
+                                 if emp.get("role_context", {}).get("assignee_identified", False))
+            logger.info(f"Role context: {identified_count}/{len(employee_tasks)} employees identified")
+            
+            # Stage 1: Text analysis with role context
             logger.info("\n" + "="*60)
             text_analysis = await self.stage1_text_analysis(tasks, employee_tasks)
             
@@ -681,19 +853,49 @@ Recent tasks:
             logger.error(f"Failed to save daily analysis: {e}")
     
     async def _save_stage_files(self, text_analysis: str, json_result: Dict[str, Any]) -> None:
-        """Save stage files like in successful test."""
+        """Save stage files with enhanced file manager and tracking."""
         try:
-            # Save Stage 1: Text analysis
-            stage1_file = Path('stage1_text_analysis.txt')
-            with open(stage1_file, 'w', encoding='utf-8') as f:
-                f.write(text_analysis)
-            logger.info(f"✅ Stage 1 text analysis saved to {stage1_file}")
+            # Save Stage 1: Text analysis with enhanced file manager
+            stage1_file = self.file_manager.save_task_stage1(text_analysis)
             
-            # Save Stage 2: JSON result  
-            stage2_file = Path('stage2_final_json.json')
-            with open(stage2_file, 'w', encoding='utf-8') as f:
-                json.dump(json_result, f, indent=2, ensure_ascii=False)
+            # Mark stage1 processing in tracker (using a virtual file marker)
+            self.processing_tracker.mark_processed(
+                Path("task_analysis_stage1"), 
+                "task_analysis", 
+                stage1_file,
+                {"analysis_type": "stage1", "content_length": len(text_analysis)}
+            )
+            
+            # Save Stage 2: JSON result with enhanced file manager
+            stage2_file = self.file_manager.save_task_stage2(json_result)
+            
+            # Mark stage2 processing in tracker
+            self.processing_tracker.mark_processed(
+                Path("task_analysis_stage2"), 
+                "task_analysis", 
+                stage2_file,
+                {"analysis_type": "stage2", "employees_count": len(json_result.get('employee_analysis', {}))}
+            )
+            
+            # Save final analysis with enhanced file manager
+            final_data = {
+                "stage1_text_analysis": text_analysis,
+                "stage2_json_result": json_result,
+                "metadata": {
+                    "generated_at": datetime.now().isoformat(),
+                    "employees_count": len(json_result.get('employee_analysis', {})),
+                    "insights_count": len(json_result.get('team_insights', [])),
+                    "recommendations_count": len(json_result.get('recommendations', []))
+                }
+            }
+            final_file = self.file_manager.save_task_final(final_data)
+            
+            logger.info(f"✅ Stage 1 text analysis saved to {stage1_file}")
             logger.info(f"✅ Stage 2 JSON result saved to {stage2_file}")
+            logger.info(f"✅ Final analysis saved to {final_file}")
+            
+            # Create backward compatibility links
+            self.file_manager.create_backward_compatibility_links()
             
         except Exception as e:
             logger.error(f"Failed to save stage files: {e}")

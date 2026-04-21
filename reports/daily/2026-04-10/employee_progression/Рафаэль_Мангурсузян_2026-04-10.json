@@ -1,0 +1,17 @@
+{
+  "employee_name": "Рафаэль Мангурсузян",
+  "analysis_date": "2026-04-10T19:34:22.704258",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.5,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Полная. Его 2 закрытые задачи по витринам данных — это то, чем он живет на встречах. Он постоянно говорит о данных, их качестве, репликации и миграции.\n- *...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-10T19:34:22.704390",
+  "source": "improved_meeting_analyzer"
+}

@@ -22,12 +22,20 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-from core.base_agent import BaseAgent, AgentConfig, AgentResult
-from core.llm_client import LLMClient, LLMRequest
-from core.json_memory_store import JSONMemoryStore
-from core.quality_metrics import QualityMetrics
-from core.config import get_employee_monitoring_config
+from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
+from ..core.llm_client import LLMClient, LLMRequest
+from ..core.json_memory_store import JSONMemoryStore
+from ..core.quality_metrics import QualityMetrics
+from ..core.config import get_employee_monitoring_config
+from ..core.role_context_manager import EmployeeRoleManager
+from ..core.processing_tracker import ProcessingTracker
+from ..core.enhanced_file_manager import EnhancedFileManager
+
+# Load .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -108,27 +116,43 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         self.llm_client = LLMClient()
         self.memory_store = JSONMemoryStore()
         self.quality_metrics = QualityMetrics()
+        self.role_manager = EmployeeRoleManager()
+        
+        # Initialize processing tracker and file manager
+        self.processing_tracker = ProcessingTracker()
+        self.file_manager = EnhancedFileManager()
         
         # Load configuration
         self.emp_config = get_employee_monitoring_config()
         self.meeting_config = self.emp_config.get('meetings', {})
         self.reports_config = self.emp_config.get('reports', {})
         self.quality_config = self.emp_config.get('quality', {})
+
+        # Project root
+        project_root = Path(__file__).resolve().parents[2]
         
-        # Analysis parameters
-        self.protocols_dir = Path(self.meeting_config.get('protocols_directory', './protocols'))
+        # Пути из .env с fallback на значения по умолчанию
+        protocols_dir_rel = os.getenv('PROTOCOLS_DIRECTORY_PATH', 'protocols')
+        daily_reports_dir_rel = os.getenv('DAILY_REPORTS_DIR', 'reports/daily')
+        task_analyzer_txt_rel = os.getenv('TASK_ANALYZER_TXT_PATH', 'stage1_text_analysis.txt')
+        task_analyzer_json_rel = os.getenv('TASK_ANALYZER_JSON_PATH', 'stage2_final_json.json')
+        
+        # Формируем абсолютные пути
+        self.protocols_dir = project_root / protocols_dir_rel
+        self.daily_reports_dir = project_root / daily_reports_dir_rel
+        self.task_analyzer_txt = project_root / task_analyzer_txt_rel
+        self.task_analyzer_json = project_root / task_analyzer_json_rel
+        
+        # Создаем директорию для отчетов
+        self.daily_reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Остальная конфигурация
         self.supported_formats = self.meeting_config.get('supported_formats', ['.txt', '.md', '.docx'])
         self.quality_threshold = self.quality_config.get('threshold', 0.9)
         
-        # Reports directory
-        self.daily_reports_dir = Path(self.reports_config.get('daily_reports_dir', './reports/daily'))
-        self.daily_reports_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Task analyzer files
-        self.task_analyzer_txt = Path('stage1_text_analysis.txt')
-        self.task_analyzer_json = Path('stage2_final_json.json')
-        
         logger.info(f"ImprovedMeetingAnalyzerAgent initialized with 3-stage analysis")
+        logger.info(f"Protocols dir: {self.protocols_dir}")
+        logger.info(f"Task analyzer txt: {self.task_analyzer_txt}")
     
     async def execute(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -212,6 +236,7 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
     async def stage1_clean_protocols(self) -> List[Dict[str, Any]]:
         """
         ЭТАП 1: Переработка протоколов в читабельный вид с правильной разбивкой диалогов.
+        Использует processing tracker для инкрементальной обработки.
         """
         try:
             cleaned_protocols = []
@@ -223,7 +248,58 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             
             logger.info(f"Found {len(protocol_files)} protocol files for cleaning")
             
+            processed_files = []
+            unprocessed_files = []
+            
+            # Сначала проверяем файловую систему - это самый надежный способ
+            cleaned_protocols_dir = self.daily_reports_dir / "2026-04-20" / "meeting-analysis" / "cleaned-protocols"
+            
             for protocol_file in protocol_files:
+                cleaned_filename = f"cleaned_{protocol_file.name}"
+                cleaned_path = cleaned_protocols_dir / cleaned_filename
+                
+                if cleaned_path.exists():
+                    # Файл существует в cleaned-protocols - загружаем его
+                    try:
+                        cleaned_content = cleaned_path.read_text(encoding='utf-8')
+                        cleaned_protocols.append({
+                            'filename': protocol_file.name,
+                            'cleaned_filename': cleaned_filename,
+                            'cleaned_filepath': cleaned_path,
+                            'original_content': protocol_file.read_text(encoding='utf-8'),
+                            'cleaned_content': cleaned_content,
+                            'file_date': datetime.fromtimestamp(protocol_file.stat().st_mtime),
+                            'from_cache': True
+                        })
+                        processed_files.append(protocol_file.name)
+                        
+                        # Обновляем processing tracker если нужно
+                        if not self.processing_tracker.is_processed(protocol_file, "meeting_clean"):
+                            self.processing_tracker.mark_processed(
+                                protocol_file,
+                                "meeting_clean",
+                                cleaned_path,
+                                {
+                                    "original_filename": protocol_file.name,
+                                    "cleaned_filename": cleaned_filename,
+                                    "content_length": len(cleaned_content),
+                                    "processing_timestamp": datetime.now().isoformat(),
+                                    "source": "file_system_sync"
+                                }
+                            )
+                        
+                        logger.info(f"Using cached cleaned protocol: {protocol_file.name}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"Failed to load cached protocol {protocol_file.name}: {e}")
+                
+                # Файл не существует или не удалось загрузить - требует обработки
+                unprocessed_files.append(protocol_file)
+            
+            logger.info(f"Processing status: {len(processed_files)} cached, {len(unprocessed_files)} new to process")
+            
+            # Обрабатываем только новые файлы
+            for protocol_file in unprocessed_files:
                 try:
                     # Читаем исходный протокол
                     raw_content = protocol_file.read_text(encoding='utf-8')
@@ -232,29 +308,46 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                     cleaned_protocol = await self._clean_protocol_with_llm(raw_content, protocol_file.name)
                     
                     if cleaned_protocol:
-                        # Сохраняем очищенный протокол
-                        cleaned_filename = f"cleaned_{protocol_file.name}"
-                        cleaned_filepath = self.daily_reports_dir / cleaned_filename
+                        # Сохраняем очищенный протокол с enhanced file manager
+                        cleaned_filepath = self.file_manager.save_cleaned_protocol(
+                            protocol_file.name, 
+                            cleaned_protocol
+                        )
                         
-                        with open(cleaned_filepath, 'w', encoding='utf-8') as f:
-                            f.write(cleaned_protocol)
+                        # Отмечаем в processing tracker
+                        self.processing_tracker.mark_processed(
+                            protocol_file,
+                            "meeting_clean",
+                            cleaned_filepath,
+                            {
+                                "original_filename": protocol_file.name,
+                                "cleaned_filename": cleaned_filepath.name,
+                                "content_length": len(cleaned_protocol),
+                                "processing_timestamp": datetime.now().isoformat()
+                            }
+                        )
                         
                         cleaned_protocols.append({
                             'filename': protocol_file.name,
-                            'cleaned_filename': cleaned_filename,
+                            'cleaned_filename': cleaned_filepath.name,
                             'cleaned_filepath': cleaned_filepath,
                             'original_content': raw_content,
                             'cleaned_content': cleaned_protocol,
-                            'file_date': datetime.fromtimestamp(protocol_file.stat().st_mtime)
+                            'file_date': datetime.fromtimestamp(protocol_file.stat().st_mtime),
+                            'from_cache': False
                         })
                         
-                        logger.info(f"Protocol {protocol_file.name} cleaned and saved to {cleaned_filename}")
+                        logger.info(f"Protocol {protocol_file.name} cleaned and saved to {cleaned_filepath.name}")
                     
                 except Exception as e:
                     logger.error(f"Failed to clean protocol {protocol_file.name}: {e}")
                     continue
             
-            logger.info(f"Successfully cleaned {len(cleaned_protocols)} protocols")
+            total_cleaned = len(cleaned_protocols)
+            from_cache = sum(1 for p in cleaned_protocols if p.get('from_cache', False))
+            newly_processed = total_cleaned - from_cache
+            
+            logger.info(f"Protocol cleaning completed: {total_cleaned} total ({from_cache} cached, {newly_processed} newly processed)")
             return cleaned_protocols
             
         except Exception as e:
@@ -340,9 +433,23 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
     
     async def stage2_comprehensive_analysis(self, cleaned_protocols: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
-        ЭТАП 2: Комплексный анализ по двум источникам (протокол TXT + stage1_text_analysis.txt).
+        ЭТАП 2: Комплексный анализ по двум источникам (протокол TXT + stage1_text_analysis.txt) с Role Context.
         """
         try:
+            # P6-10: Load Role Context FIRST - это критически важно!
+            logger.info("Loading Role Context for comprehensive analysis...")
+            
+            # Извлекаем имена участников из протоколов для обогащения role context
+            combined_protocols_text = "\n\n".join([
+                f"=== ПРОТОКОЛ: {p['filename']} ===\n{p['cleaned_content']}"
+                for p in cleaned_protocols
+            ])
+            participant_names = self._extract_participant_names(combined_protocols_text)
+            role_context_data = await self._enhance_analysis_with_role_context(participant_names)
+            
+            # Форматируем Role Context для промпта
+            role_context_text = self._format_role_context_for_prompt(role_context_data)
+            
             # Загружаем анализ задач от Task Analyzer
             task_analyzer_content = await self._load_task_analyzer_txt()
             
@@ -384,6 +491,79 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             logger.error(f"Failed to load Task Analyzer TXT: {e}")
             return None
     
+    async def _enhance_analysis_with_role_context(self, participants: List[str]) -> Dict[str, Any]:
+        """
+        Обогащение анализа участников контекстом ролей.
+        
+        Args:
+            participants: Список имен участников
+            
+        Returns:
+            Обогащенные данные о ролях участников
+        """
+        try:
+            # Используем role context manager для обогащения анализа
+            role_enhancement = self.role_manager.enhance_meeting_analysis(participants)
+            
+            logger.info(f"Role context enhancement: {role_enhancement['identification_rate']:.2%} participants identified")
+            
+            return role_enhancement
+            
+        except Exception as e:
+            logger.error(f"Failed to enhance analysis with role context: {e}")
+            return {
+                "total_participants": len(participants),
+                "identified_participants": [],
+                "unidentified_participants": participants,
+                "identification_rate": 0.0,
+                "participant_contexts": {},
+                "decision_makers_present": [],
+                "high_activity_present": []
+            }
+    
+    def _extract_participant_names(self, text: str) -> List[str]:
+        """
+        Извлечение имен участников из текста протоколов.
+        
+        Args:
+            text: Текст протоколов
+            
+        Returns:
+            Список уникальных имен участников
+        """
+        try:
+            # Базовые паттерны для извлечения имен
+            name_patterns = [
+                r'([А-Я][а-я]+\s+[А-Я][а-я]+):',  # Имя Фамилия:
+                r'([А-Я][а-я]+\s+[А-Я][а-я]+\s+[А-Я][а-я]+):',  # Имя Отчество Фамилия:
+                r'устроен[а]? ([А-Я][а-я]+\s+[А-Я][а-я]+)',  # устроен Имя Фамилия
+                r'ответственный:\s*([А-Я][а-я]+\s+[А-Я][а-я]+)',  # ответственный: Имя Фамилия
+                r'исполнитель:\s*([А-Я][а-я]+\s+[А-Я][а-я]+)',  # исполнитель: Имя Фамилия
+            ]
+            
+            participants = set()
+            
+            for pattern in name_patterns:
+                matches = re.findall(pattern, text)
+                for match in matches:
+                    participants.add(match.strip())
+            
+            # Дополнительное извлечение из секций участников
+            participants_section = re.search(r'Участники?:\s*([^\n]+)', text, re.IGNORECASE)
+            if participants_section:
+                participants_text = participants_section.group(1)
+                # Разделяем по запятым и точкам с запятой
+                for name in re.split(r'[;,]', participants_text):
+                    name = name.strip()
+                    if len(name.split()) >= 2:  # Минимум Имя Фамилия
+                        participants.add(name)
+            
+            return list(participants)
+            
+        except Exception as e:
+            logger.error(f"Failed to extract participant names: {e}")
+            return []
+
     async def _analyze_comprehensive_data(self, protocols_content: str, task_analyzer_content: str) -> Optional[Dict[str, Any]]:
         """
         Комплексный анализ данных из двух источников.
@@ -394,8 +574,17 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 logger.warning("LLM not available")
                 return None
             
+            # Извлекаем имена участников из протоколов для обогащения role context
+            participant_names = self._extract_participant_names(protocols_content)
+            role_context_data = await self._enhance_analysis_with_role_context(participant_names)
+            
+            # Форматируем Role Context для промпта
+            role_context_text = self._format_role_context_for_prompt(role_context_data)
+            
             prompt = f"""
 Ты - СТАРШИЙ АНАЛИТИК КОМАНДЫ для комплексного анализа. Проанализируй данные из двух источников и предоставь детальный анализ НА РУССКОМ ЯЗЫКЕ.
+
+{role_context_text}
 
 ИСТОЧНИК 1 - ПРОТОКОЛЫ СОБРАНИЙ:
 {protocols_content}
@@ -637,8 +826,26 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 matches = re.findall(pattern, analysis_text, re.DOTALL)
                 employee_matches.extend(matches)
             
+            # Дедупликация - храним только уникальные имена сотрудников
+            seen_employees = set()
+            unique_employee_matches = []
+            
             for employee_name, employee_text in employee_matches:
                 employee_name = employee_name.strip()
+                # Очищаем имя от лишних символов и приводим к стандартному виду
+                clean_name = employee_name.replace('**', '').strip()
+                
+                # Создаем normalized ключ для дедупликации (сортируем слова)
+                name_parts = clean_name.split()
+                normalized_key = ' '.join(sorted(name_parts))
+                
+                if normalized_key not in seen_employees:
+                    seen_employees.add(normalized_key)
+                    unique_employee_matches.append((clean_name, employee_text))
+            
+            employee_matches = unique_employee_matches
+            
+            for employee_name, employee_text in employee_matches:
                 
                 # Извлекаем метрики сотрудника
                 correlation_match = re.search(r'Корреляция.*?:\s*([^\n]+)', employee_text)
@@ -647,7 +854,7 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 
                 structured_data['employee_analysis'][employee_name] = {
                     'task_meeting_correlation': correlation_match.group(1).strip() if correlation_match else 'неизвестно',
-                    'communication_consistency': employee_text[:200] + '...' if len(employee_text) > 200 else employee_text,
+                    'communication_consistency': employee_text[:2000] + ('...' if len(employee_text) > 2000 else employee_text),
                     'communication_effectiveness': float(effectiveness_match.group(1)) if effectiveness_match else 5.0,
                     'meeting_strengths': [],
                     'meeting_problems': [],
@@ -883,6 +1090,91 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Failed to save employee progression: {e}")
     
+    def _format_role_context_for_prompt(self, role_context_data: Dict[str, Any]) -> str:
+        """
+        Форматирует контекст ролей для включения в LLM промпт.
+        
+        Args:
+            role_context_data: Данные ролевого контекст
+            
+        Returns:
+            Отформатированный текст для промпта
+        """
+        try:
+            context_parts = []
+            
+            # Заголовок секции
+            context_parts.append("=== КОНТЕКСТ РОЛЕЙ И ДОЛЖНОСТЕЙ (УЧАСТНИКИ ВСТРЕЧ) ===")
+            
+            # Общая информация об участниках
+            total_participants = role_context_data.get("total_participants", 0)
+            identified_count = len(role_context_data.get("identified_participants", []))
+            identification_rate = role_context_data.get("identification_rate", 0.0)
+            
+            context_parts.append(f"Всего участников в протоколах: {total_participants}")
+            context_parts.append(f"Выявленные сотрудники: {identified_count}")
+            context_parts.append(f"Процент идентификации: {identification_rate:.1%}")
+            context_parts.append("")
+            
+            # Детальная информация по выявленным участникам
+            participant_contexts = role_context_data.get("participant_contexts", {})
+            if participant_contexts:
+                context_parts.append("ИНФОРМАЦИЯ ОБ УЧАСТНИКАХ ВСТРЕЧИ:")
+                
+                for participant_name, context in participant_contexts.items():
+                    # Формируем информацию об участнике
+                    participant_info = []
+                    participant_info.append(f"Участник: {participant_name}")
+                    
+                    if context.get("assignee_identified"):
+                        participant_info.append(f"Должность: {context.get('role_level', 'N/A')}")
+                        participant_info.append(f"Ответственность: {context.get('responsibility_level', 'N/A')}")
+                        participant_info.append(f"Активность: {context.get('activity_level', 'N/A')}")
+                        participant_info.append(f"Специализация: {context.get('specialization', 'N/A')}")
+                    else:
+                        participant_info.append("Должность: Не определена")
+                        participant_info.append("Статус: Новый или временный участник")
+                    
+                    # Роль в встрече
+                    if context.get("is_decision_maker"):
+                        participant_info.append("Роль в встрече: Принимает решения")
+                    elif context.get("is_high_activity"):
+                        participant_info.append("Роль в встрече: Активный участник")
+                    else:
+                        participant_info.append("Роль в встрече: Наблюдатель")
+                    
+                    context_parts.append("\n".join(participant_info))
+                    context_parts.append("")  # Пустая строка между участниками
+            
+            # Лидеры и активные участники
+            decision_makers = role_context_data.get("decision_makers_present", [])
+            high_activity = role_context_data.get("high_activity_present", [])
+            
+            if decision_makers:
+                context_parts.append(f"ПРИНИМАЮЩИЕ РЕШЕНИЯ: {', '.join(decision_makers)}")
+            
+            if high_activity:
+                context_parts.append(f"АКТИВНЫЕ УЧАСТНИКИ: {', '.join(high_activity)}")
+            
+            if decision_makers or high_activity:
+                context_parts.append("")
+            
+            # Важные инструкции для LLM с учетом ролей
+            context_parts.append("=== ИНСТРУКЦИИ ДЛЯ АНАЛИЗА С УЧЕТОМ РОЛЕЙ УЧАСТНИКОВ ===")
+            context_parts.append("1. Учитывай должности и ответственность при анализе участия в встречах")
+            context_parts.append("2. Product Owner и Team Lead имеют разные роли и степени влияния")
+            context_parts.append("3. Обращай внимание на кто принимает решения и кто активно участвует")
+            context_parts.append("4. Рекомендации должны соответствовать уровню должности участника")
+            context_parts.append("5. Новым участникам требуются четкие задачи и наставничество")
+            context_parts.append("6. Оценивай участие в контексте должностных обязанностей")
+            context_parts.append("")
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            logger.error(f"Failed to format role context for prompt: {e}")
+            return "=== КОНТЕКСТ РОЛЕЙ И ДОЛЖНОСТЕЙ ===\nОшибка форматирования контекста ролей\n"
+    
     async def get_health_status(self) -> Dict[str, Any]:
         """Проверка состояния агента."""
         try:
@@ -968,8 +1260,11 @@ if __name__ == "__main__":
                 
                 if analysis_data.employees_performance:
                     print(f"👥 Детализация по сотрудникам:")
-                    for employee, perf in list(analysis_data.employees_performance.items())[:5]:
-                        print(f"  • {employee}: рейтинг {perf.performance_rating:.1f}/10, эффективность {perf.communication_effectiveness:.1f}/10")
+                    for employee, perf in analysis_data.employees_performance.items():
+                        rating = perf.performance_rating
+                        correlation = perf.task_to_meeting_correlation
+                        effectiveness = perf.communication_effectiveness
+                        print(f"  • {employee}: рейтинг {rating:.1f}/10, корреляция {correlation:.2f}, эффективность {effectiveness:.1f}/10")
                 
                 print(f"🎯 Качество анализа: {analysis_data.quality_score:.3f}")
                 

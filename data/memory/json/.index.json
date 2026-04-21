@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "path": "weekly_summary_data_2026-04-06.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-10T19:34:26.129865",
+      "size": 1636,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-10T19:34:26.127517",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "20ce6911-63d0-4584-b81c-51c691df7f55",
+        "size_bytes": 1152
+      }
+    }
+  ],
+  "last_updated": "2026-04-10T19:34:26.129886"
+}

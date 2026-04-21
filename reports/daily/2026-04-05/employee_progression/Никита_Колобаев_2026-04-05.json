@@ -1,0 +1,17 @@
+{
+  "employee_name": "Никита Колобаев",
+  "analysis_date": "2026-04-05T23:16:09.013874",
+  "speaking_turns": 0,
+  "questions_asked": 0,
+  "suggestions_made": 0,
+  "action_items_assigned": 0,
+  "engagement_level": "medium",
+  "leadership_indicators": [],
+  "task_to_meeting_correlation": 0.5,
+  "overall_consistency": 0.7,
+  "communication_effectiveness": 5.0,
+  "detailed_insights": "- **Корреляция задач и участия в встречах:** Средняя. На встречах он выглядит активным и продуктивным (работа с Егором, четкие сроки), но в Jira у него есть задачи в статусе \"On Hold\". Это говорит о т...",
+  "performance_rating": 5.0,
+  "last_updated": "2026-04-05T23:16:09.014044",
+  "source": "improved_meeting_analyzer"
+}

@@ -19,16 +19,16 @@ employee_monitoring:
     
   # Meeting Protocols Configuration
   protocols:
-    directory_path: "/data/meeting-protocols"
-    file_formats: ["txt", "pdf", "docx", "doc"]
+    directory_path: "protocols"
+    file_formats: ["txt", "md", "docx"]
     scan_subdirectories: true
     encoding: "utf-8"
     processed_files_marker: ".processed"
     
   # Reports Configuration
   reports:
-    daily_reports_dir: "./reports/daily"
-    weekly_reports_dir: "./reports/weekly"
+    daily_reports_dir: "reports/daily"
+    weekly_reports_dir: "reports/weekly"
     quality_reports_dir: "./reports/quality"
     report_format: "json"
     backup_enabled: true
