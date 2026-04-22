@@ -25,7 +25,9 @@ from ..core.config import get_employee_monitoring_config
 from ..core.jira_client import JiraClient
 from ..core.role_context_manager import EmployeeRoleManager
 from ..core.processing_tracker import ProcessingTracker
-from ..core.enhanced_file_manager import EnhancedFileManager
+from ..core.run_file_manager import RunFileManager
+from ..core.jira_snapshot_store import JiraSnapshotStore
+from ..core.jira_diff import diff_jira_snapshots
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +94,17 @@ class DailyTaskAnalysisResult:
 
 class ImprovedTaskAnalyzerAgent(BaseAgent):
     """
+    Функция для удаления дублирующихся маркеров из имён сотрудников.
+    """
+
+    def _sanitize_employee_identifiers(self, employees_progress):
+        cleaned_progress = {}
+        for name, progress in employees_progress.items():
+            cleaned_name = re.sub(r"\*\*+", "", name).strip()
+            cleaned_progress[cleaned_name] = progress
+        return cleaned_progress
+
+    """
     Improved Task Analysis Agent with Two-Stage LLM Analysis.
     
     Uses the proven two-stage approach:
@@ -115,9 +128,15 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
         self.quality_metrics = QualityMetrics()
         self.role_manager = EmployeeRoleManager()
         
-        # Initialize processing tracker and file manager
+        project_root = Path(__file__).resolve().parents[2]
+
+        # Run-based reports
+        self.run_manager = RunFileManager(project_root)
+        self.run_id = self.run_manager.generate_run_id()
+        self.run_paths = self.run_manager.init_run(self.run_id)
+
+        # Initialize processing tracker
         self.processing_tracker = ProcessingTracker()
-        self.file_manager = EnhancedFileManager()
         
         # Load configuration
         self.emp_config = get_employee_monitoring_config()
@@ -138,12 +157,9 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
         self.analysis_depth_days = int(analysis_depth_days)
         logger.info(f"Improved Task Analyzer configured with {self.analysis_depth_days} days analysis depth")
         
-        # Reports directory
-        self.reports_config = self.emp_config.get('reports', {})
-        self.daily_reports_dir = Path(self.reports_config.get('daily_reports_dir', './reports/daily'))
-        self.daily_reports_dir.mkdir(parents=True, exist_ok=True)
-        
         logger.info("ImprovedTaskAnalyzerAgent initialized with two-stage analysis")
+        logger.info(f"Run id: {self.run_id}")
+        logger.info(f"Run dir: {self.run_paths.run_dir}")
     
     async def fetch_jira_tasks(self) -> List[Dict[str, Any]]:
         """Fetch tasks from Jira API using existing client."""
@@ -659,17 +675,55 @@ Recent tasks:
             
             # Fetch tasks
             tasks = await self.fetch_jira_tasks()
-            
+
             if not tasks:
                 return AgentResult(
                     success=False,
                     message="No JIRA tasks found for analysis",
-                    data={}
+                    data={},
                 )
-            
+
+            # Jira snapshot + diff (инкремент по Jira-изменениям между run)
+            try:
+                project_root = Path(__file__).resolve().parents[2]
+                store = JiraSnapshotStore(project_root)
+                snapshot_path = store.save_snapshot(
+                    self.run_id,
+                    tasks,
+                    jql=self.jira_config.get("query_filter", ""),
+                    project_key=self.jira_config.get("project_key", ""),
+                    analysis_depth_days=self.analysis_depth_days,
+                )
+
+                prev_path = store.find_previous_snapshot_path(self.run_id)
+                if prev_path:
+                    prev = store.load_snapshot(prev_path)
+                    curr = store.load_snapshot(snapshot_path)
+                    jira_diff = diff_jira_snapshots(prev.get("tasks", []), curr.get("tasks", []))
+
+                    diff_dir = self.run_paths.run_dir / "jira-diff"
+                    diff_dir.mkdir(parents=True, exist_ok=True)
+                    diff_path = diff_dir / "jira-diff.json"
+                    self.run_manager.save_json(
+                        diff_path,
+                        {
+                            "run_id": self.run_id,
+                            "prev_run_id": prev.get("meta", {}).get("run_id"),
+                            "generated_at": datetime.now().isoformat(),
+                            "stats": jira_diff.get("stats", {}),
+                            "diff": jira_diff,
+                        },
+                    )
+
+                    # latest
+                    self.run_manager.set_latest(self.run_id)
+                    self.run_manager.copy_to_latest(diff_path, Path("jira-diff") / "jira-diff.json")
+            except Exception:
+                pass
+
             # Group tasks by employee
             employee_tasks = await self._group_tasks_by_employee(tasks)
-            
+
             logger.info(f"Retrieved {len(tasks)} tasks for {len(employee_tasks)} employees")
             
             # Enhanced role context analysis
@@ -708,7 +762,7 @@ Recent tasks:
             await self._save_stage_files(text_analysis, json_result)
             
             # Create employee progress objects
-            employees_progress = {}
+            employees_progress_raw = {}
             for employee, emp_data in json_result.get('employee_analysis', {}).items():
                 emp_task_list = employee_tasks.get(employee, [])
                 
@@ -717,7 +771,7 @@ Recent tasks:
                 completed_tasks = len([t for t in emp_task_list if t.get('status', '').lower() in ['done', 'completed', 'closed', 'закрыт']])
                 in_progress_tasks = len([t for t in emp_task_list if t.get('status', '').lower() in ['in_progress', 'progress', 'в работе']])
                 
-                employees_progress[employee] = EmployeeTaskProgress(
+                employees_progress_raw[employee] = EmployeeTaskProgress(
                     employee_name=employee,
                     analysis_date=datetime.now(),
                     total_tasks=emp_data.get('total_tasks', total_tasks),
@@ -738,6 +792,8 @@ Recent tasks:
                     llm_insights=emp_data.get('insights', '')
                 )
             
+            employees_progress = self._sanitize_employee_identifiers(employees_progress_raw)
+
             # Create analysis result
             analysis_result = DailyTaskAnalysisResult(
                 analysis_date=datetime.now(),
@@ -785,9 +841,8 @@ Recent tasks:
     async def _save_daily_analysis(self, analysis_result: DailyTaskAnalysisResult) -> None:
         """Save analysis results to file system."""
         try:
-            # Create date-specific directory
-            date_str = analysis_result.analysis_date.strftime('%Y-%m-%d')
-            daily_dir = self.daily_reports_dir / date_str
+            # сохраняем агрегированный json в текущий run
+            daily_dir = self.run_paths.run_dir / "task-analysis"
             daily_dir.mkdir(parents=True, exist_ok=True)
             
             # Prepare data for serialization
@@ -843,10 +898,13 @@ Recent tasks:
                 }
             
             # Save to JSON file
-            report_file = daily_dir / f"task-analysis_{date_str}.json"
-            with open(report_file, 'w', encoding='utf-8') as f:
-                json.dump(analysis_data, f, indent=2, ensure_ascii=False)
-            
+            report_file = daily_dir / "task-analysis.json"
+            self.run_manager.save_json(report_file, analysis_data)
+
+            # latest
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(report_file, Path("task-analysis") / "task-analysis.json")
+
             logger.info(f"Improved task analysis saved to {report_file}")
             
         except Exception as e:
@@ -855,47 +913,66 @@ Recent tasks:
     async def _save_stage_files(self, text_analysis: str, json_result: Dict[str, Any]) -> None:
         """Save stage files with enhanced file manager and tracking."""
         try:
-            # Save Stage 1: Text analysis with enhanced file manager
-            stage1_file = self.file_manager.save_task_stage1(text_analysis)
-            
-            # Mark stage1 processing in tracker (using a virtual file marker)
+            task_dir = self.run_paths.run_dir / "task-analysis"
+            stage1_dir = task_dir / "stage1"
+            stage2_dir = task_dir / "stage2"
+            final_dir = task_dir / "final"
+            for d in (stage1_dir, stage2_dir, final_dir):
+                d.mkdir(parents=True, exist_ok=True)
+
+            stage1_file = stage1_dir / "stage1_task_analysis.txt"
+            self.run_manager.save_text(stage1_file, text_analysis)
+
             self.processing_tracker.mark_processed(
-                Path("task_analysis_stage1"), 
-                "task_analysis", 
+                Path("task_analysis_stage1"),
+                "task_analysis",
                 stage1_file,
-                {"analysis_type": "stage1", "content_length": len(text_analysis)}
+                {"analysis_type": "stage1", "content_length": len(text_analysis), "run_id": self.run_id},
             )
-            
-            # Save Stage 2: JSON result with enhanced file manager
-            stage2_file = self.file_manager.save_task_stage2(json_result)
-            
-            # Mark stage2 processing in tracker
+
+            stage2_file = stage2_dir / "stage2_task_result.json"
+            self.run_manager.save_json(stage2_file, json_result)
+
             self.processing_tracker.mark_processed(
-                Path("task_analysis_stage2"), 
-                "task_analysis", 
+                Path("task_analysis_stage2"),
+                "task_analysis",
                 stage2_file,
-                {"analysis_type": "stage2", "employees_count": len(json_result.get('employee_analysis', {}))}
+                {"analysis_type": "stage2", "employees_count": len(json_result.get("employee_analysis", {})), "run_id": self.run_id},
             )
-            
-            # Save final analysis with enhanced file manager
+
             final_data = {
                 "stage1_text_analysis": text_analysis,
                 "stage2_json_result": json_result,
                 "metadata": {
                     "generated_at": datetime.now().isoformat(),
-                    "employees_count": len(json_result.get('employee_analysis', {})),
-                    "insights_count": len(json_result.get('team_insights', [])),
-                    "recommendations_count": len(json_result.get('recommendations', []))
-                }
+                    "employees_count": len(json_result.get("employee_analysis", {})),
+                    "insights_count": len(json_result.get("team_insights", [])),
+                    "recommendations_count": len(json_result.get("recommendations", [])),
+                    "run_id": self.run_id,
+                },
             }
-            final_file = self.file_manager.save_task_final(final_data)
-            
+            final_file = final_dir / "final_task_analysis.json"
+            self.run_manager.save_json(final_file, final_data)
+
+            # latest
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(stage1_file, Path("task-analysis") / "stage1_task_analysis.txt")
+            self.run_manager.copy_to_latest(stage2_file, Path("task-analysis") / "stage2_task_result.json")
+            self.run_manager.copy_to_latest(final_file, Path("task-analysis") / "final_task_analysis.json")
+
+            # backward compatibility (корень проекта) — выключено по умолчанию
+            try:
+                if os.getenv("ENABLE_LEGACY_ROOT_ARTIFACTS", "0") == "1":
+                    root_stage1 = Path(__file__).resolve().parents[2] / "stage1_text_analysis.txt"
+                    root_stage2 = Path(__file__).resolve().parents[2] / "stage2_final_json.json"
+                    root_stage1.write_text(text_analysis, encoding="utf-8")
+                    root_stage2.write_text(json.dumps(json_result, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                pass
+
             logger.info(f"✅ Stage 1 text analysis saved to {stage1_file}")
             logger.info(f"✅ Stage 2 JSON result saved to {stage2_file}")
             logger.info(f"✅ Final analysis saved to {final_file}")
-            
-            # Create backward compatibility links
-            self.file_manager.create_backward_compatibility_links()
             
         except Exception as e:
             logger.error(f"Failed to save stage files: {e}")
@@ -913,7 +990,7 @@ Recent tasks:
                 'llm_client': 'available' if llm_available else 'unavailable',
                 'memory_store': memory_health.get('status', 'unknown'),
                 'config_loaded': bool(self.emp_config),
-                'reports_directory': str(self.daily_reports_dir),
+                "reports_directory": str(self.run_manager.latest_root),
                 'analysis_method': 'two_stage_llm',
                 'last_check': datetime.now().isoformat()
             }

@@ -3,12 +3,12 @@
     {
       "file_path": "task_analysis_stage1",
       "file_hash": "",
-      "processed_at": "2026-04-20T23:17:20.200345",
+      "processed_at": "2026-04-22T18:38:16.643796",
       "processing_type": "task_analysis",
-      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/task-analysis/stage1/stage1_task_analysis_20260420_231720.txt",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-22/task-analysis/stage1/stage1_task_analysis_20260422_183816.txt",
       "metadata": {
         "analysis_type": "stage1",
-        "content_length": 10783
+        "content_length": 11891
       }
     }
   ],
@@ -16,12 +16,12 @@
     {
       "file_path": "task_analysis_stage2",
       "file_hash": "",
-      "processed_at": "2026-04-20T23:17:20.202534",
+      "processed_at": "2026-04-22T18:38:16.649059",
       "processing_type": "task_analysis",
-      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/task-analysis/stage2/stage2_task_result_20260420_231720.json",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-22/task-analysis/stage2/stage2_task_result_20260422_183816.json",
       "metadata": {
         "analysis_type": "stage2",
-        "employees_count": 9
+        "employees_count": 12
       }
     }
   ],
@@ -364,14 +364,14 @@
     {
       "file_path": "/Users/pvmurz10/Documents/MTS_MultAgent/protocols/2026.04.15_Daily_RUN.txt",
       "file_hash": "59fbf30a4303ccbf68d0f943ac79fce0",
-      "processed_at": "2026-04-20T23:40:58.867609",
+      "processed_at": "2026-04-22T18:41:23.529670",
       "processing_type": "meeting_clean",
-      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-20/meeting-analysis/cleaned-protocols/cleaned_20260415_Daily_RUN_20260420_234058.txt",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-22/meeting-analysis/cleaned-protocols/cleaned_20260415_Daily_RUN_20260422_184123.txt",
       "metadata": {
         "original_filename": "2026.04.15_Daily_RUN.txt",
-        "cleaned_filename": "cleaned_20260415_Daily_RUN_20260420_234058.txt",
-        "content_length": 9152,
-        "processing_timestamp": "2026-04-20T23:40:58.863944"
+        "cleaned_filename": "cleaned_20260415_Daily_RUN_20260422_184123.txt",
+        "content_length": 9728,
+        "processing_timestamp": "2026-04-22T18:41:23.526980"
       }
     }
   ],

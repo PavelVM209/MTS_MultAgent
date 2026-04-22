@@ -27,7 +27,7 @@ from ..core.quality_metrics import QualityMetrics
 from ..core.config import get_employee_monitoring_config
 from ..core.role_context_manager import EmployeeRoleManager
 from ..core.processing_tracker import ProcessingTracker
-from ..core.enhanced_file_manager import EnhancedFileManager
+from ..core.run_file_manager import RunFileManager
 from ..agents.task_analyzer_agent_improved import ImprovedTaskAnalyzerAgent, DailyTaskAnalysisResult, EmployeeTaskProgress
 from ..agents.meeting_analyzer_agent_improved import ImprovedMeetingAnalyzerAgent, ComprehensiveMeetingAnalysis, EmployeeMeetingPerformance
 
@@ -120,7 +120,11 @@ class FinalOrchestrator(BaseAgent):
         self.quality_metrics = QualityMetrics()
         self.role_manager = EmployeeRoleManager()
         self.processing_tracker = ProcessingTracker()
-        self.file_manager = EnhancedFileManager()
+
+        project_root = Path(__file__).resolve().parents[2]
+        self.run_manager = RunFileManager(project_root)
+        self.run_id = self.run_manager.generate_run_id()
+        self.run_paths = self.run_manager.init_run(self.run_id)
         
         # Initialize agents
         self.task_analyzer = ImprovedTaskAnalyzerAgent()
@@ -128,13 +132,10 @@ class FinalOrchestrator(BaseAgent):
         
         # Load configuration
         self.emp_config = get_employee_monitoring_config()
-        self.reports_config = self.emp_config.get('reports', {})
-        
-        # Reports directory
-        self.reports_dir = Path(self.reports_config.get('daily_reports_dir', './reports/daily'))
-        self.reports_dir.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info("FinalOrchestrator initialized for unified analysis")
+        logger.info(f"Run id: {self.run_id}")
+        logger.info(f"Run dir: {self.run_paths.run_dir}")
     
     async def execute(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -226,35 +227,27 @@ class FinalOrchestrator(BaseAgent):
         meeting_analysis = None
         
         try:
-            # Попытка загрузить файлы анализа
-            date_str = datetime.now().strftime('%Y-%m-%d')
-            daily_dir = self.reports_dir / date_str
-            
-            # Загрузка task analysis
-            task_analysis_file = daily_dir / f"task-analysis_{date_str}.json"
+            latest_root = self.run_manager.latest_root
+
+            task_analysis_file = latest_root / "task-analysis" / "task-analysis.json"
             if task_analysis_file.exists():
                 task_analysis = await self._load_task_analysis_from_file(task_analysis_file)
-                logger.info(f"✅ Task analysis loaded: {len(task_analysis.employees_progress)} employees")
+                logger.info(f"✅ Task analysis loaded (latest): {len(task_analysis.employees_progress)} employees")
             else:
-                logger.warning("⚠️ Task analysis file not found, will run analyzer")
-                # Запускаем анализатор если файла нет
+                logger.warning("⚠️ Task analysis not found in reports/latest, will run analyzer")
                 task_result = await self.task_analyzer.execute({})
                 if task_result.success:
                     task_analysis = task_result.data
-                    logger.info(f"✅ Task analysis executed: {len(task_analysis.employees_progress)} employees")
-            
-            # Загрузка meeting analysis
-            meeting_analysis_file = daily_dir / f"meeting-analysis_{date_str}.json"
+
+            meeting_analysis_file = latest_root / "meeting-analysis" / "meeting-analysis.json"
             if meeting_analysis_file.exists():
                 meeting_analysis = await self._load_meeting_analysis_from_file(meeting_analysis_file)
-                logger.info(f"✅ Meeting analysis loaded: {len(meeting_analysis.employees_performance)} employees")
+                logger.info(f"✅ Meeting analysis loaded (latest): {len(meeting_analysis.employees_performance)} employees")
             else:
-                logger.warning("⚠️ Meeting analysis file not found, will run analyzer")
-                # Запускаем анализатор если файла нет
+                logger.warning("⚠️ Meeting analysis not found in reports/latest, will run analyzer")
                 meeting_result = await self.meeting_analyzer.execute({})
                 if meeting_result.success:
                     meeting_analysis = meeting_result.data
-                    logger.info(f"✅ Meeting analysis executed: {len(meeting_analysis.employees_performance)} employees")
             
         except Exception as e:
             logger.error(f"Failed to load analysis results: {e}")
@@ -316,14 +309,25 @@ class FinalOrchestrator(BaseAgent):
         employees_performance = {}
         personal_insights = data.get('personal_insights', {})
         
+        latest_run_id_path = self.run_manager.latest_root / "run_id.txt"
+        run_dir: Optional[Path] = None
+        if latest_run_id_path.exists():
+            run_id = latest_run_id_path.read_text(encoding="utf-8").strip()
+            run_dir = self.run_manager.runs_root / run_id
+
         for emp_name in personal_insights.keys():
-            # Загружаем детальные данные из employee progression если есть
-            progression_file = file_path.parent / "employee_progression" / f"{emp_name.replace(' ', '_')}_{datetime.now().strftime('%Y-%m-%d')}.json"
-            
             detailed_data = {}
-            if progression_file.exists():
-                with open(progression_file, 'r', encoding='utf-8') as f:
-                    detailed_data = json.load(f)
+            if run_dir:
+                safe_filename = emp_name.replace(" ", "_")
+                progression_file = run_dir / "employee_progression" / f"{safe_filename}.json"
+                if not progression_file.exists():
+                    # fallback: пытались сохранить без пробелов/служебных символов
+                    safe_filename = re.sub(r"[^\w\s-]", "", emp_name).strip()
+                    safe_filename = re.sub(r"[-\s]+", "_", safe_filename)
+                    progression_file = run_dir / "employee_progression" / f"{safe_filename}.json"
+                if progression_file.exists():
+                    with open(progression_file, "r", encoding="utf-8") as f:
+                        detailed_data = json.load(f)
             
             employees_performance[emp_name] = EmployeeMeetingPerformance(
                 employee_name=emp_name,
@@ -810,10 +814,8 @@ class FinalOrchestrator(BaseAgent):
     async def _save_final_unified_analysis(self, unified_analysis: FinalUnifiedAnalysis) -> None:
         """Сохранить финальный объединенный анализ."""
         try:
-            # Создаем директорию для даты
-            date_str = unified_analysis.analysis_date.strftime('%Y-%m-%d')
-            daily_dir = self.reports_dir / date_str / "unified-analysis"
-            daily_dir.mkdir(parents=True, exist_ok=True)
+            unified_dir = self.run_paths.run_dir / "unified-analysis"
+            unified_dir.mkdir(parents=True, exist_ok=True)
             
             # Сохраняем основной файл
             analysis_data = {
@@ -867,12 +869,18 @@ class FinalOrchestrator(BaseAgent):
                 }
             
             # Сохраняем основной файл
-            main_file = daily_dir / f"unified-analysis_{date_str}.json"
-            with open(main_file, 'w', encoding='utf-8') as f:
-                json.dump(analysis_data, f, indent=2, ensure_ascii=False)
-            
-            # Сохраняем TXT отчет для удобства чтения
-            await self._save_unified_report_txt(unified_analysis, daily_dir)
+            main_file = unified_dir / "unified-analysis.json"
+            self.run_manager.save_json(main_file, analysis_data)
+
+            # Сохраняем TXT отчет
+            await self._save_unified_report_txt(unified_analysis, unified_dir)
+
+            # latest
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(main_file, Path("unified-analysis") / "unified-analysis.json")
+            txt_path = unified_dir / "unified-report.txt"
+            if txt_path.exists():
+                self.run_manager.copy_to_latest(txt_path, Path("unified-analysis") / "unified-report.txt")
             
             # Отмечаем в processing tracker
             self.processing_tracker.mark_processed(
@@ -897,8 +905,7 @@ class FinalOrchestrator(BaseAgent):
     async def _save_unified_report_txt(self, unified_analysis: FinalUnifiedAnalysis, output_dir: Path) -> None:
         """Сохранить унифицированный отчет в TXT формате."""
         try:
-            date_str = unified_analysis.analysis_date.strftime('%Y-%m-%d')
-            report_file = output_dir / f"unified-report_{date_str}.txt"
+            report_file = output_dir / "unified-report.txt"
             
             report_lines = []
             report_lines.append("ФИНАЛЬНЫЙ ОБЪЕДИНЕННЫЙ АНАЛИЗ КОМАНДЫ")
@@ -1044,7 +1051,7 @@ class FinalOrchestrator(BaseAgent):
                 'task_analyzer': 'available',
                 'meeting_analyzer': 'available',
                 'role_manager': 'available',
-                'reports_directory': str(self.reports_dir),
+                "reports_directory": str(self.run_manager.latest_root),
                 'unified_analysis_ready': True,
                 'last_check': datetime.now().isoformat()
             }

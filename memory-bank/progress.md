@@ -25,12 +25,12 @@
 - **20 employees successfully extracted**: Показывает отличные результаты
 - **⚠️ Performance проблема**: 83 минуты обработки (требуется оптимизация)
 
-### ❌ Weekly Reports Agent
+### ✅ Weekly Reports Agent
 - **Complete weekly analysis**: Готовые отчеты по команде
 - **Confluence integration**: Автоматическая публикация
 - **Team health metrics**: Комплексная оценка производительности
 - **Individual performance**: Персональные инсайты и рекомендации
-- **❌ Интеграция нарушена**: Проблемы с передачей данных между агентами
+- **✅ Интеграция восстановлена**: читает артефакты недели из `reports/runs/*` (task stage2 + meeting final)
 
 ### ❌ Quality Validator Agent
 - **Quality metrics system**: Реализована оценка качества
@@ -57,7 +57,8 @@
 - **Quality validation**: Финальная проверка качества
 
 ### 📝 Documentation
-- ~~Update README.md~~: **✅ В ПРОГРЕССЕ** - Обновление после очистки проекта
+- **Update README.md**: ✅ выполнено (описаны `data/*`, `ProcessingIndex`, `reports/runs|latest`, ops-скрипты)
+- **ADR**: ✅ добавлен `docs/adr/0001-run-artifacts-and-incremental-processing-index.md`
 - **API documentation**: Документация всех методов
 - **Deployment guide**: Инструкции по развертыванию
 
@@ -107,7 +108,7 @@
 #### Baseline тестирование всех агентов
 - **Task Analyzer Agent**: ✅ Отлично работает (204с, 12 сотрудников, качество 1.0)
 - **Meeting Analyzer Agent**: ⚠️ Функционален но требует оптимизации (83 минуты)
-- **Weekly Reports Agent**: ❌ Нарушена интеграция данных между агентами
+- **Weekly Reports Agent**: ✅ Интеграция восстановлена (run-артефакты)
 - **Quality Validator Agent**: ❌ Отсутствует метод проверки работоспособности
 
 #### Jira интеграция - полностью готова к производству
@@ -122,8 +123,8 @@
 - **Маппинг полей**: Включая критически важные комментарии
 - **Стратегии API**: Оптимизированные паттерны запросов
 
-### Overall System Status: 70% Complete
-- **Core agents**: 75% готовности (TaskAnalyzer ✅, MeetingAnalyzer ⚠️, WeeklyReports ❌)
+### Overall System Status: 75% Complete
+- **Core agents**: 85% готовности (TaskAnalyzer ✅, MeetingAnalyzer ⚠️, WeeklyReports ✅)
 - **Jira Integration**: 100% готовности  
 - **Testing**: 80% готовности (baseline завершен, нужно исправление проблем)
 - **Documentation**: 85% готовности (спецификация создана)
@@ -131,9 +132,9 @@
 
 ### Критические проблемы, которые нужно решить
 1. **Performance Meeting Analyzer** - 83 минуты (требуется оптимизация до <10 минут)
-2. **Интеграция Weekly Reports Agent** - нарушена передача данных между агентами
-3. **Health check Quality Validator** - отсутствует метод проверки работоспособности
-4. **Подготовка к новым протоколам** - требуется создание role context системы
+2. **Health check Quality Validator** - отсутствует метод проверки работоспособности
+3. **Инкрементная аналитика по Jira diff** - начать использовать `reports/latest/jira-diff/jira-diff.json` для динамики и сравнения “run vs run”
+4. **Деградация legacy-артефактов** - зависимости от root `stage1_text_analysis.txt`/`stage2_final_json.json` должны быть выключены (включение только через `ENABLE_LEGACY_ROOT_ARTIFACTS=1`); также продолжить уход от `reports/daily` как шины
 
 ### Следующие шаги приоритетности
 #### P0 (Критически важно)
@@ -197,9 +198,9 @@
 - **Documentation**: 80% (все методы задокументированы)
 
 ### Performance
-- **Task analysis**: 45-60 секунд (двухэтапный процесс)
-- **Meeting analysis**: 540 секунд (трехэтапный процесс)
-- **Weekly reports**: 120-180 секунд (комплексный анализ)
+- **Task analysis**: ~204 секунды по baseline (двухэтапный процесс, 12 сотрудников)
+- **Meeting analysis**: ~83 минуты по baseline (требуется оптимизация, основной bottleneck — LLM/объем протоколов)
+- **Weekly reports**: 120-180 секунд (комплексный анализ) — интеграция входных данных восстановлена (run-артефакты)
 
 ### Reliability
 - **Success rate**: 95% (большинство запусков успешны)

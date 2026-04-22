@@ -37,10 +37,11 @@
 - Извлечение комментариев и контекста задач
 - Автоматическое сохранение в JSON и TXT форматах
 
-**Файлы**:
+**Артефакты**:
 - `src/agents/task_analyzer_agent_improved.py` - Улучшенный агент
-- `stage1_text_analysis.txt` - Детальный текстовый анализ
-- `stage2_final_json.json` - Структурированные данные
+- `reports/runs/{run_id}/task-analysis/` - артефакты запуска (stage1/stage2/final)
+- `reports/latest/task-analysis/` - последние результаты (копии артефактов)
+- `stage1_text_analysis.txt` и `stage2_final_json.json` - legacy backward compatibility (выключено по умолчанию; включение: `ENABLE_LEGACY_ROOT_ARTIFACTS=1`)
 
 #### 2. Meeting Analyzer Agent v2.0.0 ✅
 **Задача**: Ежедневный анализ новых протоколов совещаний
@@ -54,11 +55,13 @@
 - Оценка эффективности коммуникации
 - Создание персональных рекомендаций
 
-**Файлы**:
+**Артефакты**:
 - `src/agents/meeting_analyzer_agent_improved.py` - Улучшенный агент
-- `reports/daily/comprehensive-analysis_YYYY-MM-DD.txt` - Комплексный анализ
-- `reports/daily/YYYY-MM-DD/meeting-analysis_YYYY-MM-DD.json` - Основной отчет
-- `reports/daily/YYYY-MM-DD/employee_progression/` - Прогресс сотрудников
+- `data/raw/protocols/` - сырые протоколы (вход)
+- `data/processed/protocols_cleaned/` - кэш очищенных протоколов (stage1)
+- `reports/runs/{run_id}/meeting-analysis/` - артефакты запуска
+- `reports/runs/{run_id}/employee_progression/` - прогресс сотрудников по итогам run
+- `reports/latest/meeting-analysis/` - последние результаты
 
 #### 3. Weekly Reports Agent v2.0.0 Complete ✅
 **Задача**: Еженедельный комплексный анализ и публикация в Confluence
@@ -242,10 +245,15 @@ MTS_MultAgent/
 │   │   └── config.py
 │   └── utils/                    # Утилиты
 ├── config/                       # Конфигурационные файлы
-├── protocols/                    # Протоколы совещаний
-├── reports/                      # Генерируемые отчеты
-│   ├── daily/                   # Ежедневные отчеты
-│   └── weekly/                  # Еженедельные отчеты
+├── data/                         # Data lake (raw/processed/index)
+│   ├── raw/                      # Сырые входы
+│   ├── processed/                # Обработанные данные/кэши
+│   └── index/                    # Индексы обработки (ProcessingIndex)
+├── protocols/                    # Legacy (источник для миграции), использовать scripts/migrate_protocols_to_datalake.py
+├── reports/                      # Артефакты анализов
+│   ├── runs/                     # Запуски (run_id = YYYYMMDD_HHMMSS)
+│   ├── latest/                   # Последний запуск (копии артефактов + run_id.txt)
+│   └── weekly/                   # Еженедельные отчеты
 ├── tests/                        # Тесты
 ├── docs/                        # Документация
 └── memory-bank/                 # Банк памяти проекта
@@ -302,14 +310,37 @@ LLM_API_BASE_URL=https://devx-copilot.tech/v1
 - Целостность данных (98%)
 - Покрытие тестами (85%)
 
-## 🔄 Инкрементальный анализ
+## 🔄 Инкрементальный анализ и запуск (run) как единица сравнения
 
-Система поддерживает инкреметальный анализ:
+Система поддерживает инкрементальность и сравнение изменений через два механизма:
 
-- **Task Analyzer**: анализирует только новые задачи с последнего запуска
-- **Meeting Analyzer**: обрабатывает только новые протоколы
-- **Progress tracking**: сохраняет историю изменений для каждого сотрудника
-- **Memory store**: JSON-based хранение для быстрого доступа к историческим данным
+1) **Инкрементальность по контенту (hash) для протоколов**
+- `ProcessingIndex`: `data/index/processing_index.json`
+- ключ: `(processing_type, file_hash)`
+- кэш очищенных протоколов: `data/processed/protocols_cleaned/`
+- позволяет не дергать LLM повторно при неизменном протоколе
+
+2) **Run-based артефакты для сравнения динамики**
+- каждый запуск сохраняется в `reports/runs/{run_id}/...`
+- последняя версия результатов доступна в `reports/latest/...`
+- `reports/latest/run_id.txt` хранит id последнего запуска
+
+3) **Инкремент по Jira через Snapshot + Diff**
+- snapshot входных данных Jira: `data/jira/snapshots/{run_id}.json`
+- diff изменений между текущим и предыдущим snapshot:
+  - run: `reports/runs/{run_id}/jira-diff/jira-diff.json`
+  - latest: `reports/latest/jira-diff/jira-diff.json`
+- diff используется как \"инкремент\" для сравнения нового состояния с предыдущим и построения динамики по сотрудникам/команде
+
+### Ops-скрипты
+- Миграция legacy протоколов в data lake:
+  - `python scripts/migrate_protocols_to_datalake.py --dry-run`
+  - `python scripts/migrate_protocols_to_datalake.py --copy` или `--move`
+- Retention/cleanup data lake (по умолчанию 60 дней):
+  - `python scripts/purge_old_data.py --dry-run --days 60`
+  - `python scripts/purge_old_data.py --apply --days 60`
+
+Подробнее: `docs/adr/0001-run-artifacts-and-incremental-processing-index.md`
 
 ## 🚨 Обработка ошибок
 

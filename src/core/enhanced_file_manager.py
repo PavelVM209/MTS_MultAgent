@@ -80,7 +80,7 @@ class EnhancedFileManager:
             self.today_dir / "meeting-analysis" / "stage1",
             self.today_dir / "meeting-analysis" / "stage2",
             self.today_dir / "meeting-analysis" / "final",
-            self.today_dir / "employee-progression"
+            self.today_dir / "employee_progression"
         ]
         
         for directory in directories:
@@ -219,7 +219,7 @@ class EnhancedFileManager:
     
     def save_employee_progression(self, employee_name: str, data: Dict[str, Any]) -> Path:
         """Сохранить прогресс сотрудника."""
-        progression_dir = self.today_dir / "employee-progression"
+        progression_dir = self.today_dir / "employee_progression"
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_name = self._sanitize_filename(employee_name)
@@ -353,7 +353,7 @@ class EnhancedFileManager:
                 "stage2": str(self.today_dir / "meeting-analysis" / "stage2"),
                 "final": str(self.today_dir / "meeting-analysis" / "final")
             },
-            "progression_dir": str(self.today_dir / "employee-progression"),
+            "progression_dir": str(self.today_dir / "employee_progression"),
             "tracker_path": str(self.get_tracker_path())
         }
     
@@ -390,6 +390,371 @@ class EnhancedFileManager:
                     logger.info("Created backward compatibility link: stage2_final_json.json")
             except Exception as e:
                 logger.warning(f"Failed to create stage2 compatibility link: {e}")
+    
+    def create_unified_txt_reports(self) -> Dict[str, Path]:
+        """
+        Создать единые TXT отчеты после завершения всех этапов анализа.
+        
+        Returns:
+            Dict[str, Path]: Словарь с путями к созданным TXT файлам
+        """
+        created_files = {}
+        
+        try:
+            # 1. Единый отчет по анализу задач
+            task_report = self._create_unified_task_report()
+            if task_report:
+                created_files['task_analysis'] = task_report
+            
+            # 2. Единый отчет по анализу встреч
+            meeting_report = self._create_unified_meeting_report()
+            if meeting_report:
+                created_files['meeting_analysis'] = meeting_report
+            
+            # 3. Комбинированный отчет по всем анализам
+            combined_report = self._create_combined_analysis_report()
+            if combined_report:
+                created_files['combined_analysis'] = combined_report
+            
+            # 4. Отчет по прогрессу сотрудников
+            employee_report = self._create_employee_progression_report()
+            if employee_report:
+                created_files['employee_progression'] = employee_report
+            
+            logger.info(f"Created {len(created_files)} unified TXT reports")
+            return created_files
+            
+        except Exception as e:
+            logger.error(f"Failed to create unified TXT reports: {e}")
+            return created_files
+    
+    def _create_unified_task_report(self) -> Optional[Path]:
+        """Создать единый TXT отчет по анализу задач."""
+        try:
+            # Получаем данные из всех этапов
+            stage1_content = self._get_latest_stage1_content()
+            stage2_data = self.get_latest_task_stage2()
+            
+            if not stage1_content and not stage2_data:
+                logger.warning("No task analysis data available for unified report")
+                return None
+            
+            # Создаем unified отчет
+            report_lines = []
+            report_lines.append("КОМПЛЕКСНЫЙ АНАЛИЗ ЗАДАЧ КОМАНДЫ")
+            report_lines.append("=" * 80)
+            report_lines.append(f"Дата анализа: {self.today}")
+            report_lines.append(f"Время генерации: {datetime.now().strftime('%H:%M:%S')}")
+            report_lines.append("")
+            
+            # Stage 1: Текстовый анализ
+            if stage1_content:
+                report_lines.append("ЭТАП 1: ТЕКСТОВЫЙ АНАЛИЗ ЗАДАЧ")
+                report_lines.append("-" * 60)
+                report_lines.append(stage1_content)
+                report_lines.append("")
+            
+            # Stage 2: Структурированные данные
+            if stage2_data:
+                report_lines.append("ЭТАП 2: СТРУКТУРИРОВАННЫЕ ДАННЫЕ")
+                report_lines.append("-" * 60)
+                report_lines.append(json.dumps(stage2_data, indent=2, ensure_ascii=False))
+                report_lines.append("")
+            
+            # Сохраняем отчет
+            reports_dir = self.today_dir / "unified-reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"unified-task-analysis_{timestamp}.txt"
+            filepath = reports_dir / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            
+            # Создаем ссылку на последнюю версию
+            latest_link = reports_dir / "unified-task-analysis_latest.txt"
+            self._create_symlink(filepath, latest_link)
+            
+            logger.info(f"Unified task report created: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to create unified task report: {e}")
+            return None
+    
+    def _create_unified_meeting_report(self) -> Optional[Path]:
+        """Создать единый TXT отчет по анализу встреч."""
+        try:
+            # Получаем данные анализа встреч
+            meeting_data = self.get_latest_meeting_final()
+            
+            if not meeting_data:
+                logger.warning("No meeting analysis data available for unified report")
+                return None
+            
+            # Создаем unified отчет
+            report_lines = []
+            report_lines.append("КОМПЛЕКСНЫЙ АНАЛИЗ ВСТРЕЧ КОМАНДЫ")
+            report_lines.append("=" * 80)
+            report_lines.append(f"Дата анализа: {self.today}")
+            report_lines.append(f"Время генерации: {datetime.now().strftime('%H:%M:%S')}")
+            report_lines.append("")
+            
+            # Основные метрики
+            if 'team_collaboration_score' in meeting_data:
+                report_lines.append("ОСНОВНЫЕ МЕТРИКИ")
+                report_lines.append("-" * 40)
+                report_lines.append(f"Оценка командной коллаборации: {meeting_data['team_collaboration_score']:.2f}/10")
+                report_lines.append(f"Согласованность задач и встреч: {meeting_data.get('task_meeting_alignment', 0):.2f}")
+                report_lines.append(f"Общее здоровье команды: {meeting_data.get('overall_team_health', 0):.2f}/10")
+                report_lines.append("")
+            
+            # Инсайты по команде
+            if 'team_insights' in meeting_data:
+                report_lines.append("КОМАНДНЫЕ ИНСАЙТЫ")
+                report_lines.append("-" * 40)
+                for insight in meeting_data['team_insights']:
+                    report_lines.append(f"• {insight}")
+                report_lines.append("")
+            
+            # Персональные инсайты
+            if 'personal_insights' in meeting_data:
+                report_lines.append("ИНСАЙТЫ СОТРУДНИКОВ")
+                report_lines.append("-" * 40)
+                for employee, insights in meeting_data['personal_insights'].items():
+                    report_lines.append(f"{employee}:")
+                    if isinstance(insights, dict):
+                        for key, value in insights.items():
+                            report_lines.append(f"  {key}: {value}")
+                    else:
+                        report_lines.append(f"  {insights}")
+                    report_lines.append("")
+            
+            # Рекомендации
+            if 'recommendations' in meeting_data:
+                report_lines.append("РЕКОМЕНДАЦИИ")
+                report_lines.append("-" * 40)
+                for i, rec in enumerate(meeting_data['recommendations'], 1):
+                    report_lines.append(f"{i}. {rec}")
+                report_lines.append("")
+            
+            # Сохраняем отчет
+            reports_dir = self.today_dir / "unified-reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"unified-meeting-analysis_{timestamp}.txt"
+            filepath = reports_dir / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            
+            # Создаем ссылку на последнюю версию
+            latest_link = reports_dir / "unified-meeting-analysis_latest.txt"
+            self._create_symlink(filepath, latest_link)
+            
+            logger.info(f"Unified meeting report created: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to create unified meeting report: {e}")
+            return None
+    
+    def _create_combined_analysis_report(self) -> Optional[Path]:
+        """Создать комбинированный отчет по всем анализам."""
+        try:
+            # Получаем данные из всех источников
+            task_data = self.get_latest_task_stage2()
+            meeting_data = self.get_latest_meeting_final()
+            
+            if not task_data and not meeting_data:
+                logger.warning("No analysis data available for combined report")
+                return None
+            
+            # Создаем комбинированный отчет
+            report_lines = []
+            report_lines.append("КОМБИНИРОВАННЫЙ АНАЛИЗ КОМАНДЫ")
+            report_lines.append("=" * 80)
+            report_lines.append(f"Дата анализа: {self.today}")
+            report_lines.append(f"Время генерации: {datetime.now().strftime('%H:%M:%S')}")
+            report_lines.append("")
+            
+            # Сводная информация
+            report_lines.append("СВОДНАЯ ИНФОРМАЦИЯ")
+            report_lines.append("-" * 40)
+            report_lines.append(f"Доступные источники данных:")
+            if task_data:
+                report_lines.append("  ✅ Анализ задач")
+            if meeting_data:
+                report_lines.append("  ✅ Анализ встреч")
+            report_lines.append("")
+            
+            # Комбинированные метрики
+            task_score = 0
+            meeting_score = 0
+            
+            if task_data and 'employee_performance' in task_data:
+                scores = []
+                for emp_data in task_data['employee_performance'].values():
+                    if 'task_performance' in emp_data and 'score' in emp_data['task_performance']:
+                        scores.append(emp_data['task_performance']['score'])
+                if scores:
+                    task_score = sum(scores) / len(scores)
+            
+            if meeting_data and 'team_collaboration_score' in meeting_data:
+                meeting_score = meeting_data['team_collaboration_score']
+            
+            report_lines.append("КОМБИНИРОВАННЫЕ МЕТРИКИ")
+            report_lines.append("-" * 40)
+            report_lines.append(f"Средняя оценка задач: {task_score:.2f}/10")
+            report_lines.append(f"Оценка коллаборации: {meeting_score:.2f}/10")
+            
+            if task_score > 0 and meeting_score > 0:
+                combined_score = (task_score + meeting_score) / 2
+                report_lines.append(f"Общая производительность: {combined_score:.2f}/10")
+            
+            report_lines.append("")
+            
+            # Объединенные рекомендации
+            all_recommendations = []
+            
+            if meeting_data and 'recommendations' in meeting_data:
+                all_recommendations.extend(meeting_data['recommendations'])
+            
+            if task_data and 'recommendations' in task_data:
+                all_recommendations.extend(task_data['recommendations'])
+            
+            if all_recommendations:
+                report_lines.append("ОБЪЕДИНЕННЫЕ РЕКОМЕНДАЦИИ")
+                report_lines.append("-" * 40)
+                for i, rec in enumerate(all_recommendations[:10], 1):  # Ограничиваем до 10
+                    report_lines.append(f"{i}. {rec}")
+                report_lines.append("")
+            
+            # Сохраняем отчет
+            reports_dir = self.today_dir / "unified-reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"combined-analysis-{timestamp}.txt"
+            filepath = reports_dir / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            
+            # Создаем ссылку на последнюю версию
+            latest_link = reports_dir / "combined-analysis_latest.txt"
+            self._create_symlink(filepath, latest_link)
+            
+            logger.info(f"Combined analysis report created: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to create combined analysis report: {e}")
+            return None
+    
+    def _create_employee_progression_report(self) -> Optional[Path]:
+        """Создать отчет по прогрессу сотрудников."""
+        try:
+            # Получаем файлы прогресса сотрудников
+            progression_dir = self.today_dir / "employee_progression"
+            progression_files = list(progression_dir.glob("*.json"))
+            
+            if not progression_files:
+                logger.warning("No employee progression data available")
+                return None
+            
+            # Собираем данные всех сотрудников
+            employees_data = {}
+            for file_path in progression_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        employee_name = data.get('employee_name', file_path.stem)
+                        employees_data[employee_name] = data
+                except Exception as e:
+                    logger.warning(f"Failed to load {file_path}: {e}")
+            
+            if not employees_data:
+                logger.warning("No valid employee progression data")
+                return None
+            
+            # Создаем отчет
+            report_lines = []
+            report_lines.append("ОТЧЕТ ПО ПРОГРЕССУ СОТРУДНИКОВ")
+            report_lines.append("=" * 80)
+            report_lines.append(f"Дата анализа: {self.today}")
+            report_lines.append(f"Всего сотрудников: {len(employees_data)}")
+            report_lines.append("")
+            
+            # Сортируем сотрудников по имени
+            sorted_employees = sorted(employees_data.items())
+            
+            for employee_name, emp_data in sorted_employees:
+                report_lines.append(f"СОТРУДНИК: {employee_name}")
+                report_lines.append("-" * 60)
+                
+                # Основные метрики
+                if 'performance_rating' in emp_data:
+                    report_lines.append(f"Общая оценка: {emp_data['performance_rating']:.2f}/10")
+                
+                if 'engagement_level' in emp_data:
+                    report_lines.append(f"Уровень вовлеченности: {emp_data['engagement_level']}")
+                
+                if 'communication_effectiveness' in emp_data:
+                    report_lines.append(f"Эффективность коммуникации: {emp_data['communication_effectiveness']:.2f}/10")
+                
+                if 'task_to_meeting_correlation' in emp_data:
+                    report_lines.append(f"Корреляция задач и встреч: {emp_data['task_to_meeting_correlation']:.2f}")
+                
+                # Детальные инсайты
+                if 'detailed_insights' in emp_data:
+                    report_lines.append("")
+                    report_lines.append("Детальные инсайты:")
+                    insights = emp_data['detailed_insights']
+                    if isinstance(insights, str):
+                        report_lines.append(insights)
+                    elif isinstance(insights, list):
+                        for insight in insights:
+                            report_lines.append(f"  • {insight}")
+                
+                report_lines.append("")
+                report_lines.append("=" * 80)
+                report_lines.append("")
+            
+            # Сохраняем отчет
+            reports_dir = self.today_dir / "unified-reports"
+            reports_dir.mkdir(parents=True, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"employee-progression-{timestamp}.txt"
+            filepath = reports_dir / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            
+            # Создаем ссылку на последнюю версию
+            latest_link = reports_dir / "employee-progression_latest.txt"
+            self._create_symlink(filepath, latest_link)
+            
+            logger.info(f"Employee progression report created: {filepath}")
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to create employee progression report: {e}")
+            return None
+    
+    def _get_latest_stage1_content(self) -> Optional[str]:
+        """Получить содержимое последнего stage1 файла."""
+        try:
+            stage1_path = self.get_latest_task_stage1()
+            if stage1_path and stage1_path.exists():
+                with open(stage1_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+        except Exception as e:
+            logger.error(f"Failed to read stage1 content: {e}")
+        return None
 
 
 if __name__ == "__main__":

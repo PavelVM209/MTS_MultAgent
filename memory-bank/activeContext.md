@@ -2,7 +2,9 @@
 
 ## Текущий фокус работы (Апрель 2026)
 
-Проект MTS_MultAgent находится в фазе комплексного аудита и подготовки к интеграции с новыми протоколами совещаний и задачами Jira. Проведен полный baseline анализ системы и Jira интеграции.
+Проект MTS_MultAgent находится в фазе подготовки к инкрементальному сравнению изменений по новым протоколам/задачам Jira на основе последовательности запусков (run). Выполнен переход на run-based артефакты (`reports/runs`, `reports/latest`) и введена инкрементальная обработка протоколов по хэшу через `ProcessingIndex`.
+
+ADR: `docs/adr/0001-run-artifacts-and-incremental-processing-index.md`
 
 ## ✅ ЗАВЕРШЕНО - Role Context система (20 апреля 2026)
 
@@ -72,6 +74,27 @@ docs/ (documentation)
 
 ## Недавние изменения
 
+### ✅ Переход на run-based артефакты и data lake (22 апреля 2026)
+- Введены директории:
+  - `data/raw/protocols/` (сырье)
+  - `data/processed/protocols_cleaned/` (кэш stage1 cleaning)
+  - `data/index/processing_index.json` (ProcessingIndex)
+  - `reports/runs/{run_id}/...` (артефакты каждого запуска)
+  - `reports/latest/...` (последний запуск + `run_id.txt`)
+- `ImprovedTaskAnalyzerAgent` переведен на сохранение в `reports/runs|latest`
+- `FinalOrchestrator` переведен на загрузку из `reports/latest/*` и сохранение unified в `reports/runs|latest`
+- Добавлены ops-скрипты миграции/retention:
+  - `scripts/migrate_protocols_to_datalake.py`
+  - `scripts/purge_old_data.py`
+
+### ✅ Инкремент по Jira через Snapshot + Diff (22 апреля 2026)
+- Добавлены Jira snapshots входных данных:
+  - `data/jira/snapshots/{run_id}.json`
+- Добавлен Jira diff как инкремент между run:
+  - `reports/runs/{run_id}/jira-diff/jira-diff.json`
+  - `reports/latest/jira-diff/jira-diff.json`
+- ADR: `docs/adr/0002-jira-snapshots-and-diff-increment.md`
+
 ### Улучшенный Meeting Analyzer Agent v2.0.0
 - **Реализована трехэтапная система анализа:**
   - Этап 1: Переработка протоколов в читабельный вид с правильной разбивкой диалогов
@@ -93,8 +116,8 @@ docs/ (documentation)
 
 ### Критические приоритеты (P0)
 1. **Оптимизация Meeting Analyzer Agent** - снижение времени обработки с 83 минут до приемлемых значений
-2. **Исправление интеграции Weekly Reports Agent** - восстановление передачи данных между агентами
-3. **Добавление health check метода в Quality Validator Agent**
+2. **Quality Validator Agent** - добавить health check метод/контуры проверки работоспособности
+3. **Инкрементная аналитика по diff** - использовать `reports/latest/jira-diff/jira-diff.json` для построения динамики и сравнения “run vs run”
 
 ### P1 Задачи для готовности к новым протоколам
 1. **Создание config/roles.yaml** с полными данными 12 сотрудников
@@ -104,10 +127,9 @@ docs/ (documentation)
 5. **Интеграция role context в task_analyzer_agent_improved.py**
 
 ### Подготовка к использованию новых протоколов и задач Jira
-- **Проект готов** для инкрементального сравнения новых данных
-- **Jira интеграция** обеспечит обновленные данные о задачах сотрудников
-- **Baseline установлен** для сравнения аналитики в динамике изменений
-- **Оценочная готовность:** Через 3 недели при решении критических проблем
+- Инкрементальность протоколов обеспечена по hash (ProcessingIndex) + кэш `data/processed/protocols_cleaned`
+- Run-based артефакты обеспечивают сравнение “новый запуск vs старый запуск” через `reports/runs/{run_id}`
+- `reports/latest` дает единый API/CLI/Confluence-friendly доступ к последним результатам
 
 ## Активные решения и соображения
 
@@ -122,9 +144,15 @@ docs/ (documentation)
 - LLM: GLM-4.6-357b модель через devx-copilot.tech API
 
 ### Хранение данных
-- JSON-based память для инкрементального анализа
-- Отдельные файлы прогресса для каждого сотрудника
-- Ежедневные/еженедельные отчеты в структурированном виде
+- Data lake:
+  - `data/raw/` — входные данные
+  - `data/processed/` — обработанные данные/кэши
+  - `data/index/` — индекс инкрементальной обработки (ProcessingIndex)
+- Артефакты анализов:
+  - `reports/runs/{run_id}` — источник истины для сравнения “запуск vs запуск”
+  - `reports/latest` — стабильная точка доступа к последним результатам
+- Employee progression:
+  - сохраняется по run в `reports/runs/{run_id}/employee_progression/*.json`
 
 ## Важные паттерны и предпочтения
 
@@ -164,7 +192,7 @@ docs/ (documentation)
 2. **Jira API доступ** - полностью валидирован и готов к production
 3. **Комментарии в Jira** - требуют отдельных API вызовов, созданы стратегии оптимизации
 4. **Performance Meeting Analyzer** - критическая проблема (83 минуты обработки)
-5. **Интеграция агентов** - нарушена передача данных между Weekly Reports и другими агентами
+5. **Интеграция агентов** - восстановлена (Weekly Reports читает run-артефакты `reports/runs/*`)
 
 ### Новые архитектурные инсайты (апрель 2026)
 1. **Jira интеграция критически важна** для инкрементального анализа

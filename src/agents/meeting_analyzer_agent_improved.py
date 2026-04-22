@@ -22,7 +22,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from pathlib import Path
-import os
 from dotenv import load_dotenv
 
 from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
@@ -31,8 +30,9 @@ from ..core.json_memory_store import JSONMemoryStore
 from ..core.quality_metrics import QualityMetrics
 from ..core.config import get_employee_monitoring_config
 from ..core.role_context_manager import EmployeeRoleManager
-from ..core.processing_tracker import ProcessingTracker
-from ..core.enhanced_file_manager import EnhancedFileManager
+from ..core.hash_utils import md5_file
+from ..core.processing_index import ProcessingIndex, ProcessingRecord, ProcessingRecordKey
+from ..core.run_file_manager import RunFileManager
 
 # Load .env file
 load_dotenv()
@@ -118,33 +118,39 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         self.quality_metrics = QualityMetrics()
         self.role_manager = EmployeeRoleManager()
         
-        # Initialize processing tracker and file manager
-        self.processing_tracker = ProcessingTracker()
-        self.file_manager = EnhancedFileManager()
-        
-        # Load configuration
-        self.emp_config = get_employee_monitoring_config()
-        self.meeting_config = self.emp_config.get('meetings', {})
-        self.reports_config = self.emp_config.get('reports', {})
-        self.quality_config = self.emp_config.get('quality', {})
-
         # Project root
         project_root = Path(__file__).resolve().parents[2]
+
+        # Initialize processing index
+        self.processing_index = ProcessingIndex.default(project_root)
+
+        # Run-based reports
+        self.run_manager = RunFileManager(project_root)
+        self.run_id = self.run_manager.generate_run_id()
+        self.run_paths = self.run_manager.init_run(self.run_id)
+
+
+        # Load configuration
+        self.emp_config = get_employee_monitoring_config()
+        self.meeting_config = self.emp_config.get("meetings", {})
+        self.reports_config = self.emp_config.get("reports", {})
+        self.quality_config = self.emp_config.get("quality", {})
         
         # Пути из .env с fallback на значения по умолчанию
-        protocols_dir_rel = os.getenv('PROTOCOLS_DIRECTORY_PATH', 'protocols')
-        daily_reports_dir_rel = os.getenv('DAILY_REPORTS_DIR', 'reports/daily')
-        task_analyzer_txt_rel = os.getenv('TASK_ANALYZER_TXT_PATH', 'stage1_text_analysis.txt')
-        task_analyzer_json_rel = os.getenv('TASK_ANALYZER_JSON_PATH', 'stage2_final_json.json')
-        
+        protocols_dir_rel = os.getenv("PROTOCOLS_DIRECTORY_PATH", "data/raw/protocols")
+        task_analyzer_txt_rel = os.getenv(
+            "TASK_ANALYZER_TXT_PATH",
+            "reports/latest/task-analysis/stage1_task_analysis.txt",
+        )
+        task_analyzer_json_rel = os.getenv(
+            "TASK_ANALYZER_JSON_PATH",
+            "reports/latest/task-analysis/stage2_task_result.json",
+        )
+
         # Формируем абсолютные пути
         self.protocols_dir = project_root / protocols_dir_rel
-        self.daily_reports_dir = project_root / daily_reports_dir_rel
         self.task_analyzer_txt = project_root / task_analyzer_txt_rel
         self.task_analyzer_json = project_root / task_analyzer_json_rel
-        
-        # Создаем директорию для отчетов
-        self.daily_reports_dir.mkdir(parents=True, exist_ok=True)
         
         # Остальная конфигурация
         self.supported_formats = self.meeting_config.get('supported_formats', ['.txt', '.md', '.docx'])
@@ -153,6 +159,9 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         logger.info(f"ImprovedMeetingAnalyzerAgent initialized with 3-stage analysis")
         logger.info(f"Protocols dir: {self.protocols_dir}")
         logger.info(f"Task analyzer txt: {self.task_analyzer_txt}")
+        logger.info(f"Processing index: {self.processing_index.index_path}")
+        logger.info(f"Run id: {self.run_id}")
+        logger.info(f"Run dir: {self.run_paths.run_dir}")
     
     async def execute(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -235,121 +244,96 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
     
     async def stage1_clean_protocols(self) -> List[Dict[str, Any]]:
         """
-        ЭТАП 1: Переработка протоколов в читабельный вид с правильной разбивкой диалогов.
-        Использует processing tracker для инкрементальной обработки.
+        ЭТАП 1: Переработка протоколов в читабельный вид (кэш по hash, без папок по дням).
+        Raw: data/raw/protocols/*.txt
+        Cleaned cache: data/processed/protocols_cleaned/*.txt
         """
         try:
-            cleaned_protocols = []
-            protocol_files = list(self.protocols_dir.glob("*.txt"))
-            
+            cleaned_protocols: List[Dict[str, Any]] = []
+            protocol_files = sorted(self.protocols_dir.glob("*.txt"))
+
             if not protocol_files:
                 logger.warning(f"No protocol files found in {self.protocols_dir}")
                 return []
-            
+
+            processed_dir = self.processing_index.index_path.parents[1] / "processed" / "protocols_cleaned"
+            processed_dir.mkdir(parents=True, exist_ok=True)
+
             logger.info(f"Found {len(protocol_files)} protocol files for cleaning")
-            
-            processed_files = []
-            unprocessed_files = []
-            
-            # Сначала проверяем файловую систему - это самый надежный способ
-            cleaned_protocols_dir = self.daily_reports_dir / "2026-04-20" / "meeting-analysis" / "cleaned-protocols"
-            
+
+            cached = 0
+            newly = 0
+
             for protocol_file in protocol_files:
-                cleaned_filename = f"cleaned_{protocol_file.name}"
-                cleaned_path = cleaned_protocols_dir / cleaned_filename
-                
-                if cleaned_path.exists():
-                    # Файл существует в cleaned-protocols - загружаем его
-                    try:
-                        cleaned_content = cleaned_path.read_text(encoding='utf-8')
-                        cleaned_protocols.append({
-                            'filename': protocol_file.name,
-                            'cleaned_filename': cleaned_filename,
-                            'cleaned_filepath': cleaned_path,
-                            'original_content': protocol_file.read_text(encoding='utf-8'),
-                            'cleaned_content': cleaned_content,
-                            'file_date': datetime.fromtimestamp(protocol_file.stat().st_mtime),
-                            'from_cache': True
-                        })
-                        processed_files.append(protocol_file.name)
-                        
-                        # Обновляем processing tracker если нужно
-                        if not self.processing_tracker.is_processed(protocol_file, "meeting_clean"):
-                            self.processing_tracker.mark_processed(
-                                protocol_file,
-                                "meeting_clean",
-                                cleaned_path,
-                                {
-                                    "original_filename": protocol_file.name,
-                                    "cleaned_filename": cleaned_filename,
-                                    "content_length": len(cleaned_content),
-                                    "processing_timestamp": datetime.now().isoformat(),
-                                    "source": "file_system_sync"
-                                }
-                            )
-                        
-                        logger.info(f"Using cached cleaned protocol: {protocol_file.name}")
-                        continue
-                    except Exception as e:
-                        logger.warning(f"Failed to load cached protocol {protocol_file.name}: {e}")
-                
-                # Файл не существует или не удалось загрузить - требует обработки
-                unprocessed_files.append(protocol_file)
-            
-            logger.info(f"Processing status: {len(processed_files)} cached, {len(unprocessed_files)} new to process")
-            
-            # Обрабатываем только новые файлы
-            for protocol_file in unprocessed_files:
                 try:
-                    # Читаем исходный протокол
-                    raw_content = protocol_file.read_text(encoding='utf-8')
-                    
-                    # Отправляем в LLM для переработки
-                    cleaned_protocol = await self._clean_protocol_with_llm(raw_content, protocol_file.name)
-                    
-                    if cleaned_protocol:
-                        # Сохраняем очищенный протокол с enhanced file manager
-                        cleaned_filepath = self.file_manager.save_cleaned_protocol(
-                            protocol_file.name, 
-                            cleaned_protocol
-                        )
-                        
-                        # Отмечаем в processing tracker
-                        self.processing_tracker.mark_processed(
-                            protocol_file,
-                            "meeting_clean",
-                            cleaned_filepath,
+                    file_hash = md5_file(protocol_file)
+                    key = ProcessingRecordKey(processing_type="meeting_clean", file_hash=file_hash)
+                    rec = self.processing_index.get(key)
+
+                    raw_content = protocol_file.read_text(encoding="utf-8")
+
+                    if rec and Path(rec.result_path).exists():
+                        cleaned_path = Path(rec.result_path)
+                        cleaned_content = cleaned_path.read_text(encoding="utf-8")
+
+                        cleaned_protocols.append(
                             {
-                                "original_filename": protocol_file.name,
-                                "cleaned_filename": cleaned_filepath.name,
-                                "content_length": len(cleaned_protocol),
-                                "processing_timestamp": datetime.now().isoformat()
+                                "filename": protocol_file.name,
+                                "cleaned_filename": cleaned_path.name,
+                                "cleaned_filepath": cleaned_path,
+                                "original_content": raw_content,
+                                "cleaned_content": cleaned_content,
+                                "file_date": datetime.fromtimestamp(protocol_file.stat().st_mtime),
+                                "from_cache": True,
+                                "file_hash": file_hash,
                             }
                         )
-                        
-                        cleaned_protocols.append({
-                            'filename': protocol_file.name,
-                            'cleaned_filename': cleaned_filepath.name,
-                            'cleaned_filepath': cleaned_filepath,
-                            'original_content': raw_content,
-                            'cleaned_content': cleaned_protocol,
-                            'file_date': datetime.fromtimestamp(protocol_file.stat().st_mtime),
-                            'from_cache': False
-                        })
-                        
-                        logger.info(f"Protocol {protocol_file.name} cleaned and saved to {cleaned_filepath.name}")
-                    
+                        cached += 1
+                        continue
+
+                    cleaned_content = await self._clean_protocol_with_llm(raw_content, protocol_file.name)
+                    if not cleaned_content:
+                        continue
+
+                    cleaned_filename = f"{protocol_file.stem}_{file_hash}.txt"
+                    cleaned_path = processed_dir / cleaned_filename
+                    cleaned_path.write_text(cleaned_content, encoding="utf-8")
+
+                    self.processing_index.upsert(
+                        ProcessingRecord(
+                            file_hash=file_hash,
+                            processing_type="meeting_clean",
+                            source_path=str(protocol_file.relative_to(Path(__file__).resolve().parents[2])),
+                            result_path=str(cleaned_path),
+                            processed_at=datetime.now().isoformat(),
+                            metadata={
+                                "original_filename": protocol_file.name,
+                                "cleaned_filename": cleaned_filename,
+                                "content_length": len(cleaned_content),
+                            },
+                        )
+                    )
+
+                    cleaned_protocols.append(
+                        {
+                            "filename": protocol_file.name,
+                            "cleaned_filename": cleaned_filename,
+                            "cleaned_filepath": cleaned_path,
+                            "original_content": raw_content,
+                            "cleaned_content": cleaned_content,
+                            "file_date": datetime.fromtimestamp(protocol_file.stat().st_mtime),
+                            "from_cache": False,
+                            "file_hash": file_hash,
+                        }
+                    )
+                    newly += 1
                 except Exception as e:
                     logger.error(f"Failed to clean protocol {protocol_file.name}: {e}")
                     continue
-            
-            total_cleaned = len(cleaned_protocols)
-            from_cache = sum(1 for p in cleaned_protocols if p.get('from_cache', False))
-            newly_processed = total_cleaned - from_cache
-            
-            logger.info(f"Protocol cleaning completed: {total_cleaned} total ({from_cache} cached, {newly_processed} newly processed)")
+
+            logger.info(f"Protocol cleaning completed: {len(cleaned_protocols)} total ({cached} cached, {newly} newly processed)")
             return cleaned_protocols
-            
+
         except Exception as e:
             logger.error(f"Stage 1 failed: {e}")
             return []
@@ -646,22 +630,23 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             if analysis_text:
                 logger.info(f"Comprehensive analysis generated ({len(analysis_text)} chars)")
                 
-                # Сохраняем финальный анализ в TXT
-                date_str = datetime.now().strftime('%Y-%m-%d')
-                final_analysis_file = self.daily_reports_dir / f"comprehensive-analysis_{date_str}.txt"
-                
-                with open(final_analysis_file, 'w', encoding='utf-8') as f:
-                    f.write(analysis_text)
-                
-                logger.info(f"Comprehensive analysis saved to {final_analysis_file}")
-                
+                # Сохраняем комплексный текстовый анализ в текущий run (TXT)
+                stage2_txt = self.run_paths.meeting_stage2_dir / "comprehensive-analysis.txt"
+                self.run_manager.save_text(stage2_txt, analysis_text)
+
+                # latest
+                self.run_manager.set_latest(self.run_id)
+                self.run_manager.copy_to_latest(stage2_txt, Path("meeting-analysis") / "comprehensive-analysis.txt")
+
+                logger.info(f"Comprehensive analysis saved to {stage2_txt}")
+
                 # Извлекаем структурированные данные из текста
                 structured_data = await self._extract_structured_data(analysis_text)
-                
+
                 return {
-                    'analysis_text': analysis_text,
-                    'structured_data': structured_data,
-                    'analysis_file': final_analysis_file
+                    "analysis_text": analysis_text,
+                    "structured_data": structured_data,
+                    "analysis_file": stage2_txt,
                 }
             else:
                 logger.warning("Empty comprehensive analysis response")
@@ -1016,77 +1001,64 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         return sum(quality_factors) / len(quality_factors) if quality_factors else 0.0
     
     async def _save_comprehensive_analysis(self, analysis: ComprehensiveMeetingAnalysis) -> None:
-        """Сохранение комплексного анализа."""
+        """Сохранение результатов анализа встреч в reports/runs/{run_id} + обновление reports/latest."""
         try:
-            # Создаем директорию для даты
-            date_str = analysis.analysis_date.strftime('%Y-%m-%d')
-            daily_dir = self.daily_reports_dir / date_str
-            daily_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Сохраняем общий анализ
             analysis_data = {
-                'analysis_date': analysis.analysis_date.isoformat(),
-                'total_employees': analysis.total_employees,
-                'total_meetings_analyzed': analysis.total_meetings_analyzed,
-                'total_tasks_analyzed': analysis.total_tasks_analyzed,
-                'team_collaboration_score': analysis.team_collaboration_score,
-                'task_meeting_alignment': analysis.task_meeting_alignment,
-                'overall_team_health': analysis.overall_team_health,
-                'team_insights': analysis.team_insights,
-                'personal_insights': analysis.personal_insights,
-                'recommendations': analysis.recommendations,
-                'quality_score': analysis.quality_score,
-                'analysis_duration_seconds': analysis.analysis_duration.total_seconds(),
-                'metadata': analysis.metadata
+                "analysis_date": analysis.analysis_date.isoformat(),
+                "total_employees": analysis.total_employees,
+                "total_meetings_analyzed": analysis.total_meetings_analyzed,
+                "total_tasks_analyzed": analysis.total_tasks_analyzed,
+                "team_collaboration_score": analysis.team_collaboration_score,
+                "task_meeting_alignment": analysis.task_meeting_alignment,
+                "overall_team_health": analysis.overall_team_health,
+                "team_insights": analysis.team_insights,
+                "personal_insights": analysis.personal_insights,
+                "recommendations": analysis.recommendations,
+                "quality_score": analysis.quality_score,
+                "analysis_duration_seconds": analysis.analysis_duration.total_seconds(),
+                "metadata": analysis.metadata,
             }
-            
-            # Сохраняем общий JSON
-            general_report_file = daily_dir / f"meeting-analysis_{date_str}.json"
-            with open(general_report_file, 'w', encoding='utf-8') as f:
-                json.dump(analysis_data, f, indent=2, ensure_ascii=False)
-            
-            logger.info(f"Comprehensive analysis saved to {general_report_file}")
-            
+
+            meeting_final_json = self.run_paths.meeting_final_dir / "meeting-analysis.json"
+            self.run_manager.save_json(meeting_final_json, analysis_data)
+
+            # latest
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(meeting_final_json, Path("meeting-analysis") / "meeting-analysis.json")
+
+            logger.info(f"Meeting final saved: {meeting_final_json}")
         except Exception as e:
             logger.error(f"Failed to save comprehensive analysis: {e}")
     
     async def _save_employee_progression(self, employees_performance: Dict[str, EmployeeMeetingPerformance]) -> None:
-        """Сохранение прогресса сотрудников для инкрементального анализа."""
+        """Сохранение прогресса сотрудников в reports/runs/{run_id}/employee_progression."""
         try:
-            date_str = datetime.now().strftime('%Y-%m-%d')
-            progression_dir = self.daily_reports_dir / date_str / "employee_progression"
-            progression_dir.mkdir(parents=True, exist_ok=True)
-            
             for employee_name, performance in employees_performance.items():
-                # Создаем JSON для каждого сотрудника
                 employee_data = {
-                    'employee_name': performance.employee_name,
-                    'analysis_date': performance.analysis_date.isoformat(),
-                    'speaking_turns': performance.speaking_turns,
-                    'questions_asked': performance.questions_asked,
-                    'suggestions_made': performance.suggestions_made,
-                    'action_items_assigned': performance.action_items_assigned,
-                    'engagement_level': performance.engagement_level,
-                    'leadership_indicators': performance.leadership_indicators,
-                    'task_to_meeting_correlation': performance.task_to_meeting_correlation,
-                    'overall_consistency': performance.overall_consistency,
-                    'communication_effectiveness': performance.communication_effectiveness,
-                    'detailed_insights': performance.detailed_insights,
-                    'performance_rating': performance.performance_rating,
-                    'last_updated': performance.last_updated.isoformat(),
-                    'source': 'improved_meeting_analyzer'
+                    "employee_name": performance.employee_name,
+                    "analysis_date": performance.analysis_date.isoformat(),
+                    "speaking_turns": performance.speaking_turns,
+                    "questions_asked": performance.questions_asked,
+                    "suggestions_made": performance.suggestions_made,
+                    "action_items_assigned": performance.action_items_assigned,
+                    "engagement_level": performance.engagement_level,
+                    "leadership_indicators": performance.leadership_indicators,
+                    "task_to_meeting_correlation": performance.task_to_meeting_correlation,
+                    "overall_consistency": performance.overall_consistency,
+                    "communication_effectiveness": performance.communication_effectiveness,
+                    "detailed_insights": performance.detailed_insights,
+                    "performance_rating": performance.performance_rating,
+                    "last_updated": performance.last_updated.isoformat(),
+                    "source": "improved_meeting_analyzer",
+                    "run_id": self.run_id,
                 }
-                
-                # Сохраняем файл сотрудника
-                safe_filename = re.sub(r'[^\w\s-]', '', employee_name).strip()
-                safe_filename = re.sub(r'[-\s]+', '_', safe_filename)
-                employee_file = progression_dir / f"{safe_filename}_{date_str}.json"
-                
-                with open(employee_file, 'w', encoding='utf-8') as f:
-                    json.dump(employee_data, f, indent=2, ensure_ascii=False)
-            
+
+                safe_filename = re.sub(r"[^\w\s-]", "", employee_name).strip()
+                safe_filename = re.sub(r"[-\s]+", "_", safe_filename)
+                employee_file = self.run_paths.employee_progression_dir / f"{safe_filename}.json"
+                self.run_manager.save_json(employee_file, employee_data)
+
             logger.info(f"Employee progression saved for {len(employees_performance)} employees")
-            
         except Exception as e:
             logger.error(f"Failed to save employee progression: {e}")
     
@@ -1186,7 +1158,7 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 'llm_client': 'available' if llm_available else 'unavailable',
                 'protocols_directory': 'exists' if self.protocols_dir.exists() else 'missing',
                 'task_analyzer_txt': 'exists' if self.task_analyzer_txt.exists() else 'missing',
-                'reports_directory': str(self.daily_reports_dir),
+                "reports_directory": str(self.run_manager.latest_root),
                 'analysis_stages': '3-stage system ready',
                 'last_check': datetime.now().isoformat()
             }

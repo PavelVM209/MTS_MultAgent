@@ -198,37 +198,44 @@ class EmployeeRoleManager:
         
         return contexts
     
-    def enhance_meeting_analysis(self, participant_names: List[str]) -> Dict[str, Any]:
+
+    def enhance_team_analysis(self, employee_names: List[str]) -> Dict[str, Any]:
         """
-        Обогатить анализ совещания контекстом ролей.
+        Обогатить командный анализ контекстом ролей.
         
         Args:
-            participant_names: Список имен участников совещания
+            employee_names: Список имен сотрудников
             
         Returns:
-            Обогащенные данные для анализа
+            Обогащенные данные для командного анализа
         """
-        participant_contexts = {}
-        identified_participants = []
-        unidentified_participants = []
+        team_contexts = {}
+        identified_employees = []
+        unidentified_employees = []
         
-        for name in participant_names:
+        for name in employee_names:
             context = self.get_employee_context(name)
             if context:
-                participant_contexts[name] = context
-                identified_participants.append(name)
+                team_contexts[name] = context
+                identified_employees.append(name)
             else:
-                unidentified_participants.append(name)
+                unidentified_employees.append(name)
+        
+        team_role_statistics = {
+            role_type: len([ctx for ctx in team_contexts.values() if ctx.employee.role == role_type])
+            for role_type in RoleType
+        }
         
         return {
-            "total_participants": len(participant_names),
-            "identified_participants": identified_participants,
-            "unidentified_participants": unidentified_participants,
-            "identification_rate": len(identified_participants) / len(participant_names) if participant_names else 0,
-            "participant_contexts": {name: ctx.get_llm_context() for name, ctx in participant_contexts.items()},
-            "decision_makers_present": [name for name, ctx in participant_contexts.items() 
+            "total_employees": len(employee_names),
+            "identified_employees": identified_employees,
+            "unidentified_employees": unidentified_employees,
+            "identification_rate": len(identified_employees) / len(employee_names) if employee_names else 0,
+            "employee_contexts": {name: ctx.get_context_summary() for name, ctx in team_contexts.items()},
+            "role_statistics": team_role_statistics,
+            "decision_makers_present": [name for name, ctx in team_contexts.items() 
                                      if ctx.employee.is_decision_maker()],
-            "high_activity_present": [name for name, ctx in participant_contexts.items() 
+            "high_activity_present": [name for name, ctx in team_contexts.items() 
                                     if ctx.employee.is_high_activity()]
         }
     

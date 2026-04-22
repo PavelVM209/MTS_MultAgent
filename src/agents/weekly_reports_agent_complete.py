@@ -14,11 +14,11 @@ from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from core.base_agent import BaseAgent, AgentConfig, AgentResult
-from core.llm_client import LLMClient
-from core.json_memory_store import JSONMemoryStore
-from core.quality_metrics import QualityMetrics
-from core.config import get_employee_monitoring_config
+from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
+from ..core.llm_client import LLMClient
+from ..core.json_memory_store import JSONMemoryStore
+from ..core.quality_metrics import QualityMetrics
+from ..core.config import get_employee_monitoring_config
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,12 @@ class WeeklyReportsAgentComplete(BaseAgent):
         self.confluence_config = self.emp_config.get('confluence', {})
         self.quality_config = self.emp_config.get('quality', {})
         
+        project_root = Path(__file__).resolve().parents[2]
+        self.reports_root = project_root / "reports"
+        self.runs_root = self.reports_root / "runs"
+
         # Analysis parameters
-        self.weekly_reports_dir = Path(self.reports_config.get('weekly_reports_dir', './reports/weekly'))
+        self.weekly_reports_dir = Path(self.reports_config.get("weekly_reports_dir", str(self.reports_root / "weekly")))
         self.weekly_reports_dir.mkdir(parents=True, exist_ok=True)
         
         # Confluence configuration - map environment variables
@@ -478,12 +482,14 @@ class WeeklyReportsAgentComplete(BaseAgent):
             
             logger.info(f"Generating weekly report for period {week_start.date()} to {week_end.date()}")
             
-            # Собираем данные из хранилища
-            daily_jira_data = await self._load_daily_jira_data(week_start, week_end)
-            daily_meeting_data = await self._load_daily_meeting_data(week_start, week_end)
-            
+            # Собираем данные из run-артефактов (единая “шина” интеграции между агентами)
+            run_task_data = await self._load_run_task_stage2_data(week_start, week_end)
+            run_meeting_data = await self._load_run_meeting_final_data(week_start, week_end)
+
             # Анализируем данные по сотрудникам
-            employees_summaries = await self._analyze_employee_data(daily_jira_data, daily_meeting_data, week_start, week_end)
+            employees_summaries = await self._analyze_employee_data_from_runs(
+                run_task_data, run_meeting_data, week_start, week_end
+            )
             
             # Формируем статистику
             total_employees = len(employees_summaries)
@@ -609,112 +615,186 @@ class WeeklyReportsAgentComplete(BaseAgent):
             logger.error(f"Failed to generate weekly report: {e}")
             raise
     
-    async def _load_daily_jira_data(self, week_start: datetime, week_end: datetime) -> List[Dict]:
-        """Загрузка ежедневных данных Jira за неделю."""
+    async def _load_run_task_stage2_data(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Загрузка stage2_task_result.json из reports/runs/* за период."""
+        results: List[Dict[str, Any]] = []
         try:
-            jira_data = []
+            if not self.runs_root.exists():
+                logger.warning(f"Runs root missing: {self.runs_root}")
+                return results
+
+            for run_dir in sorted(self.runs_root.iterdir()):
+                if not run_dir.is_dir():
+                    continue
+                try:
+                    run_dt = datetime.strptime(run_dir.name, "%Y%m%d_%H%M%S")
+                except ValueError:
+                    continue
+
+                if run_dt.date() < week_start.date() or run_dt.date() > week_end.date():
+                    continue
+
+                stage2_path = run_dir / "task-analysis" / "stage2" / "stage2_task_result.json"
+                if stage2_path.exists():
+                    results.append(json.loads(stage2_path.read_text(encoding="utf-8")))
+            return results
+        except Exception as e:
+            logger.error(f"Failed to load run task stage2 data: {e}")
+            return results
+
+    async def _load_run_meeting_final_data(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Загрузка meeting-analysis.json из reports/runs/* за период."""
+        results: List[Dict[str, Any]] = []
+        try:
+            if not self.runs_root.exists():
+                logger.warning(f"Runs root missing: {self.runs_root}")
+                return results
+
+            for run_dir in sorted(self.runs_root.iterdir()):
+                if not run_dir.is_dir():
+                    continue
+                try:
+                    run_dt = datetime.strptime(run_dir.name, "%Y%m%d_%H%M%S")
+                except ValueError:
+                    continue
+
+                if run_dt.date() < week_start.date() or run_dt.date() > week_end.date():
+                    continue
+
+                meeting_path = run_dir / "meeting-analysis" / "final" / "meeting-analysis.json"
+                if meeting_path.exists():
+                    results.append(json.loads(meeting_path.read_text(encoding="utf-8")))
+            return results
+        except Exception as e:
+            logger.error(f"Failed to load run meeting data: {e}")
+            return results
+
+    async def _analyze_employee_data_from_runs(
+        self,
+        task_stage2_runs: List[Dict[str, Any]],
+        meeting_final_runs: List[Dict[str, Any]],
+        week_start: datetime,
+        week_end: datetime,
+    ) -> Dict[str, EmployeeWeeklySummary]:
+        """Анализ данных по сотрудникам на основе run-артефактов."""
+        try:
+            employees_summaries: Dict[str, EmployeeWeeklySummary] = {}
+
+            # TASKS (stage2 employee_analysis: totals/completed/in_progress)
+            for stage2 in task_stage2_runs:
+                employee_analysis = stage2.get("employee_analysis", {})
+                for employee_name, emp in employee_analysis.items():
+                    if employee_name not in employees_summaries:
+                        employees_summaries[employee_name] = EmployeeWeeklySummary(
+                            employee_name=employee_name,
+                            week_start=week_start,
+                            week_end=week_end,
+                        )
+
+                    summary = employees_summaries[employee_name]
+                    summary.total_tasks += int(emp.get("total_tasks", 0) or 0)
+                    summary.completed_tasks += int(emp.get("completed_tasks", 0) or 0)
+                    summary.in_progress_tasks += int(emp.get("in_progress_tasks", 0) or 0)
+
+            # MEETINGS (meeting-analysis.json пока без пер-сотрудника => учитываем как общий факт встреч)
+            meetings_count = len(meeting_final_runs)
+            if meetings_count > 0:
+                for summary in employees_summaries.values():
+                    summary.meetings_total += meetings_count
+                    summary.meetings_attended += meetings_count
+
+            # Производные метрики + инсайты
+            for summary in employees_summaries.values():
+                summary.task_completion_rate = summary.completed_tasks / summary.total_tasks if summary.total_tasks > 0 else 0.0
+                summary.meeting_engagement_score = min(
+                    10.0, (summary.speaking_turns + summary.suggestions_made) / max(1, summary.meetings_attended)
+                )
+                await self._generate_employee_insights(summary)
+
+            return employees_summaries
+
+        except Exception as e:
+            logger.error(f"Failed to analyze employee data from runs: {e}")
+            return {}
+
+    async def _load_daily_jira_data(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Legacy: загрузка ежедневных данных Jira за неделю из memory store."""
+        try:
+            jira_data: List[Dict[str, Any]] = []
             current_date = week_start.date()
-            
+
             while current_date <= week_end.date():
                 try:
-                    daily_data = await self.memory_store.load_json_data('daily_jira_data', current_date)
+                    daily_data = await self.memory_store.load_json_data("daily_jira_data", current_date)
                     jira_data.append(daily_data)
                 except FileNotFoundError:
                     logger.warning(f"No Jira data found for {current_date}")
                 except Exception as e:
                     logger.error(f"Error loading Jira data for {current_date}: {e}")
-                
                 current_date += timedelta(days=1)
-            
+
             return jira_data
-            
         except Exception as e:
             logger.error(f"Failed to load daily Jira data: {e}")
             return []
-    
-    async def _load_daily_meeting_data(self, week_start: datetime, week_end: datetime) -> List[Dict]:
-        """Загрузка ежедневных данных собраний за неделю."""
+
+    async def _load_daily_meeting_data(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Legacy: загрузка ежедневных данных собраний за неделю из memory store."""
         try:
-            meeting_data = []
+            meeting_data: List[Dict[str, Any]] = []
             current_date = week_start.date()
-            
+
             while current_date <= week_end.date():
                 try:
-                    daily_data = await self.memory_store.load_json_data('daily_meeting_data', current_date)
+                    daily_data = await self.memory_store.load_json_data("daily_meeting_data", current_date)
                     meeting_data.append(daily_data)
                 except FileNotFoundError:
                     logger.warning(f"No meeting data found for {current_date}")
                 except Exception as e:
                     logger.error(f"Error loading meeting data for {current_date}: {e}")
-                
                 current_date += timedelta(days=1)
-            
+
             return meeting_data
-            
         except Exception as e:
             logger.error(f"Failed to load daily meeting data: {e}")
             return []
-    
-    async def _analyze_employee_data(self, jira_data: List[Dict], meeting_data: List[Dict], week_start: datetime, week_end: datetime) -> Dict[str, EmployeeWeeklySummary]:
-        """Анализ данных по сотрудникам."""
+
+    async def _analyze_employee_data(
+        self, jira_data: List[Dict[str, Any]], meeting_data: List[Dict[str, Any]], week_start: datetime, week_end: datetime
+    ) -> Dict[str, EmployeeWeeklySummary]:
+        """Legacy: анализ данных по сотрудникам (для collect_weekly_data)."""
         try:
-            employees_summaries = {}
-            
-            # Собираем всех сотрудников из данных Jira
+            employees_summaries: Dict[str, EmployeeWeeklySummary] = {}
+
+            # Пытаемся поддержать старый формат memory store, если он есть
             for daily_jira in jira_data:
-                employees = daily_jira.get('employees', {})
+                employees = daily_jira.get("employees", {})
                 for employee_name, employee_tasks in employees.items():
                     if employee_name not in employees_summaries:
                         employees_summaries[employee_name] = EmployeeWeeklySummary(
                             employee_name=employee_name,
                             week_start=week_start,
-                            week_end=week_end
+                            week_end=week_end,
                         )
-                    
+
                     summary = employees_summaries[employee_name]
-                    
-                    # Обновляем метрики задач
-                    summary.total_tasks += len(employee_tasks.get('tasks', []))
-                    summary.completed_tasks += len([t for t in employee_tasks.get('tasks', []) if t.get('status') == 'Done'])
-                    summary.in_progress_tasks += len([t for t in employee_tasks.get('tasks', []) if t.get('status') == 'In Progress'])
-                    summary.story_points_completed += sum(t.get('story_points', 0) for t in employee_tasks.get('tasks', []) if t.get('status') == 'Done')
-                    summary.commits_count += employee_tasks.get('commits_count', 0)
-            
-            # Собираем данные из протоколов собраний
-            for daily_meeting in meeting_data:
-                meeting_analyses = daily_meeting.get('meeting_analyses', [])
-                for analysis in meeting_analyses:
-                    participant_insights = analysis.get('participant_insights', {})
-                    for employee_name, insights in participant_insights.items():
-                        if employee_name not in employees_summaries:
-                            employees_summaries[employee_name] = EmployeeWeeklySummary(
-                                employee_name=employee_name,
-                                week_start=week_start,
-                                week_end=week_end
-                            )
-                        
-                        summary = employees_summaries[employee_name]
-                        
-                        # Обновляем метрики собраний
-                        if insights.get('attended'):
-                            summary.meetings_attended += 1
-                        summary.meetings_total += 1
-                        summary.speaking_turns += insights.get('speaking_turns', 0)
-                        summary.action_items_completed += insights.get('action_items_completed', 0)
-                        summary.suggestions_made += insights.get('suggestions_made', 0)
-            
-            # Рассчитываем производные метрики
+                    tasks = employee_tasks.get("tasks", [])
+                    summary.total_tasks += len(tasks)
+                    summary.completed_tasks += len([t for t in tasks if t.get("status") == "Done"])
+                    summary.in_progress_tasks += len([t for t in tasks if t.get("status") == "In Progress"])
+                    summary.story_points_completed += sum(t.get("story_points", 0) for t in tasks if t.get("status") == "Done")
+                    summary.commits_count += int(employee_tasks.get("commits_count", 0) or 0)
+
             for summary in employees_summaries.values():
-                summary.task_completion_rate = summary.completed_tasks / summary.total_tasks if summary.total_tasks > 0 else 0
-                summary.meeting_engagement_score = min(10, (summary.speaking_turns + summary.suggestions_made) / max(1, summary.meetings_attended))
-                
-                # Генерируем инсайты с помощью LLM
+                summary.task_completion_rate = summary.completed_tasks / summary.total_tasks if summary.total_tasks > 0 else 0.0
+                summary.meeting_engagement_score = min(
+                    10.0, (summary.speaking_turns + summary.suggestions_made) / max(1, summary.meetings_attended)
+                )
                 await self._generate_employee_insights(summary)
-            
+
             return employees_summaries
-            
         except Exception as e:
-            logger.error(f"Failed to analyze employee data: {e}")
+            logger.error(f"Failed to analyze employee data (legacy): {e}")
             return {}
     
     async def _generate_employee_insights(self, summary: EmployeeWeeklySummary):
