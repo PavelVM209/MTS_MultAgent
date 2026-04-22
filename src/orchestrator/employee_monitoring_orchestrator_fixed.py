@@ -11,9 +11,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from agents.quality_orchestrator import QualityOrchestrator
-from core.scheduler_manager import SchedulerManager, JobConfig
-from core.config import get_employee_monitoring_config
+from ..agents.quality_orchestrator import QualityOrchestrator
+from ..core.scheduler_manager import SchedulerManager, JobConfig
+from ..core.config import get_employee_monitoring_config
 
 logger = logging.getLogger(__name__)
 

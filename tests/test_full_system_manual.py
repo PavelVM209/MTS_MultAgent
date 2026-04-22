@@ -9,16 +9,15 @@
 import asyncio
 import logging
 import sys
-import os
 from datetime import datetime
 from pathlib import Path
 
-# Добавляем src в путь
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Добавляем корень проекта в путь
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from orchestrator.employee_monitoring_orchestrator_fixed import EmployeeMonitoringOrchestratorFixed
-from core.config import get_employee_monitoring_config
-from agents.quality_orchestrator import QualityOrchestrator
+from src.orchestrator.employee_monitoring_orchestrator_fixed import EmployeeMonitoringOrchestratorFixed
+from src.core.config import get_employee_monitoring_config
+from src.agents.quality_orchestrator import QualityOrchestrator
 
 # Настройка логирования
 logging.basicConfig(

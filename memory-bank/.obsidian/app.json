@@ -1,0 +1,10 @@
+{
+  "legacyEditor": false,
+  "promptDelete": true,
+  "showLineNumber": false,
+  "readableLineLength": true,
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "./attachments",
+  "newFileLocation": "current",
+  "defaultViewMode": "preview"
+}

@@ -238,6 +238,14 @@ dist/
 # Coverage reports
 .coverage
 htmlcov/
+
+# Generated runtime/test artifacts
+reports/runs/
+data/index/
+data/processed/
+data/jira/snapshots/
+reports/weekly/weekly_report_*.json
+data/memory/json/weekly_summary_data_*.json
 coverage.xml
 
 # Profiling

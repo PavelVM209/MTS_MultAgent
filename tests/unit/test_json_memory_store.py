@@ -333,7 +333,7 @@ class TestJSONMemoryStore:
         assert "last_check" in health
     
     @pytest.mark.asyncio
-    async def test_get_storage_stats(self, temp_store, sample_jira_data):
+    async def test_get_storage_stats(self, temp_store, sample_jira_data, sample_meeting_data):
         """Test storage statistics functionality"""
         # Save some test data
         await temp_store.persist_json_data("daily_jira_data", sample_jira_data)

@@ -17,12 +17,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
-from .task_analyzer_agent import TaskAnalyzerAgent
-from .meeting_analyzer_agent_auto import MeetingAnalyzerAgent
+from .task_analyzer_agent_improved import ImprovedTaskAnalyzerAgent
+from .meeting_analyzer_agent_improved import ImprovedMeetingAnalyzerAgent
 from .weekly_reports_agent_complete import WeeklyReportsAgentComplete
 from .quality_validator_agent import QualityValidatorAgent
-from core.config import get_employee_monitoring_config
-from core.json_memory_store import JSONMemoryStore
+from ..core.config import get_employee_monitoring_config
+from ..core.json_memory_store import JSONMemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +41,8 @@ class QualityOrchestrator:
         self.memory_store = JSONMemoryStore()
         
         # Подчиненные агенты
-        self.task_analyzer = TaskAnalyzerAgent()
-        self.meeting_analyzer = MeetingAnalyzerAgent()
+        self.task_analyzer = ImprovedTaskAnalyzerAgent()
+        self.meeting_analyzer = ImprovedMeetingAnalyzerAgent()
         self.weekly_reports = WeeklyReportsAgentComplete()
         self.quality_validator = QualityValidatorAgent()
         

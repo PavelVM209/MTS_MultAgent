@@ -156,21 +156,34 @@ python3 src/agents/quality_orchestrator.py
 
 #### Запуск всех тестов
 ```bash
-# Тестирование Task Analyzer
-python3 test_improved_task_analyzer.py
+# Все pytest-тесты
+./venv_py311/bin/pytest -q
 
-# Тестирование Meeting Analyzer
-python3 test_improved_meeting_analyzer.py
+# Быстрый набор
+./venv_py311/bin/pytest -q tests/unit/test_json_memory_store.py tests/test_weekly_reports_agent.py
 
-# Тестирование Weekly Reports
-python3 test_weekly_reports_agent.py
-
-# Комплексное тестирование
-python3 test_full_system_manual.py
-
-# Тестирование интеграций
-python3 test_confluence_integration.py
+# Отдельные сценарии
+./venv_py311/bin/pytest -q tests/test_improved_task_analyzer.py
+./venv_py311/bin/pytest -q tests/test_improved_meeting_analyzer.py
+./venv_py311/bin/pytest -q tests/test_confluence_integration.py
 ```
+
+#### Очистка test/runtime артефактов
+```bash
+# Предпросмотр
+./venv_py311/bin/python scripts/cleanup_test_artifacts.py
+
+# Фактическая очистка
+./venv_py311/bin/python scripts/cleanup_test_artifacts.py --apply
+```
+
+Скрипт чистит только runtime/test-артефакты, которые засоряют рабочее дерево:
+- `reports/runs/`
+- `data/index/`
+- `data/processed/`
+- новые `reports/weekly/weekly_report_*.json`
+- новые `data/memory/json/weekly_summary_data_*.json`
+- восстанавливает служебный `data/memory/json/.index.json`, если он изменился только из-за локального тестового запуска
 
 #### 📁 Структура тестов (после очистки)
 ```

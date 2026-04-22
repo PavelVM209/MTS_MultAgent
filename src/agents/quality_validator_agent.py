@@ -14,11 +14,11 @@ from dataclasses import dataclass, field, asdict
 from enum import Enum
 from pathlib import Path
 
-from core.base_agent import BaseAgent, AgentConfig, AgentResult
-from core.llm_client import LLMClient
-from core.json_memory_store import JSONMemoryStore
-from core.quality_metrics import QualityMetrics as CoreQualityMetrics
-from core.config import get_employee_monitoring_config
+from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
+from ..core.llm_client import LLMClient
+from ..core.json_memory_store import JSONMemoryStore
+from ..core.quality_metrics import QualityMetrics as CoreQualityMetrics
+from ..core.config import get_employee_monitoring_config
 
 logger = logging.getLogger(__name__)
 

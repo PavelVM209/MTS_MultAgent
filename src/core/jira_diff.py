@@ -1,1 +1,81 @@
-# -*- coding: utf-8 -*-\n\nfrom dataclasses import dataclass\nfrom typing import Any, Dict, List, Optional, Tuple\n\n\n@dataclass(frozen=True)\nclass JiraIssueKey:\n    key: str\n\n\ndef _task_identity(task: Dict[str, Any]) -> Optional[str]:\n    key = task.get(\"key\")\n    return str(key) if key else None\n\n\ndef _task_fingerprint(task: Dict[str, Any]) -> Tuple[Any, ...]:\n    \"\"\"Минимальный fingerprint для определения изменения задачи между снапшотами.\"\"\"\n    return (\n        task.get(\"status\"),\n        task.get(\"assignee\"),\n        task.get(\"priority\"),\n        task.get(\"summary\"),\n        task.get(\"updated\"),\n    )\n\n\ndef diff_jira_snapshots(prev_tasks: List[Dict[str, Any]], curr_tasks: List[Dict[str, Any]]) -> Dict[str, Any]:\n    prev_by_key: Dict[str, Dict[str, Any]] = {}\n    for t in prev_tasks:\n        k = _task_identity(t)\n        if k:\n            prev_by_key[k] = t\n\n    curr_by_key: Dict[str, Dict[str, Any]] = {}\n    for t in curr_tasks:\n        k = _task_identity(t)\n        if k:\n            curr_by_key[k] = t\n\n    added_keys = sorted(set(curr_by_key.keys()) - set(prev_by_key.keys()))\n    removed_keys = sorted(set(prev_by_key.keys()) - set(curr_by_key.keys()))\n\n    changed: List[Dict[str, Any]] = []\n    for k in sorted(set(curr_by_key.keys()) & set(prev_by_key.keys())):\n        prev_fp = _task_fingerprint(prev_by_key[k])\n        curr_fp = _task_fingerprint(curr_by_key[k])\n        if prev_fp != curr_fp:\n            changed.append(\n                {\n                    \"key\": k,\n                    \"prev\": {\n                        \"status\": prev_by_key[k].get(\"status\"),\n                        \"assignee\": prev_by_key[k].get(\"assignee\"),\n                        \"priority\": prev_by_key[k].get(\"priority\"),\n                        \"updated\": prev_by_key[k].get(\"updated\"),\n                    },\n                    \"curr\": {\n                        \"status\": curr_by_key[k].get(\"status\"),\n                        \"assignee\": curr_by_key[k].get(\"assignee\"),\n                        \"priority\": curr_by_key[k].get(\"priority\"),\n                        \"updated\": curr_by_key[k].get(\"updated\"),\n                    },\n                }\n            )\n\n    return {\n        \"added\": [curr_by_key[k] for k in added_keys],\n        \"removed\": [prev_by_key[k] for k in removed_keys],\n        \"changed\": changed,\n        \"stats\": {\n            \"added\": len(added_keys),\n            \"removed\": len(removed_keys),\n            \"changed\": len(changed),\n            \"prev_total\": len(prev_by_key),\n            \"curr_total\": len(curr_by_key),\n        },\n    }\n
+# -*- coding: utf-8 -*-
+
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
+
+
+@dataclass(frozen=True)
+class JiraIssueKey:
+    key: str
+
+
+def _task_identity(task: Dict[str, Any]) -> Optional[str]:
+    key = task.get("key")
+    return str(key) if key else None
+
+
+def _task_fingerprint(task: Dict[str, Any]) -> Tuple[Any, ...]:
+    """Minimal fingerprint for detecting changes between snapshots."""
+    return (
+        task.get("status"),
+        task.get("assignee"),
+        task.get("priority"),
+        task.get("summary"),
+        task.get("updated"),
+    )
+
+
+def diff_jira_snapshots(
+    prev_tasks: List[Dict[str, Any]],
+    curr_tasks: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    prev_by_key: Dict[str, Dict[str, Any]] = {}
+    for task in prev_tasks:
+        key = _task_identity(task)
+        if key:
+            prev_by_key[key] = task
+
+    curr_by_key: Dict[str, Dict[str, Any]] = {}
+    for task in curr_tasks:
+        key = _task_identity(task)
+        if key:
+            curr_by_key[key] = task
+
+    added_keys = sorted(set(curr_by_key.keys()) - set(prev_by_key.keys()))
+    removed_keys = sorted(set(prev_by_key.keys()) - set(curr_by_key.keys()))
+
+    changed: List[Dict[str, Any]] = []
+    for key in sorted(set(curr_by_key.keys()) & set(prev_by_key.keys())):
+        prev_fp = _task_fingerprint(prev_by_key[key])
+        curr_fp = _task_fingerprint(curr_by_key[key])
+        if prev_fp != curr_fp:
+            changed.append(
+                {
+                    "key": key,
+                    "prev": {
+                        "status": prev_by_key[key].get("status"),
+                        "assignee": prev_by_key[key].get("assignee"),
+                        "priority": prev_by_key[key].get("priority"),
+                        "updated": prev_by_key[key].get("updated"),
+                    },
+                    "curr": {
+                        "status": curr_by_key[key].get("status"),
+                        "assignee": curr_by_key[key].get("assignee"),
+                        "priority": curr_by_key[key].get("priority"),
+                        "updated": curr_by_key[key].get("updated"),
+                    },
+                }
+            )
+
+    return {
+        "added": [curr_by_key[key] for key in added_keys],
+        "removed": [prev_by_key[key] for key in removed_keys],
+        "changed": changed,
+        "stats": {
+            "added": len(added_keys),
+            "removed": len(removed_keys),
+            "changed": len(changed),
+            "prev_total": len(prev_by_key),
+            "curr_total": len(curr_by_key),
+        },
+    }

@@ -9,6 +9,8 @@ import json
 import asyncio
 import aiofiles
 import logging
+import copy
+import re
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
@@ -89,36 +91,45 @@ class JSONMemoryStore:
             StorageError: If write operation fails
         """
         try:
-            # 🔹 Schema Validation
+            if target_date is None:
+                data_date = data.get("date")
+                if isinstance(data_date, str):
+                    try:
+                        target_date = datetime.strptime(data_date, "%Y-%m-%d").date()
+                    except ValueError:
+                        target_date = None
+
+            if target_date is None:
+                target_date = date.today()
+            elif isinstance(target_date, str):
+                target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
+
+            filename = f"{data_type}_{target_date.strftime('%Y-%m-%d')}.json"
+            file_path = self.base_path / filename
+
+            # Schema Validation
             schema = self.schemas.get(data_type)
             if schema:
                 validation_result = await schema.validate(data)
                 if not validation_result.valid:
                     raise ValidationError(f"Schema validation failed: {validation_result.errors}")
-            
-            # 🔹 Data Enrichment
+
+            # Data Enrichment
             enriched_data = await self._enrich_with_metadata(data, data_type)
-            
-            # 🔹 File Path Generation
-            if target_date is None:
-                target_date = date.today()
-            elif isinstance(target_date, str):
-                target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-            
-            filename = f"{data_type}_{target_date.strftime('%Y-%m-%d')}.json"
-            file_path = self.base_path / filename
-            
-            # 🔹 Atomic Write
+
+            # Atomic Write
             await self._atomic_json_write(file_path, enriched_data)
-            
-            # 🔹 Update Indexes
+
+            # Update Indexes
             await self._update_indexes(data_type, file_path, enriched_data)
-            
-            # 🔹 Cleanup Old Files
+
+            # Cleanup Old Files
             await self._cleanup_old_data(data_type)
-            
+
             return str(file_path)
-            
+
+        except ValidationError:
+            raise
         except Exception as e:
             raise StorageError(f"Failed to persist {data_type}: {str(e)}")
     
@@ -227,7 +238,12 @@ class JSONMemoryStore:
         data_type: str
     ) -> Dict[str, Any]:
         """Enrich data with metadata"""
-        enriched_data = data.copy()
+        enriched_data = copy.deepcopy(data)
+
+        quality_score = None
+        system_metrics = enriched_data.get("system_metrics")
+        if isinstance(system_metrics, dict):
+            quality_score = system_metrics.get("quality_score")
         
         metadata = {
             "data_type": data_type,
@@ -235,7 +251,8 @@ class JSONMemoryStore:
             "persisted_by": "MTS_MultAgent_v3",
             "version": "1.0.0",
             "file_id": str(uuid.uuid4()),
-            "size_bytes": len(json.dumps(data, default=str))
+            "size_bytes": len(json.dumps(data, default=str)),
+            "quality_score": quality_score,
         }
         
         enriched_data["_metadata"] = metadata
@@ -243,7 +260,7 @@ class JSONMemoryStore:
     
     async def _atomic_json_write(self, file_path: Path, data: Dict[str, Any]):
         """Atomically write JSON data to file"""
-        temp_path = file_path.with_suffix('.tmp')
+        temp_path = file_path.with_suffix(f".{uuid.uuid4().hex}.tmp")
         
         try:
             # Write to temp file first
@@ -354,14 +371,14 @@ class JSONMemoryStore:
         
         def get_sort_key(item):
             # Navigate to sort field
-            current_value = item
+            current_value = item.get("data", item)
             for path_part in sort_by.split('.'):
                 if isinstance(current_value, (dict, list)) and path_part in current_value:
                     current_value = current_value[path_part]
                 else:
                     current_value = None
                     break
-            return current_value
+            return (current_value is None, current_value)
         
         return sorted(results, key=get_sort_key, reverse=reverse)
     
@@ -440,20 +457,23 @@ class JSONMemoryStore:
     async def get_storage_stats(self) -> Dict[str, Any]:
         """Get storage statistics"""
         try:
-            files = list(self.base_path.glob("*.json"))
+            files = [
+                file_path
+                for file_path in self.base_path.glob("*.json")
+                if not file_path.name.startswith(".")
+            ]
             total_size = sum(f.stat().st_size for f in files)
             
             # Count by data type
             type_counts = {}
             for file_path in files:
-                if '_' in file_path.stem:
-                    data_type = file_path.stem.split('_')[0] + '_' + file_path.stem.split('_')[1]
-                    type_counts[data_type] = type_counts.get(data_type, 0) + 1
+                data_type = re.sub(r"_\d{4}-\d{2}-\d{2}$", "", file_path.stem)
+                type_counts[data_type] = type_counts.get(data_type, 0) + 1
             
             return {
                 "total_files": len(files),
                 "total_size_bytes": total_size,
-                "total_size_mb": round(total_size / (1024 * 1024), 2),
+                "total_size_mb": max(round(total_size / (1024 * 1024), 4), 0.0001) if total_size else 0.0,
                 "files_by_type": type_counts,
                 "storage_path": str(self.base_path),
                 "retention_days": self.config.retention_days
@@ -603,11 +623,16 @@ class JSONQuery:
 # Convenience functions for common operations
 async def create_memory_store(config: StorageConfig = None) -> JSONMemoryStore:
     """Create and initialize JSON memory store"""
-    store = JSONMemoryStore(config)
-    
-    # Perform health check
-    health = await store.health_check()
-    if health["status"] != "healthy":
-        raise StorageError(f"Memory store health check failed: {health}")
-    
-    return store
+    try:
+        store = JSONMemoryStore(config)
+
+        # Perform health check
+        health = await store.health_check()
+        if health["status"] != "healthy":
+            raise StorageError(f"Memory store health check failed: {health}")
+
+        return store
+    except StorageError:
+        raise
+    except Exception as e:
+        raise StorageError(f"Failed to create memory store: {e}")

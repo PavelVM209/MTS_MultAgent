@@ -9,15 +9,14 @@
 import asyncio
 import logging
 import sys
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Добавляем src в Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Добавляем корень проекта в Python path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from agents.weekly_reports_agent_complete import WeeklyReportsAgentComplete
-from core.llm_client import LLMClient
+from src.agents.weekly_reports_agent_complete import WeeklyReportsAgentComplete
+from src.core.llm_client import LLMClient
 
 # Настройка логирования
 logging.basicConfig(
