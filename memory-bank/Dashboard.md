@@ -37,11 +37,15 @@ tags:
 - [[artifact-cleanup-workflow]]
 - [[jira-analysis-workflow]]
 - [[meeting-analysis-workflow]]
+- [[evidence-based-pipeline-workflow]]
+- [[jira-incremental-processing-workflow]]
 
 ## Decisions
 
 - [[ADR-0001-run-artifacts]]
 - [[ADR-0002-jira-snapshots]]
+- [[ADR-0003-evidence-based-pipeline]]
+- [[ADR-0004-storage-roadmap-sql-vector]]
 - [[why-cleanup-script-exists]]
 
 ## Open Issues

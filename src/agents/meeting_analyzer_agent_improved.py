@@ -33,9 +33,10 @@ from ..core.role_context_manager import EmployeeRoleManager
 from ..core.hash_utils import md5_file
 from ..core.processing_index import ProcessingIndex, ProcessingRecord, ProcessingRecordKey
 from ..core.run_file_manager import RunFileManager
+from ..core.analysis_index_db import AnalysisIndexDB
 
 # Safety limits for Stage2 prompt size (can be overridden by env)
-MEETING_STAGE2_MAX_PROTOCOLS = int(os.getenv("MEETING_STAGE2_MAX_PROTOCOLS", "5"))
+MEETING_STAGE2_MAX_PROTOCOLS = int(os.getenv("MEETING_STAGE2_MAX_PROTOCOLS", "10"))
 MEETING_STAGE2_MAX_CHARS_PROTOCOL = int(os.getenv("MEETING_STAGE2_MAX_CHARS_PROTOCOL", "40000"))
 MEETING_STAGE2_MAX_CHARS_TASKS = int(os.getenv("MEETING_STAGE2_MAX_CHARS_TASKS", "20000"))
 
@@ -143,6 +144,7 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         self.run_manager = RunFileManager(project_root)
         self.run_id = self.run_manager.generate_run_id()
         self.run_paths = self.run_manager.init_run(self.run_id)
+        self.analysis_index_db = AnalysisIndexDB(project_root)
 
 
         # Load configuration
@@ -229,6 +231,7 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             
             # Обновляем progression для инкрементального анализа
             await self._save_employee_progression(final_analysis.employees_performance)
+            await self._save_employee_evidence_trace(final_analysis, comprehensive_analysis)
             
             execution_time = datetime.now() - start_time
             final_analysis.analysis_duration = execution_time
@@ -435,41 +438,52 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         ЭТАП 2: Комплексный анализ по двум источникам (протокол TXT + stage1_text_analysis.txt) с Role Context.
         """
         try:
-            # P6-10: Load Role Context FIRST - это критически важно!
             logger.info("Loading Role Context for comprehensive analysis...")
-            
-            # Извлекаем имена участников из протоколов для обогащения role context
-            combined_protocols_text = "\n\n".join([
-                f"=== ПРОТОКОЛ: {p['filename']} ===\n{p['cleaned_content']}"
-                for p in cleaned_protocols
-            ])
-            participant_names = self._extract_participant_names(combined_protocols_text)
+
+            task_evidence = await self._load_task_evidence()
+            protocol_evidence = await self._build_protocol_evidence(cleaned_protocols)
+            await self._save_protocol_evidence(protocol_evidence)
+
+            participant_names = sorted(
+                {
+                    participant
+                    for protocol in protocol_evidence
+                    for participant in protocol.get("participants", [])
+                    if participant
+                }
+            )
             role_context_data = await self._enhance_analysis_with_role_context(participant_names)
-            
-            # Форматируем Role Context для промпта
             role_context_text = self._format_role_context_for_prompt(role_context_data)
-            
-            # Загружаем анализ задач от Task Analyzer
             task_analyzer_content = await self._load_task_analyzer_txt()
-            
+
             if not task_analyzer_content:
                 logger.error("Task Analyzer TXT file not found or empty")
                 return None
-            
-            # Комбинируем очищенные протоколы (ограничиваем объем для Stage2)
+
             protocols_sorted = sorted(cleaned_protocols, key=lambda x: x.get("file_date") or datetime.min, reverse=True)
             protocols_selected = protocols_sorted[:MEETING_STAGE2_MAX_PROTOCOLS]
 
-            combined_protocols = "\n\n".join(
+            supporting_protocols = "\n\n".join(
                 [
                     f"=== ПРОТОКОЛ: {p['filename']} ===\n"
                     f"{_truncate_text(p['cleaned_content'], MEETING_STAGE2_MAX_CHARS_PROTOCOL)}"
                     for p in protocols_selected
                 ]
             )
-            
-            # Проводим комплексный анализ
-            comprehensive_result = await self._analyze_comprehensive_data(combined_protocols, task_analyzer_content)
+
+            evidence_index = self._build_meeting_evidence_index(protocol_evidence)
+            selected_excerpts = self._build_selected_excerpts(protocol_evidence)
+
+            comprehensive_result = await self._analyze_comprehensive_data(
+                supporting_protocols,
+                task_analyzer_content,
+                role_context_text=role_context_text,
+                meeting_evidence_index=evidence_index,
+                task_evidence=task_evidence,
+                selected_excerpts=selected_excerpts,
+                protocol_evidence=protocol_evidence,
+                role_context_data=role_context_data,
+            )
             
             if comprehensive_result:
                 logger.info("Comprehensive analysis completed successfully")
@@ -495,6 +509,20 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Failed to load Task Analyzer TXT: {e}")
             return None
+
+    async def _load_task_evidence(self) -> Dict[str, Any]:
+        """Load structured task evidence from latest task-analysis artifacts."""
+        try:
+            latest_evidence = Path(__file__).resolve().parents[2] / "reports" / "latest" / "task-analysis" / "task_evidence.json"
+            if latest_evidence.exists():
+                return json.loads(latest_evidence.read_text(encoding="utf-8"))
+
+            run_candidates = sorted((Path(__file__).resolve().parents[2] / "reports" / "runs").glob("*/task-analysis/evidence/task_evidence.json"))
+            if run_candidates:
+                return json.loads(run_candidates[-1].read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"Failed to load task evidence: {e}")
+        return {"employees": {}, "team_insights": [], "recommendations": []}
     
     async def _enhance_analysis_with_role_context(self, participants: List[str]) -> Dict[str, Any]:
         """
@@ -569,7 +597,176 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             logger.error(f"Failed to extract participant names: {e}")
             return []
 
-    async def _analyze_comprehensive_data(self, protocols_content: str, task_analyzer_content: str) -> Optional[Dict[str, Any]]:
+    async def _build_protocol_evidence(self, cleaned_protocols: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Extract structured evidence from each cleaned protocol without discarding the full text."""
+        protocol_evidence: List[Dict[str, Any]] = []
+        for protocol in cleaned_protocols:
+            text = protocol.get("cleaned_content", "")
+            protocol_evidence.append(
+                {
+                    "meeting_id": protocol.get("file_hash") or protocol.get("filename"),
+                    "filename": protocol.get("filename"),
+                    "file_date": protocol.get("file_date").isoformat() if protocol.get("file_date") else None,
+                    "participants": self._extract_participant_names(text),
+                    "decisions": self._extract_bullets(text, [r"решен", r"decision", r"договор", r"утверд"]),
+                    "action_items": self._extract_bullets(text, [r"todo", r"нужно", r"сделать", r"action", r"задач"]),
+                    "risks": self._extract_bullets(text, [r"риск", r"block", r"проблем", r"зависим", r"не успе"]),
+                    "employee_signals": self._extract_employee_signals(text),
+                    "supporting_excerpt": _truncate_text(text, 4000),
+                    "cleaned_content": text,
+                }
+            )
+        return protocol_evidence
+
+    def _extract_bullets(self, text: str, keywords: List[str], limit: int = 8) -> List[str]:
+        lines = []
+        for raw_line in text.splitlines():
+            line = raw_line.strip(" -*\t")
+            if not line:
+                continue
+            line_lower = line.lower()
+            if any(keyword in line_lower for keyword in keywords):
+                lines.append(line[:800])
+            if len(lines) >= limit:
+                break
+        return lines
+
+    def _extract_employee_signals(self, text: str) -> Dict[str, Dict[str, List[str]]]:
+        signals: Dict[str, Dict[str, List[str]]] = {}
+        for line in text.splitlines():
+            stripped = line.strip()
+            match = re.match(r"^([А-ЯA-Z][^:]{2,80}):\s*(.+)$", stripped)
+            if not match:
+                continue
+            employee_name = match.group(1).strip()
+            statement = match.group(2).strip()
+            normalized = re.sub(r"\s+", " ", employee_name)
+            employee_bucket = signals.setdefault(
+                normalized,
+                {
+                    "statements": [],
+                    "commitments": [],
+                    "blockers": [],
+                    "leadership_signals": [],
+                    "communication_signals": [],
+                },
+            )
+            employee_bucket["statements"].append(statement[:500])
+            lower = statement.lower()
+            if any(word in lower for word in ["сделаю", "беру", "подготов", "планир", "возьму", "deliver"]):
+                employee_bucket["commitments"].append(statement[:300])
+            if any(word in lower for word in ["блок", "риск", "не успе", "зависим", "проблем"]):
+                employee_bucket["blockers"].append(statement[:300])
+            if any(word in lower for word in ["предлага", "решил", "давайте", "координиру", "нужно решить"]):
+                employee_bucket["leadership_signals"].append(statement[:300])
+            employee_bucket["communication_signals"].append(statement[:300])
+        return signals
+
+    async def _save_protocol_evidence(self, protocol_evidence: List[Dict[str, Any]]) -> None:
+        try:
+            evidence_dir = self.run_paths.meeting_dir / "evidence" / "protocols"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            index_file = self.run_paths.meeting_dir / "evidence" / "meeting_evidence_index.json"
+            self.run_manager.save_json(index_file, {"protocols": protocol_evidence, "run_id": self.run_id})
+            for protocol in protocol_evidence:
+                filename = f"{Path(protocol.get('filename', 'protocol')).stem}.json"
+                self.run_manager.save_json(evidence_dir / filename, protocol)
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(index_file, Path("meeting-analysis") / "meeting_evidence_index.json")
+        except Exception as e:
+            logger.error(f"Failed to save protocol evidence: {e}")
+
+    def _build_meeting_evidence_index(self, protocol_evidence: List[Dict[str, Any]]) -> Dict[str, Any]:
+        employee_index: Dict[str, Any] = {}
+        for protocol in protocol_evidence:
+            for participant in protocol.get("participants", []):
+                employee_index.setdefault(
+                    participant,
+                    {
+                        "meetings": [],
+                        "decisions": [],
+                        "action_items": [],
+                        "risks": [],
+                        "signals": {
+                            "statements": [],
+                            "commitments": [],
+                            "blockers": [],
+                            "leadership_signals": [],
+                            "communication_signals": [],
+                        },
+                    },
+                )
+                bucket = employee_index[participant]
+                bucket["meetings"].append(protocol.get("filename"))
+                bucket["decisions"].extend(protocol.get("decisions", [])[:3])
+                bucket["action_items"].extend(protocol.get("action_items", [])[:3])
+                bucket["risks"].extend(protocol.get("risks", [])[:3])
+
+            for employee_name, signals in protocol.get("employee_signals", {}).items():
+                bucket = employee_index.setdefault(
+                    employee_name,
+                    {
+                        "meetings": [],
+                        "decisions": [],
+                        "action_items": [],
+                        "risks": [],
+                        "signals": {
+                            "statements": [],
+                            "commitments": [],
+                            "blockers": [],
+                            "leadership_signals": [],
+                            "communication_signals": [],
+                        },
+                    },
+                )
+                bucket["meetings"].append(protocol.get("filename"))
+                for key, values in signals.items():
+                    bucket["signals"].setdefault(key, [])
+                    bucket["signals"][key].extend(values[:5])
+
+        return {
+            "protocol_count": len(protocol_evidence),
+            "employees": employee_index,
+            "protocols": [
+                {
+                    "meeting_id": protocol.get("meeting_id"),
+                    "filename": protocol.get("filename"),
+                    "file_date": protocol.get("file_date"),
+                    "participants": protocol.get("participants", []),
+                    "decisions": protocol.get("decisions", []),
+                    "action_items": protocol.get("action_items", []),
+                    "risks": protocol.get("risks", []),
+                }
+                for protocol in protocol_evidence
+            ],
+        }
+
+    def _build_selected_excerpts(self, protocol_evidence: List[Dict[str, Any]], limit: int = 20) -> List[Dict[str, Any]]:
+        excerpts: List[Dict[str, Any]] = []
+        for protocol in protocol_evidence:
+            for bucket_name in ("decisions", "action_items", "risks"):
+                for item in protocol.get(bucket_name, [])[:4]:
+                    excerpts.append(
+                        {
+                            "filename": protocol.get("filename"),
+                            "kind": bucket_name,
+                            "excerpt": item,
+                        }
+                    )
+        return excerpts[:limit]
+
+    async def _analyze_comprehensive_data(
+        self,
+        protocols_content: str,
+        task_analyzer_content: str,
+        *,
+        role_context_text: str,
+        meeting_evidence_index: Dict[str, Any],
+        task_evidence: Dict[str, Any],
+        selected_excerpts: List[Dict[str, Any]],
+        protocol_evidence: List[Dict[str, Any]],
+        role_context_data: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
         """
         Комплексный анализ данных из двух источников.
         """
@@ -578,27 +775,32 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             if not llm_available:
                 logger.warning("LLM not available")
                 return None
-            
-            # Извлекаем имена участников из протоколов для обогащения role context
-            participant_names = self._extract_participant_names(protocols_content)
-            role_context_data = await self._enhance_analysis_with_role_context(participant_names)
-            
-            # Форматируем Role Context для промпта
-            role_context_text = self._format_role_context_for_prompt(role_context_data)
-            
+
             protocols_content = _truncate_text(protocols_content, MEETING_STAGE2_MAX_PROTOCOLS * MEETING_STAGE2_MAX_CHARS_PROTOCOL)
             task_analyzer_content = _truncate_text(task_analyzer_content, MEETING_STAGE2_MAX_CHARS_TASKS)
+            evidence_index_text = json.dumps(meeting_evidence_index, ensure_ascii=False, indent=2, default=str)
+            task_evidence_text = json.dumps(task_evidence, ensure_ascii=False, indent=2, default=str)
+            excerpts_text = json.dumps(selected_excerpts, ensure_ascii=False, indent=2, default=str)
 
             prompt = f"""
 Ты - СТАРШИЙ АНАЛИТИК КОМАНДЫ для комплексного анализа. Проанализируй данные из двух источников и предоставь детальный анализ НА РУССКОМ ЯЗЫКЕ.
 
 {role_context_text}
 
-ИСТОЧНИК 1 - ПРОТОКОЛЫ СОБРАНИЙ:
-{protocols_content}
+ИСТОЧНИК 1 - EVIDENCE INDEX ПО ВСЕМ ПРОТОКОЛАМ:
+{evidence_index_text}
 
-ИСТОЧНИК 2 - АНАЛИЗ ЗАДАЧ ОТ TASK ANALYZER:
+ИСТОЧНИК 2 - TASK EVIDENCE ПО СОТРУДНИКАМ:
+{task_evidence_text}
+
+ИСТОЧНИК 3 - SELECTED EXCERPTS ДЛЯ СПОРНЫХ/ВАЖНЫХ МОМЕНТОВ:
+{excerpts_text}
+
+ИСТОЧНИК 4 - АНАЛИЗ ЗАДАЧ ОТ TASK ANALYZER:
 {task_analyzer_content}
+
+ИСТОЧНИК 5 - ПОЛНЫЕ ТЕКСТЫ 10 САМЫХ РЕЛЕВАНТНЫХ ПРОТОКОЛОВ:
+{protocols_content}
 
 ПРОВЕДИ КОМПЛЕКСНЫЙ АНАЛИЗ:
 
@@ -635,9 +837,10 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
 - Предоставь actionable рекомендации
 
 ВАЖНО:
-- Используй ДАННЫЕ из обоих источников
+- Используй evidence по ВСЕМ протоколам, а не только по полным текстам
 - Анализируй КАЖДОГО сотрудника упомянутого в источниках
 - Предоставляй КОНКРЕТНЫЕ инсайты на основе данных
+- Если формулируешь вывод, опирайся на decisions/action_items/risks/statements
 - Все выводы должны быть НА РУССКОМ языке
 """
             
@@ -671,6 +874,11 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                     "analysis_text": analysis_text,
                     "structured_data": structured_data,
                     "analysis_file": stage2_txt,
+                    "meeting_evidence_index": meeting_evidence_index,
+                    "protocol_evidence": protocol_evidence,
+                    "task_evidence": task_evidence,
+                    "selected_excerpts": selected_excerpts,
+                    "role_context_data": role_context_data,
                 }
             else:
                 logger.warning("Empty comprehensive analysis response")
@@ -898,25 +1106,36 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             analysis_date = datetime.now()
             structured_data = comprehensive_data.get('structured_data', {})
             analysis_text = comprehensive_data.get('analysis_text', '')
+            meeting_evidence_index = comprehensive_data.get("meeting_evidence_index", {})
+            task_evidence = comprehensive_data.get("task_evidence", {})
+            role_context_data = comprehensive_data.get("role_context_data", {})
             
             # Создаем объекты производительности сотрудников
             employees_performance = {}
             
             for employee_name, employee_data in structured_data.get('employee_analysis', {}).items():
+                employee_meeting_evidence = meeting_evidence_index.get("employees", {}).get(employee_name, {})
+                employee_task_evidence = task_evidence.get("employees", {}).get(employee_name, {})
+                statements = employee_meeting_evidence.get("signals", {}).get("statements", [])
+                blockers = employee_meeting_evidence.get("signals", {}).get("blockers", [])
+                leadership = employee_meeting_evidence.get("signals", {}).get("leadership_signals", [])
                 performance = EmployeeMeetingPerformance(
                     employee_name=employee_name,
                     analysis_date=analysis_date,
-                    speaking_turns=0,  # Будет заполнено из анализа текста
-                    questions_asked=0,
-                    suggestions_made=0,
-                    action_items_assigned=0,
-                    engagement_level='medium',
+                    speaking_turns=len(statements),
+                    questions_asked=sum(1 for item in statements if "?" in item),
+                    suggestions_made=len(leadership),
+                    action_items_assigned=len(employee_meeting_evidence.get("action_items", [])),
+                    engagement_level='high' if len(statements) >= 6 else 'medium' if len(statements) >= 2 else 'low',
+                    leadership_indicators=leadership[:5],
                     task_to_meeting_correlation=self._normalize_correlation(employee_data.get('task_meeting_correlation', 'средняя')),
-                    overall_consistency=0.7,  # Будет вычислено
+                    overall_consistency=0.9 if employee_task_evidence and employee_meeting_evidence else 0.6,
                     communication_effectiveness=employee_data.get('communication_effectiveness', 5.0),
                     detailed_insights=employee_data.get('communication_consistency', ''),
                     performance_rating=employee_data.get('overall_participation_rating', 5.0)
                 )
+                if blockers:
+                    performance.detailed_insights += f"\nВыявленные blockers: {'; '.join(blockers[:3])}"
                 
                 employees_performance[employee_name] = performance
             
@@ -963,7 +1182,10 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 analysis_duration=timedelta(),
                 metadata={
                     'analysis_text_length': len(analysis_text),
-                    'comprehensive_data_source': str(comprehensive_data.get('analysis_file', 'unknown'))
+                    'comprehensive_data_source': str(comprehensive_data.get('analysis_file', 'unknown')),
+                    'evidence_protocol_count': meeting_evidence_index.get("protocol_count", 0),
+                    'task_evidence_employees': len(task_evidence.get("employees", {})),
+                    'role_context_identification_rate': role_context_data.get("identification_rate", 0.0),
                 }
             )
             
@@ -1041,10 +1263,32 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 "quality_score": analysis.quality_score,
                 "analysis_duration_seconds": analysis.analysis_duration.total_seconds(),
                 "metadata": analysis.metadata,
+                "employees_performance": {
+                    employee_name: {
+                        "speaking_turns": performance.speaking_turns,
+                        "questions_asked": performance.questions_asked,
+                        "suggestions_made": performance.suggestions_made,
+                        "action_items_assigned": performance.action_items_assigned,
+                        "engagement_level": performance.engagement_level,
+                        "leadership_indicators": performance.leadership_indicators,
+                        "task_to_meeting_correlation": performance.task_to_meeting_correlation,
+                        "overall_consistency": performance.overall_consistency,
+                        "communication_effectiveness": performance.communication_effectiveness,
+                        "detailed_insights": performance.detailed_insights,
+                        "performance_rating": performance.performance_rating,
+                    }
+                    for employee_name, performance in analysis.employees_performance.items()
+                },
             }
 
             meeting_final_json = self.run_paths.meeting_final_dir / "meeting-analysis.json"
             self.run_manager.save_json(meeting_final_json, analysis_data)
+            self.analysis_index_db.record_run(
+                self.run_id,
+                "meeting_analysis",
+                str(meeting_final_json),
+                {"employees": analysis.total_employees, "quality_score": analysis.quality_score},
+            )
 
             # latest
             self.run_manager.set_latest(self.run_id)
@@ -1082,9 +1326,49 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 employee_file = self.run_paths.employee_progression_dir / f"{safe_filename}.json"
                 self.run_manager.save_json(employee_file, employee_data)
 
+            self.analysis_index_db.record_meeting_employee_evidence(
+                self.run_id,
+                employees_performance.keys(),
+                str(self.run_paths.run_dir / "employee_evidence"),
+            )
             logger.info(f"Employee progression saved for {len(employees_performance)} employees")
         except Exception as e:
             logger.error(f"Failed to save employee progression: {e}")
+
+    async def _save_employee_evidence_trace(
+        self,
+        final_analysis: ComprehensiveMeetingAnalysis,
+        comprehensive_data: Dict[str, Any],
+    ) -> None:
+        """Save per-employee evidence traces for review and weekly synthesis."""
+        try:
+            meeting_evidence_index = comprehensive_data.get("meeting_evidence_index", {})
+            task_evidence = comprehensive_data.get("task_evidence", {})
+            role_context_data = comprehensive_data.get("role_context_data", {})
+            participant_contexts = role_context_data.get("participant_contexts", {})
+            trace_dir = self.run_paths.run_dir / "employee_evidence"
+            trace_dir.mkdir(parents=True, exist_ok=True)
+
+            for employee_name, performance in final_analysis.employees_performance.items():
+                safe_name = re.sub(r"[^\w\s-]", "", employee_name).strip()
+                safe_name = re.sub(r"[-\s]+", "_", safe_name)
+                trace = {
+                    "employee": employee_name,
+                    "run_id": self.run_id,
+                    "generated_at": datetime.now().isoformat(),
+                    "role_context": participant_contexts.get(employee_name, {}),
+                    "task_evidence": task_evidence.get("employees", {}).get(employee_name, {}),
+                    "meeting_evidence": meeting_evidence_index.get("employees", {}).get(employee_name, {}),
+                    "final_interpretation": {
+                        "performance_rating": performance.performance_rating,
+                        "communication_effectiveness": performance.communication_effectiveness,
+                        "engagement_level": performance.engagement_level,
+                        "detailed_insights": performance.detailed_insights,
+                    },
+                }
+                self.run_manager.save_json(trace_dir / f"{safe_name}.json", trace)
+        except Exception as e:
+            logger.error(f"Failed to save employee evidence trace: {e}")
     
     def _format_role_context_for_prompt(self, role_context_data: Dict[str, Any]) -> str:
         """

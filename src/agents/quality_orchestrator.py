@@ -24,6 +24,7 @@ from .weekly_reports_agent_complete import WeeklyReportsAgentComplete
 from .quality_validator_agent import QualityValidatorAgent
 from ..core.config import get_employee_monitoring_config
 from ..core.json_memory_store import JSONMemoryStore
+from ..core.analysis_index_db import AnalysisIndexDB
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class QualityOrchestrator:
         """Инициализация оркестратора и подчиненных агентов."""
         self.emp_config = get_employee_monitoring_config()
         self.memory_store = JSONMemoryStore()
+        self.analysis_index_db = AnalysisIndexDB(Path(__file__).resolve().parents[2])
         
         # Подчиненные агенты
         self.task_analyzer = ImprovedTaskAnalyzerAgent()
@@ -110,9 +112,24 @@ class QualityOrchestrator:
                         'attempts': attempt + 1,
                         'workflow_duration': (datetime.now() - workflow_start).total_seconds()
                     }
+
+                analysis_plan = self.task_analyzer.plan_incremental_strategy(jira_tasks)
+                logger.info(
+                    "Task analysis strategy: %s (added=%s, changed=%s, unchanged=%s, removed=%s)",
+                    analysis_plan["mode"],
+                    analysis_plan["stats"]["added"],
+                    analysis_plan["stats"]["changed"],
+                    analysis_plan["stats"]["unchanged"],
+                    analysis_plan["stats"]["removed"],
+                )
                 
                 # 2. Запускаем анализ задач
-                task_result = await self.task_analyzer.execute({'jira_tasks': jira_tasks})
+                task_result = await self.task_analyzer.execute(
+                    {
+                        'jira_tasks': jira_tasks,
+                        'analysis_plan': analysis_plan,
+                    }
+                )
                 
                 if not task_result.success:
                     logger.error(f"Task analysis failed: {task_result.message}")
@@ -157,6 +174,8 @@ class QualityOrchestrator:
                         'quality_score': overall_score,
                         'attempts': attempt + 1,
                         'tasks_analyzed': len(jira_tasks),
+                        'analysis_method': analysis_plan["mode"],
+                        'impacted_employees': analysis_plan.get("impacted_employees", []),
                         'workflow_duration': workflow_duration
                     }
                 
@@ -177,6 +196,8 @@ class QualityOrchestrator:
                     'quality_score': overall_score,
                     'attempts': attempt + 1,
                     'tasks_analyzed': len(jira_tasks),
+                    'analysis_method': analysis_plan["mode"],
+                    'impacted_employees': analysis_plan.get("impacted_employees", []),
                     'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
                     'warning': 'Saved with quality issues'
                 }
@@ -329,16 +350,17 @@ class QualityOrchestrator:
             try:
                 logger.info(f"Weekly report attempt {attempt + 1}/{self.max_revision_attempts + 1}")
                 
-                # 1. Собираем данные за неделю
+                # 1. Определяем период недели
                 report_period_end = datetime.now()
                 report_period_start = report_period_end - timedelta(days=7)
-                
-                weekly_data = await self.weekly_reports.collect_weekly_data(
-                    report_period_start, report_period_end
+
+                # 2. Генерируем отчет напрямую через актуальный SQLite-first/read-path workflow
+                weekly_result = await self.weekly_reports.execute(
+                    {
+                        "week_start": report_period_start,
+                        "week_end": report_period_end,
+                    }
                 )
-                
-                # 2. Генерируем отчет
-                weekly_result = await self.weekly_reports.execute(weekly_data)
                 
                 if not weekly_result.success:
                     logger.error(f"Weekly report generation failed: {weekly_result.message}")
@@ -622,6 +644,36 @@ class QualityOrchestrator:
         """Получение информации о последних запусках."""
         try:
             last_runs = {}
+
+            now = datetime.now()
+            indexed_task_runs = self.analysis_index_db.get_runs_in_period(
+                "task_analysis",
+                now - timedelta(days=30),
+                now,
+            )
+            indexed_meeting_runs = self.analysis_index_db.get_runs_in_period(
+                "meeting_analysis",
+                now - timedelta(days=30),
+                now,
+            )
+
+            if indexed_task_runs:
+                latest_task = indexed_task_runs[-1]
+                last_runs["task_analysis"] = {
+                    "run_id": latest_task.get("run_id"),
+                    "artifact_path": latest_task.get("artifact_path"),
+                    "last_run": latest_task.get("created_at"),
+                    "source": "sqlite_index",
+                }
+
+            if indexed_meeting_runs:
+                latest_meeting = indexed_meeting_runs[-1]
+                last_runs["meeting_analysis"] = {
+                    "run_id": latest_meeting.get("run_id"),
+                    "artifact_path": latest_meeting.get("artifact_path"),
+                    "last_run": latest_meeting.get("created_at"),
+                    "source": "sqlite_index",
+                }
             
             # Проверяем последние ежедневные отчеты
             daily_dir = Path("reports/daily")

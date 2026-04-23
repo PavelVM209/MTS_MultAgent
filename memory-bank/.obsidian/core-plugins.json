@@ -2,7 +2,7 @@
   "file-explorer": true,
   "global-search": true,
   "switcher": false,
-  "graph": false,
+  "graph": true,
   "backlink": true,
   "outgoing-link": true,
   "tag-pane": true,
@@ -29,5 +29,5 @@
   "properties": true,
   "bookmarks": true,
   "bases": true,
-  "webviewer": false
+  "webviewer": true
 }

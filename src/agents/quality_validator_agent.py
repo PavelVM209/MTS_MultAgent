@@ -809,7 +809,7 @@ class QualityValidatorAgent(BaseAgent):
             logger.error(f"Failed to save validation report: {e}")
     
     async def _update_memory_store(self, analysis_data: Dict[str, Any], validation_result: ValidationResult, quality_metrics: QualityMetrics) -> None:
-        """Update memory store with validation results."""
+        """Best-effort memory update; validation reports are the source of truth."""
         try:
             validation_record = {
                 'validation_timestamp': validation_result.validation_time.isoformat(),
@@ -841,7 +841,10 @@ class QualityValidatorAgent(BaseAgent):
             logger.info("Updated memory store with validation results")
             
         except Exception as e:
-            logger.error(f"Failed to update memory store: {e}")
+            logger.warning(
+                "Skipping memory store update for validation results; "
+                f"quality report is already saved. Reason: {e}"
+            )
     
     async def validate_analysis(self, analysis_data: Dict[str, Any], analysis_type: str = "unknown", validation_level: str = "standard") -> Dict[str, Any]:
         """
@@ -867,7 +870,7 @@ class QualityValidatorAgent(BaseAgent):
                 analysis_dict = asdict(analysis_data) if hasattr(analysis_data, '__dataclass_fields__') else analysis_data.__dict__
             elif hasattr(analysis_data, 'get'):
                 # Already a dict-like object
-                analysis_dict = analysis_data
+                analysis_dict = dict(analysis_data)
             else:
                 # Try to convert to dict
                 try:
@@ -875,6 +878,8 @@ class QualityValidatorAgent(BaseAgent):
                 except (TypeError, ValueError):
                     # Last resort - wrap in dict
                     analysis_dict = {'data': analysis_data}
+
+            analysis_dict.setdefault("analysis_type", analysis_type)
             
             # Prepare input data for validation
             input_data = {

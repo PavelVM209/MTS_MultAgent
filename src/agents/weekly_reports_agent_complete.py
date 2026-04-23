@@ -9,6 +9,7 @@ import asyncio
 import logging
 import json
 import aiohttp
+import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from ..core.llm_client import LLMClient, LLMRequest
 from ..core.json_memory_store import JSONMemoryStore
 from ..core.quality_metrics import QualityMetrics
 from ..core.config import get_employee_monitoring_config
+from ..core.analysis_index_db import AnalysisIndexDB
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ class EmployeeWeeklySummary:
     key_achievements: List[str] = field(default_factory=list)
     areas_for_improvement: List[str] = field(default_factory=list)
     llm_insights: str = ""
+    evidence_bundle: Dict[str, Any] = field(default_factory=dict)
     
     # Metadata
     last_updated: datetime = field(default_factory=datetime.now)
@@ -127,6 +130,7 @@ class WeeklyReportsAgentComplete(BaseAgent):
         project_root = Path(__file__).resolve().parents[2]
         self.reports_root = project_root / "reports"
         self.runs_root = self.reports_root / "runs"
+        self.analysis_index_db = AnalysisIndexDB(project_root)
 
         # Analysis parameters
         self.weekly_reports_dir = Path(self.reports_config.get("weekly_reports_dir", str(self.reports_root / "weekly")))
@@ -485,10 +489,17 @@ class WeeklyReportsAgentComplete(BaseAgent):
             # Собираем данные из run-артефактов (единая “шина” интеграции между агентами)
             run_task_data = await self._load_run_task_stage2_data(week_start, week_end)
             run_meeting_data = await self._load_run_meeting_final_data(week_start, week_end)
+            run_task_evidence = await self._load_run_task_evidence(week_start, week_end)
+            run_employee_evidence = await self._load_run_employee_evidence(week_start, week_end)
 
             # Анализируем данные по сотрудникам
             employees_summaries = await self._analyze_employee_data_from_runs(
-                run_task_data, run_meeting_data, week_start, week_end
+                run_task_data,
+                run_meeting_data,
+                week_start,
+                week_end,
+                task_evidence_runs=run_task_evidence,
+                employee_evidence_runs=run_employee_evidence,
             )
             
             # Формируем статистику
@@ -619,6 +630,18 @@ class WeeklyReportsAgentComplete(BaseAgent):
         """Загрузка stage2_task_result.json из reports/runs/* за период."""
         results: List[Dict[str, Any]] = []
         try:
+            indexed_runs = self.analysis_index_db.get_runs_in_period("task_analysis", week_start, week_end)
+            if indexed_runs:
+                for run in indexed_runs:
+                    artifact_path = run.get("artifact_path")
+                    if not artifact_path:
+                        continue
+                    task_analysis_path = Path(artifact_path).parent / "stage2" / "stage2_task_result.json"
+                    if task_analysis_path.exists():
+                        results.append(json.loads(task_analysis_path.read_text(encoding="utf-8")))
+                if results:
+                    return results
+
             if not self.runs_root.exists():
                 logger.warning(f"Runs root missing: {self.runs_root}")
                 return results
@@ -646,6 +669,15 @@ class WeeklyReportsAgentComplete(BaseAgent):
         """Загрузка meeting-analysis.json из reports/runs/* за период."""
         results: List[Dict[str, Any]] = []
         try:
+            indexed_runs = self.analysis_index_db.get_runs_in_period("meeting_analysis", week_start, week_end)
+            if indexed_runs:
+                for run in indexed_runs:
+                    artifact_path = run.get("artifact_path")
+                    if artifact_path and Path(artifact_path).exists():
+                        results.append(json.loads(Path(artifact_path).read_text(encoding="utf-8")))
+                if results:
+                    return results
+
             if not self.runs_root.exists():
                 logger.warning(f"Runs root missing: {self.runs_root}")
                 return results
@@ -669,16 +701,90 @@ class WeeklyReportsAgentComplete(BaseAgent):
             logger.error(f"Failed to load run meeting data: {e}")
             return results
 
+    async def _load_run_task_evidence(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Load structured task evidence from reports/runs/* for the weekly period."""
+        results: List[Dict[str, Any]] = []
+        try:
+            indexed_rows = self.analysis_index_db.get_task_evidence_rows(week_start, week_end)
+            if indexed_rows:
+                grouped: Dict[str, Dict[str, Any]] = {}
+                for row in indexed_rows:
+                    run_id = row["run_id"]
+                    grouped.setdefault(run_id, {"employees": {}})
+                    artifact_path = row.get("artifact_path")
+                    if artifact_path and Path(artifact_path).exists():
+                        grouped[run_id]["employees"][row["employee_name"]] = json.loads(
+                            Path(artifact_path).read_text(encoding="utf-8")
+                        )
+                if grouped:
+                    return list(grouped.values())
+
+            if not self.runs_root.exists():
+                return results
+            for run_dir in sorted(self.runs_root.iterdir()):
+                if not run_dir.is_dir():
+                    continue
+                try:
+                    run_dt = datetime.strptime(run_dir.name, "%Y%m%d_%H%M%S")
+                except ValueError:
+                    continue
+                if run_dt.date() < week_start.date() or run_dt.date() > week_end.date():
+                    continue
+                evidence_path = run_dir / "task-analysis" / "evidence" / "task_evidence.json"
+                if evidence_path.exists():
+                    results.append(json.loads(evidence_path.read_text(encoding="utf-8")))
+            return results
+        except Exception as e:
+            logger.error(f"Failed to load run task evidence: {e}")
+            return results
+
+    async def _load_run_employee_evidence(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
+        """Load per-employee evidence traces produced by meeting analysis."""
+        results: List[Dict[str, Any]] = []
+        try:
+            indexed_rows = self.analysis_index_db.get_meeting_employee_evidence_rows(week_start, week_end)
+            if indexed_rows:
+                for row in indexed_rows:
+                    artifact_path = row.get("artifact_path")
+                    if artifact_path and Path(artifact_path).exists():
+                        results.append(json.loads(Path(artifact_path).read_text(encoding="utf-8")))
+                if results:
+                    return results
+
+            if not self.runs_root.exists():
+                return results
+            for run_dir in sorted(self.runs_root.iterdir()):
+                if not run_dir.is_dir():
+                    continue
+                try:
+                    run_dt = datetime.strptime(run_dir.name, "%Y%m%d_%H%M%S")
+                except ValueError:
+                    continue
+                if run_dt.date() < week_start.date() or run_dt.date() > week_end.date():
+                    continue
+                trace_dir = run_dir / "employee_evidence"
+                if trace_dir.exists():
+                    for trace_path in sorted(trace_dir.glob("*.json")):
+                        results.append(json.loads(trace_path.read_text(encoding="utf-8")))
+            return results
+        except Exception as e:
+            logger.error(f"Failed to load run employee evidence: {e}")
+            return results
+
     async def _analyze_employee_data_from_runs(
         self,
         task_stage2_runs: List[Dict[str, Any]],
         meeting_final_runs: List[Dict[str, Any]],
         week_start: datetime,
         week_end: datetime,
+        task_evidence_runs: Optional[List[Dict[str, Any]]] = None,
+        employee_evidence_runs: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, EmployeeWeeklySummary]:
         """Анализ данных по сотрудникам на основе run-артефактов."""
         try:
             employees_summaries: Dict[str, EmployeeWeeklySummary] = {}
+            task_evidence_runs = task_evidence_runs or []
+            employee_evidence_runs = employee_evidence_runs or []
 
             # TASKS (stage2 employee_analysis: totals/completed/in_progress)
             for stage2 in task_stage2_runs:
@@ -696,12 +802,58 @@ class WeeklyReportsAgentComplete(BaseAgent):
                     summary.completed_tasks += int(emp.get("completed_tasks", 0) or 0)
                     summary.in_progress_tasks += int(emp.get("in_progress_tasks", 0) or 0)
 
-            # MEETINGS (meeting-analysis.json пока без пер-сотрудника => учитываем как общий факт встреч)
+            # TASK EVIDENCE (richer Jira facts, comments, signals)
+            for evidence_run in task_evidence_runs:
+                for employee_name, evidence in evidence_run.get("employees", {}).items():
+                    if employee_name not in employees_summaries:
+                        employees_summaries[employee_name] = EmployeeWeeklySummary(
+                            employee_name=employee_name,
+                            week_start=week_start,
+                            week_end=week_end,
+                        )
+                    summary = employees_summaries[employee_name]
+                    summary.evidence_bundle.setdefault("task_evidence", []).append(evidence)
+                    for achievement in evidence.get("achievements", [])[:3]:
+                        if achievement and achievement not in summary.key_achievements:
+                            summary.key_achievements.append(achievement)
+                    for bottleneck in evidence.get("bottlenecks", [])[:3]:
+                        if bottleneck and bottleneck not in summary.areas_for_improvement:
+                            summary.areas_for_improvement.append(bottleneck)
+
+            # MEETINGS (final analysis contains employee metrics, employee_evidence contains facts)
             meetings_count = len(meeting_final_runs)
             if meetings_count > 0:
                 for summary in employees_summaries.values():
                     summary.meetings_total += meetings_count
                     summary.meetings_attended += meetings_count
+
+            for meeting_run in meeting_final_runs:
+                for employee_name, meeting_perf in meeting_run.get("employees_performance", {}).items():
+                    if employee_name not in employees_summaries:
+                        employees_summaries[employee_name] = EmployeeWeeklySummary(
+                            employee_name=employee_name,
+                            week_start=week_start,
+                            week_end=week_end,
+                        )
+                    summary = employees_summaries[employee_name]
+                    summary.meetings_total += max(1, int(meeting_run.get("total_meetings_analyzed", 1) or 1))
+                    summary.meetings_attended += max(1, int(meeting_run.get("total_meetings_analyzed", 1) or 1))
+                    summary.speaking_turns += int(meeting_perf.get("speaking_turns", 0) or 0)
+                    summary.action_items_completed += int(meeting_perf.get("action_items_assigned", 0) or 0)
+                    summary.suggestions_made += int(meeting_perf.get("suggestions_made", 0) or 0)
+                    summary.evidence_bundle.setdefault("meeting_performance", []).append(meeting_perf)
+
+            for trace in employee_evidence_runs:
+                employee_name = trace.get("employee")
+                if not employee_name:
+                    continue
+                if employee_name not in employees_summaries:
+                    employees_summaries[employee_name] = EmployeeWeeklySummary(
+                        employee_name=employee_name,
+                        week_start=week_start,
+                        week_end=week_end,
+                    )
+                employees_summaries[employee_name].evidence_bundle.setdefault("employee_evidence_traces", []).append(trace)
 
             # Производные метрики + инсайты
             for summary in employees_summaries.values():
@@ -814,9 +966,10 @@ class WeeklyReportsAgentComplete(BaseAgent):
                     summary.overall_performance_score = 5.0
                 return
             
-            # Запрос к LLM для генерации инсайтов
+            evidence_bundle = json.dumps(summary.evidence_bundle, ensure_ascii=False, indent=2, default=str)
+
             prompt = f"""
-            Analyze employee performance for the week and provide insights:
+            Проанализируй недельную производительность сотрудника строго на основе evidence.
             
             Employee: {summary.employee_name}
             Week: {summary.week_start.date()} to {summary.week_end.date()}
@@ -833,20 +986,23 @@ class WeeklyReportsAgentComplete(BaseAgent):
             - Speaking turns: {summary.speaking_turns}
             - Action items completed: {summary.action_items_completed}
             - Suggestions made: {summary.suggestions_made}
+
+            Evidence bundle:
+            {evidence_bundle}
             
-            Please provide:
-            1. Key achievements (max 3)
-            2. Areas for improvement (max 3)
-            3. Overall performance score (0-10)
-            4. Brief insights comment
-            
-            Format as JSON:
+            Верни строгий JSON по схеме:
             {{
-                "key_achievements": ["achievement1", "achievement2"],
-                "areas_for_improvement": ["area1", "area2"],
+                "key_achievements": ["1-3 достижения, подтвержденные evidence"],
+                "areas_for_improvement": ["1-3 зоны развития или риска, подтвержденные evidence"],
                 "overall_performance_score": 8.5,
-                "insights_comment": "Brief comment about performance"
+                "insights_comment": "Короткий вывод с опорой на Jira/meeting evidence",
+                "evidence_references": ["короткие ссылки на issue/meeting/excerpt"]
             }}
+            
+            Требования:
+            - только JSON без markdown
+            - не выдумывай факты, которых нет в evidence
+            - если evidence мало, явно напиши это в insights_comment
             """
             
             llm_request = LLMRequest(
@@ -858,23 +1014,93 @@ class WeeklyReportsAgentComplete(BaseAgent):
             response = await self.llm_client.generate_response(llm_request)
 
             if response and getattr(response, "content", None):
-                # Парсим JSON ответ
-                try:
-                    insights_data = json.loads(response.content)
-
+                insights_data = await self._parse_or_repair_employee_insights(response.content, summary.employee_name)
+                if insights_data:
                     summary.key_achievements = insights_data.get("key_achievements", [])
                     summary.areas_for_improvement = insights_data.get("areas_for_improvement", [])
                     summary.overall_performance_score = insights_data.get("overall_performance_score", 5.0)
                     summary.llm_insights = insights_data.get("insights_comment", "")
-
-                except json.JSONDecodeError:
+                else:
                     logger.warning(f"Failed to parse LLM response for {summary.employee_name}")
+                    self._save_unparsed_employee_insight(summary.employee_name, response.content)
                     summary.overall_performance_score = min(10, summary.task_completion_rate * 10)
             
         except Exception as e:
             logger.error(f"Failed to generate insights for {summary.employee_name}: {e}")
             # Базовая оценка
             summary.overall_performance_score = min(10, summary.task_completion_rate * 10)
+
+    async def _parse_or_repair_employee_insights(self, raw_response: str, employee_name: str) -> Optional[Dict[str, Any]]:
+        """Parse strict JSON, then ask for a repair pass before giving up."""
+        parsed = self._parse_json_object(raw_response)
+        if parsed:
+            return parsed
+
+        try:
+            repair_prompt = f"""
+Исправь ответ LLM в валидный JSON без markdown и без добавления новых фактов.
+
+Сотрудник: {employee_name}
+
+Исходный ответ:
+{raw_response}
+
+Верни JSON по схеме:
+{{
+  "key_achievements": [],
+  "areas_for_improvement": [],
+  "overall_performance_score": 5.0,
+  "insights_comment": "",
+  "evidence_references": []
+}}
+"""
+            repair_request = LLMRequest(
+                prompt=repair_prompt,
+                system_prompt="Ты исправляешь невалидный JSON. Верни только JSON.",
+                max_tokens=800,
+                temperature=0.0,
+            )
+            repair_response = await self.llm_client.generate_response(repair_request)
+            if repair_response and getattr(repair_response, "content", None):
+                return self._parse_json_object(repair_response.content)
+        except Exception as e:
+            logger.warning(f"JSON repair failed for {employee_name}: {e}")
+        return None
+
+    def _parse_json_object(self, raw_response: str) -> Optional[Dict[str, Any]]:
+        try:
+            return json.loads(raw_response)
+        except Exception:
+            pass
+
+        json_patterns = [
+            r"```json\s*(\{.*?\})\s*```",
+            r"```\s*(\{.*?\})\s*```",
+            r"(\{.*\})",
+        ]
+        for pattern in json_patterns:
+            match = re.search(pattern, raw_response, re.DOTALL | re.IGNORECASE)
+            if not match:
+                continue
+            json_text = re.sub(r",\s*([}\]])", r"\1", match.group(1).strip())
+            try:
+                parsed = json.loads(json_text)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                continue
+        return None
+
+    def _save_unparsed_employee_insight(self, employee_name: str, raw_response: str) -> None:
+        try:
+            errors_dir = self.weekly_reports_dir / "llm_parse_errors"
+            errors_dir.mkdir(parents=True, exist_ok=True)
+            safe_name = re.sub(r"[^\w\s-]", "", employee_name).strip()
+            safe_name = re.sub(r"[-\s]+", "_", safe_name)
+            error_file = errors_dir / f"{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            error_file.write_text(raw_response, encoding="utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to save unparsed insight for {employee_name}: {e}")
     
     async def _generate_team_insights(self, employees_summaries: Dict[str, EmployeeWeeklySummary]) -> Dict[str, Any]:
         """Генерация командных инсайтов."""

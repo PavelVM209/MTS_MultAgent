@@ -28,6 +28,8 @@ from ..core.processing_tracker import ProcessingTracker
 from ..core.run_file_manager import RunFileManager
 from ..core.jira_snapshot_store import JiraSnapshotStore
 from ..core.jira_diff import diff_jira_snapshots
+from ..core.jira_issue_fingerprint_store import JiraIssueFingerprintStore
+from ..core.analysis_index_db import AnalysisIndexDB
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,9 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
             cleaned_progress[cleaned_name] = progress
         return cleaned_progress
 
+    def _normalize_employee_name(self, name: str) -> str:
+        return re.sub(r"\s+", " ", re.sub(r"\*\*+", "", (name or "")).strip())
+
     """
     Improved Task Analysis Agent with Two-Stage LLM Analysis.
     
@@ -137,6 +142,8 @@ class ImprovedTaskAnalyzerAgent(BaseAgent):
 
         # Initialize processing tracker
         self.processing_tracker = ProcessingTracker()
+        self.fingerprint_store = JiraIssueFingerprintStore(project_root)
+        self.analysis_index_db = AnalysisIndexDB(project_root)
         
         # Load configuration
         self.emp_config = get_employee_monitoring_config()
@@ -673,8 +680,10 @@ Recent tasks:
             logger.info("Starting Improved Task Analysis with Two-Stage LLM")
             start_time = datetime.now()
             
-            # Fetch tasks
-            tasks = await self.fetch_jira_tasks()
+            # Fetch tasks unless already provided by orchestrator
+            tasks = input_data.get("jira_tasks") if input_data else None
+            if tasks is None:
+                tasks = await self.fetch_jira_tasks()
 
             if not tasks:
                 return AgentResult(
@@ -682,6 +691,16 @@ Recent tasks:
                     message="No JIRA tasks found for analysis",
                     data={},
                 )
+
+            analysis_plan = (input_data or {}).get("analysis_plan") or self.plan_incremental_strategy(tasks)
+            fingerprint_diff = analysis_plan["fingerprint_diff"]
+            await self._save_fingerprint_diff(fingerprint_diff)
+
+            if analysis_plan["mode"] == "reuse":
+                cached_result = await self._load_cached_task_analysis_result()
+                if cached_result:
+                    logger.info("No Jira issue changes detected; reusing latest task analysis artifacts")
+                    return cached_result
 
             # Jira snapshot + diff (инкремент по Jira-изменениям между run)
             try:
@@ -723,22 +742,39 @@ Recent tasks:
 
             # Group tasks by employee
             employee_tasks = await self._group_tasks_by_employee(tasks)
+            cached_stage2 = analysis_plan.get("cached_stage2")
+            impacted_employees = set(analysis_plan.get("impacted_employees", []))
+            can_do_selective_rebuild = analysis_plan["mode"] == "selective"
 
             logger.info(f"Retrieved {len(tasks)} tasks for {len(employee_tasks)} employees")
+            if can_do_selective_rebuild:
+                logger.info(
+                    "Selective employee rebuild enabled for %s/%s employees: %s",
+                    len(impacted_employees),
+                    len(employee_tasks),
+                    ", ".join(sorted(impacted_employees)),
+                )
             
             # Enhanced role context analysis
             logger.info("\n" + "="*60)
             logger.info("ROLE CONTEXT ENHANCEMENT")
             logger.info("="*60)
             
-            role_enhancement = await self._enhance_task_analysis_with_role_context(employee_tasks)
+            target_employee_tasks = (
+                {employee: employee_tasks[employee] for employee in employee_tasks if employee in impacted_employees}
+                if can_do_selective_rebuild
+                else employee_tasks
+            )
+            target_tasks = [task for employee in target_employee_tasks for task in target_employee_tasks[employee]]
+
+            role_enhancement = await self._enhance_task_analysis_with_role_context(target_employee_tasks)
             identified_count = sum(1 for emp in role_enhancement.get("enhanced_employees", {}).values() 
                                  if emp.get("role_context", {}).get("assignee_identified", False))
-            logger.info(f"Role context: {identified_count}/{len(employee_tasks)} employees identified")
+            logger.info(f"Role context: {identified_count}/{len(target_employee_tasks)} employees identified")
             
             # Stage 1: Text analysis with role context
             logger.info("\n" + "="*60)
-            text_analysis = await self.stage1_text_analysis(tasks, employee_tasks)
+            text_analysis = await self.stage1_text_analysis(target_tasks, target_employee_tasks)
             
             if not text_analysis:
                 return AgentResult(
@@ -749,13 +785,20 @@ Recent tasks:
             
             # Stage 2: JSON generation
             logger.info("\n" + "="*60)
-            json_result = await self.stage2_json_generation(text_analysis, employee_tasks)
+            json_result = await self.stage2_json_generation(text_analysis, target_employee_tasks)
             
             if not json_result:
                 return AgentResult(
                     success=False,
                     message="Stage 2 JSON generation failed",
                     data={}
+                )
+
+            if can_do_selective_rebuild:
+                json_result = self._merge_selective_json_result(
+                    fresh_result=json_result,
+                    cached_result=cached_stage2,
+                    impacted_employees=impacted_employees,
                 )
             
             # Save stage files like in successful test
@@ -793,6 +836,31 @@ Recent tasks:
                 )
             
             employees_progress = self._sanitize_employee_identifiers(employees_progress_raw)
+            task_evidence = self._build_task_evidence(employee_tasks, json_result)
+            await self._save_task_evidence(task_evidence)
+            self.fingerprint_store.update_from_tasks(
+                tasks,
+                run_id=self.run_id,
+                task_evidence_path=str(self.run_paths.run_dir / "task-analysis" / "evidence" / "task_evidence.json"),
+                analyzed_keys=[task.get("key") for task in tasks if task.get("key")],
+            )
+            self.analysis_index_db.record_run(
+                self.run_id,
+                "task_analysis",
+                str(self.run_paths.run_dir / "task-analysis" / "task-analysis.json"),
+                {"tasks_analyzed": len(tasks), "employees": len(task_evidence.get("employees", {}))},
+            )
+            self.analysis_index_db.record_jira_issue_versions(
+                self.run_id,
+                tasks,
+                fingerprint_fn=self.fingerprint_store.compute_fingerprint,
+                artifact_path=str(self.run_paths.run_dir / "task-analysis" / "evidence" / "task_evidence.json"),
+            )
+            self.analysis_index_db.record_task_evidence(
+                self.run_id,
+                task_evidence.get("employees", {}),
+                str(self.run_paths.run_dir / "task-analysis" / "evidence" / "employees"),
+            )
 
             # Create analysis result
             analysis_result = DailyTaskAnalysisResult(
@@ -807,7 +875,14 @@ Recent tasks:
                 recommendations=json_result.get('recommendations', []),
                 quality_score=1.0,  # Two-stage system guarantees high quality
                 analysis_duration=datetime.now() - start_time,
-                metadata={'analysis_method': 'two_stage_llm', 'version': '2.0.0'}
+                metadata={
+                    'analysis_method': 'two_stage_llm',
+                    'version': '2.0.0',
+                    'run_id': self.run_id,
+                    'task_evidence_employees': len(task_evidence.get('employees', {})),
+                    'analysis_method': analysis_plan["mode"],
+                    'impacted_employees': sorted(impacted_employees),
+                }
             )
             
             # Save analysis
@@ -825,7 +900,8 @@ Recent tasks:
                     'tasks_analyzed': len(tasks),
                     'employees_analyzed': len(employees_progress),
                     'quality_score': 1.0,
-                    'analysis_method': 'two_stage_llm'
+                    'analysis_method': analysis_plan["mode"],
+                    'impacted_employees': sorted(impacted_employees),
                 }
             )
             
@@ -976,6 +1052,325 @@ Recent tasks:
             
         except Exception as e:
             logger.error(f"Failed to save stage files: {e}")
+
+    def _build_task_evidence(
+        self,
+        employee_tasks: Dict[str, List[Dict[str, Any]]],
+        json_result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build evidence-first task artifacts for downstream meeting/weekly analysis."""
+        employees: Dict[str, Any] = {}
+        employee_analysis = json_result.get("employee_analysis", {})
+
+        for employee_name, task_list in employee_tasks.items():
+            normalized_name = self._normalize_employee_name(employee_name)
+            analysis_entry = employee_analysis.get(employee_name) or employee_analysis.get(normalized_name, {})
+
+            jira_evidence = []
+            signals: set[str] = set()
+
+            for task in task_list:
+                status = str(task.get("status", ""))
+                description = str(task.get("description", "") or "")
+                comments = str(task.get("comments", "") or "")
+                combined_text = f"{task.get('summary', '')}\n{description}\n{comments}".lower()
+
+                task_signals: List[str] = []
+                if any(word in status.lower() for word in ["blocked", "заблок", "ожид"]):
+                    task_signals.append("blocked")
+                if any(word in combined_text for word in ["block", "blocked", "риск", "зависим", "проблем"]):
+                    task_signals.append("risk_or_blocker")
+                if any(word in combined_text for word in ["done", "completed", "заверш", "выполн"]):
+                    task_signals.append("completion")
+                if len(comments) > 120:
+                    task_signals.append("active_discussion")
+
+                signals.update(task_signals)
+                jira_evidence.append(
+                    {
+                        "issue": task.get("key"),
+                        "status": status,
+                        "summary": task.get("summary", ""),
+                        "priority": task.get("priority", "Medium"),
+                        "project": task.get("project", ""),
+                        "updated": task.get("updated"),
+                        "description_excerpt": description[:1200],
+                        "comments_excerpt": comments[:1200],
+                        "signals": task_signals,
+                        "source": "jira",
+                    }
+                )
+
+            employees[normalized_name] = {
+                "employee": normalized_name,
+                "task_metrics": {
+                    "total_tasks": len(task_list),
+                    "completed_tasks": analysis_entry.get("completed_tasks", 0),
+                    "in_progress_tasks": analysis_entry.get("in_progress_tasks", 0),
+                    "performance_rating": analysis_entry.get("performance_rating", 5.0),
+                },
+                "jira_evidence": jira_evidence,
+                "analysis_signals": sorted(signals),
+                "achievements": analysis_entry.get("achievements", []),
+                "bottlenecks": analysis_entry.get("bottlenecks", []),
+                "insights": analysis_entry.get("insights", ""),
+            }
+
+        return {
+            "run_id": self.run_id,
+            "generated_at": datetime.now().isoformat(),
+            "employees": employees,
+            "team_insights": json_result.get("team_insights", []),
+            "recommendations": json_result.get("recommendations", []),
+        }
+
+    async def _save_task_evidence(self, task_evidence: Dict[str, Any]) -> None:
+        """Persist aggregated and per-employee task evidence for downstream agents."""
+        try:
+            evidence_dir = self.run_paths.run_dir / "task-analysis" / "evidence"
+            employees_dir = evidence_dir / "employees"
+            employees_dir.mkdir(parents=True, exist_ok=True)
+
+            evidence_file = evidence_dir / "task_evidence.json"
+            self.run_manager.save_json(evidence_file, task_evidence)
+
+            for employee_name, employee_evidence in task_evidence.get("employees", {}).items():
+                safe_name = re.sub(r"[^\w\s-]", "", employee_name).strip()
+                safe_name = re.sub(r"[-\s]+", "_", safe_name)
+                self.run_manager.save_json(employees_dir / f"{safe_name}.json", employee_evidence)
+
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(evidence_file, Path("task-analysis") / "task_evidence.json")
+            logger.info(f"Task evidence saved to {evidence_file}")
+        except Exception as e:
+            logger.error(f"Failed to save task evidence: {e}")
+
+    async def _save_fingerprint_diff(self, fingerprint_diff: Dict[str, Any]) -> None:
+        """Persist issue-level fingerprint diff for observability."""
+        try:
+            diff_dir = self.run_paths.run_dir / "jira-diff"
+            diff_dir.mkdir(parents=True, exist_ok=True)
+            diff_file = diff_dir / "issue-fingerprint-diff.json"
+            payload = {
+                "run_id": self.run_id,
+                "generated_at": datetime.now().isoformat(),
+                "stats": {
+                    "added": len(fingerprint_diff.get("added", [])),
+                    "changed": len(fingerprint_diff.get("changed", [])),
+                    "unchanged": len(fingerprint_diff.get("unchanged", [])),
+                    "removed": len(fingerprint_diff.get("removed", [])),
+                },
+                "added": fingerprint_diff.get("added", []),
+                "changed": fingerprint_diff.get("changed", []),
+                "unchanged": fingerprint_diff.get("unchanged", []),
+                "removed": fingerprint_diff.get("removed", []),
+            }
+            self.run_manager.save_json(diff_file, payload)
+            self.run_manager.set_latest(self.run_id)
+            self.run_manager.copy_to_latest(diff_file, Path("jira-diff") / "issue-fingerprint-diff.json")
+        except Exception as e:
+            logger.error(f"Failed to save fingerprint diff: {e}")
+
+    def plan_incremental_strategy(self, tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Decide whether task analysis should do full rebuild, selective rebuild, or reuse."""
+        fingerprint_diff = self.fingerprint_store.diff_tasks(tasks)
+        impacted_employees = sorted(self._calculate_impacted_employees(tasks, fingerprint_diff))
+        cached_stage2 = None
+        try:
+            project_root = Path(__file__).resolve().parents[2]
+            latest_stage2 = project_root / "reports" / "latest" / "task-analysis" / "stage2_task_result.json"
+            if latest_stage2.exists():
+                cached_stage2 = json.loads(latest_stage2.read_text(encoding="utf-8"))
+        except Exception:
+            cached_stage2 = None
+
+        if not fingerprint_diff["added"] and not fingerprint_diff["changed"] and not fingerprint_diff["removed"]:
+            mode = "reuse"
+        elif cached_stage2 and impacted_employees:
+            employee_tasks = {}
+            for task in tasks:
+                employee = task.get("assignee")
+                if employee:
+                    employee_tasks.setdefault(employee, []).append(task)
+            if len(impacted_employees) < len(employee_tasks):
+                mode = "selective"
+            else:
+                mode = "full"
+        else:
+            mode = "full"
+
+        return {
+            "mode": mode,
+            "fingerprint_diff": fingerprint_diff,
+            "impacted_employees": impacted_employees,
+            "cached_stage2": cached_stage2,
+            "stats": {
+                "added": len(fingerprint_diff.get("added", [])),
+                "changed": len(fingerprint_diff.get("changed", [])),
+                "unchanged": len(fingerprint_diff.get("unchanged", [])),
+                "removed": len(fingerprint_diff.get("removed", [])),
+            },
+        }
+
+    def _calculate_impacted_employees(self, tasks: List[Dict[str, Any]], fingerprint_diff: Dict[str, Any]) -> set[str]:
+        """Map Jira issue changes to the smallest employee subset that needs rebuild."""
+        current_by_key = {
+            str(task.get("key") or "").strip(): task
+            for task in tasks
+            if str(task.get("key") or "").strip()
+        }
+        previous = fingerprint_diff.get("previous", {}) or {}
+        impacted: set[str] = set()
+
+        for issue_key in fingerprint_diff.get("added", []):
+            assignee = str(current_by_key.get(issue_key, {}).get("assignee") or "").strip()
+            if assignee:
+                impacted.add(assignee)
+
+        for issue_key in fingerprint_diff.get("changed", []):
+            assignee = str(current_by_key.get(issue_key, {}).get("assignee") or "").strip()
+            previous_assignee = str(previous.get(issue_key, {}).get("assignee") or "").strip()
+            if assignee:
+                impacted.add(assignee)
+            if previous_assignee:
+                impacted.add(previous_assignee)
+
+        for issue_key in fingerprint_diff.get("removed", []):
+            previous_assignee = str(previous.get(issue_key, {}).get("assignee") or "").strip()
+            if previous_assignee:
+                impacted.add(previous_assignee)
+
+        return impacted
+
+    async def _load_cached_stage2_result(self) -> Optional[Dict[str, Any]]:
+        """Load latest stage2 JSON to support selective employee rebuild."""
+        try:
+            project_root = Path(__file__).resolve().parents[2]
+            latest_stage2 = project_root / "reports" / "latest" / "task-analysis" / "stage2_task_result.json"
+            if latest_stage2.exists():
+                return json.loads(latest_stage2.read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"Failed to load cached stage2 result: {e}")
+        return None
+
+    def _merge_selective_json_result(
+        self,
+        *,
+        fresh_result: Dict[str, Any],
+        cached_result: Dict[str, Any],
+        impacted_employees: set[str],
+    ) -> Dict[str, Any]:
+        """Merge fresh employee analysis for impacted employees with cached analysis for unaffected ones."""
+        merged_employee_analysis = dict(cached_result.get("employee_analysis", {}))
+        merged_employee_analysis.update(fresh_result.get("employee_analysis", {}))
+
+        fresh_insights = fresh_result.get("team_insights", []) or []
+        cached_insights = cached_result.get("team_insights", []) or []
+        fresh_recommendations = fresh_result.get("recommendations", []) or []
+        cached_recommendations = cached_result.get("recommendations", []) or []
+
+        merged_insights: List[str] = []
+        for insight in fresh_insights + cached_insights:
+            if insight and insight not in merged_insights:
+                merged_insights.append(insight)
+
+        merged_recommendations: List[str] = []
+        for recommendation in fresh_recommendations + cached_recommendations:
+            if recommendation and recommendation not in merged_recommendations:
+                merged_recommendations.append(recommendation)
+
+        metadata = dict(cached_result.get("metadata", {}))
+        metadata.update(
+            {
+                "merge_mode": "selective_employee_rebuild",
+                "impacted_employees": sorted(impacted_employees),
+                "reused_employee_count": max(0, len(merged_employee_analysis) - len(impacted_employees)),
+            }
+        )
+
+        return {
+            "employee_analysis": merged_employee_analysis,
+            "team_insights": merged_insights[:5],
+            "recommendations": merged_recommendations[:5],
+            "metadata": metadata,
+        }
+
+    async def _load_cached_task_analysis_result(self) -> Optional[AgentResult]:
+        """Reuse latest task analysis when Jira issue fingerprints are unchanged."""
+        try:
+            project_root = Path(__file__).resolve().parents[2]
+            latest_file = project_root / "reports" / "latest" / "task-analysis" / "task-analysis.json"
+            latest_evidence = project_root / "reports" / "latest" / "task-analysis" / "task_evidence.json"
+            if not latest_file.exists():
+                return None
+
+            analysis_data = json.loads(latest_file.read_text(encoding="utf-8"))
+            employee_performance = analysis_data.get("employee_performance", {})
+            employees_progress: Dict[str, EmployeeTaskProgress] = {}
+
+            for employee_name, employee_data in employee_performance.items():
+                task_perf = employee_data.get("task_performance", {})
+                employees_progress[employee_name] = EmployeeTaskProgress(
+                    employee_name=employee_name,
+                    analysis_date=datetime.now(),
+                    total_tasks=int(task_perf.get("tasks_total", 0) or 0),
+                    completed_tasks=int(task_perf.get("tasks_completed", 0) or 0),
+                    in_progress_tasks=0,
+                    blocked_tasks=0,
+                    todo_tasks=0,
+                    overdue_tasks=0,
+                    total_story_points=0.0,
+                    completed_story_points=0.0,
+                    in_progress_story_points=0.0,
+                    completion_rate=float(task_perf.get("completion_rate", 0.0) or 0.0),
+                    productivity_score=0.0,
+                    active_projects=set(employee_data.get("active_projects", [])),
+                    key_achievements=employee_data.get("key_achievements", []),
+                    bottlenecks=employee_data.get("bottlenecks", []),
+                    llm_insights=employee_data.get("llm_insights", ""),
+                    performance_rating=float(task_perf.get("score", 5.0) or 5.0),
+                )
+
+            analysis_result = DailyTaskAnalysisResult(
+                analysis_date=datetime.now(),
+                employees_progress=employees_progress,
+                total_employees=int(analysis_data.get("total_employees", len(employees_progress)) or len(employees_progress)),
+                total_tasks_analyzed=int(analysis_data.get("total_tasks_analyzed", 0) or 0),
+                avg_completion_rate=float(
+                    analysis_data.get("project_health", {}).get("overall", {}).get("velocity", 0) or 0
+                ) / 100.0,
+                top_performers=analysis_data.get("top_performers", []),
+                employees_needing_attention=analysis_data.get("employees_needing_attention", []),
+                team_insights=analysis_data.get("team_insights", []),
+                recommendations=analysis_data.get("recommendations", []),
+                quality_score=float(
+                    analysis_data.get("system_metrics", {}).get("quality_score", 100) or 100
+                ) / 100.0,
+                analysis_duration=timedelta(),
+                metadata={
+                    "analysis_method": "reused_from_fingerprint_cache",
+                    "version": "2.1.0",
+                    "run_id": self.run_id,
+                    "reused_latest_artifact": str(latest_file),
+                    "reused_task_evidence": str(latest_evidence) if latest_evidence.exists() else None,
+                },
+            )
+
+            return AgentResult(
+                success=True,
+                message="Reused latest task analysis because Jira issue fingerprints did not change",
+                data=analysis_result,
+                metadata={
+                    "execution_time": 0.0,
+                    "tasks_analyzed": analysis_result.total_tasks_analyzed,
+                    "employees_analyzed": len(employees_progress),
+                    "quality_score": analysis_result.quality_score,
+                    "analysis_method": "fingerprint_cache_reuse",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load cached task analysis result: {e}")
+            return None
     
     async def get_health_status(self) -> Dict[str, Any]:
         """Get agent health status."""
