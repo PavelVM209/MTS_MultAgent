@@ -168,10 +168,10 @@ class QualityOrchestrator:
         for attempt in range(self.max_revision_attempts + 1):
             try:
                 logger.info(f"Daily meeting analysis attempt {attempt + 1}/{self.max_revision_attempts + 1}")
-                
-                # 1. Сканируем директорию с протоколами
-                protocols = await self.meeting_analyzer.scan_protocols_directory()
-                if not protocols:
+
+                # 1. Проверяем наличие входных протоколов через реальный интерфейс improved-агента
+                protocol_files = sorted(self.meeting_analyzer.protocols_dir.glob("*.txt"))
+                if not protocol_files:
                     logger.warning("No protocols found in directory")
                     return {
                         'success': False,
@@ -179,9 +179,9 @@ class QualityOrchestrator:
                         'attempts': attempt + 1,
                         'workflow_duration': (datetime.now() - workflow_start).total_seconds()
                     }
-                
-                # 2. Запускаем анализ протоколов
-                meeting_result = await self.meeting_analyzer.execute({'meeting_protocols': protocols})
+
+                # 2. Запускаем анализ протоколов через execute(), который сам выполняет stage1/stage2/stage3
+                meeting_result = await self.meeting_analyzer.execute({})
                 
                 if not meeting_result.success:
                     logger.error(f"Meeting analysis failed: {meeting_result.message}")
@@ -199,12 +199,19 @@ class QualityOrchestrator:
                     meeting_result.data,
                     analysis_type="meeting_analysis"
                 )
-                
-                # Handle both dict and object validation results
-                if isinstance(validation, dict):
-                    overall_score = validation.get('overall_score', 0)
-                else:
-                    overall_score = getattr(validation, 'overall_score', 0)
+
+                if not validation.get('success', False):
+                    logger.error(f"Meeting validation failed: {validation.get('error', 'Unknown validation error')}")
+                    if attempt < self.max_revision_attempts:
+                        continue
+                    return {
+                        'success': False,
+                        'error': validation.get('error', 'Validation failed'),
+                        'attempts': attempt + 1,
+                        'workflow_duration': (datetime.now() - workflow_start).total_seconds()
+                    }
+
+                overall_score = validation.get('overall_score', 0.0)
                 
                 logger.info(f"Quality validation result: {overall_score:.2f}")
                 
@@ -219,13 +226,13 @@ class QualityOrchestrator:
                         'success': True,
                         'quality_score': overall_score,
                         'attempts': attempt + 1,
-                        'protocols_analyzed': len(protocols),
+                        'protocols_analyzed': len(protocol_files),
                         'workflow_duration': workflow_duration
                     }
                 
                 # 5. Если качество < порога и есть попытки - запрашиваем доработку
                 if attempt < self.max_revision_attempts and self.auto_improve:
-                    logger.warning(f"Quality score {validation.overall_score:.2f} < threshold {self.quality_threshold}, requesting improvement")
+                    logger.warning(f"Quality score {overall_score:.2f} < threshold {self.quality_threshold}, requesting improvement")
                     improved_data = await self._request_improvement(meeting_result.data, validation, "meeting_analysis")
                     if improved_data:
                         meeting_result.data = improved_data
@@ -237,9 +244,9 @@ class QualityOrchestrator:
                 
                 return {
                     'success': False,
-                    'quality_score': validation.overall_score,
+                    'quality_score': overall_score,
                     'attempts': attempt + 1,
-                    'protocols_analyzed': len(protocols),
+                    'protocols_analyzed': len(protocol_files),
                     'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
                     'warning': 'Saved with quality issues'
                 }

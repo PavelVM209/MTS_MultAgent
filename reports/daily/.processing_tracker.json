@@ -3,12 +3,13 @@
     {
       "file_path": "task_analysis_stage1",
       "file_hash": "",
-      "processed_at": "2026-04-22T18:38:16.643796",
+      "processed_at": "2026-04-23T03:06:13.992267",
       "processing_type": "task_analysis",
-      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-22/task-analysis/stage1/stage1_task_analysis_20260422_183816.txt",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/runs/20260423_025907/task-analysis/stage1/stage1_task_analysis.txt",
       "metadata": {
         "analysis_type": "stage1",
-        "content_length": 11891
+        "content_length": 11820,
+        "run_id": "20260423_025907"
       }
     }
   ],
@@ -16,12 +17,13 @@
     {
       "file_path": "task_analysis_stage2",
       "file_hash": "",
-      "processed_at": "2026-04-22T18:38:16.649059",
+      "processed_at": "2026-04-23T03:06:13.995019",
       "processing_type": "task_analysis",
-      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/daily/2026-04-22/task-analysis/stage2/stage2_task_result_20260422_183816.json",
+      "result_path": "/Users/pvmurz10/Documents/MTS_MultAgent/reports/runs/20260423_025907/task-analysis/stage2/stage2_task_result.json",
       "metadata": {
         "analysis_type": "stage2",
-        "employees_count": 12
+        "employees_count": 12,
+        "run_id": "20260423_025907"
       }
     }
   ],

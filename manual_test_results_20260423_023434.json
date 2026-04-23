@@ -1,0 +1,122 @@
+{
+  "start_time": "2026-04-23T02:33:51.950263",
+  "tests": {
+    "system_status": {
+      "success": true,
+      "status": {
+        "orchestrator": {
+          "status": "running",
+          "scheduling": {
+            "daily_task_time": "22:55",
+            "daily_meeting_time": "22:57",
+            "weekly_report_time": "22:58",
+            "weekly_report_day": "sunday"
+          },
+          "last_check": "2026-04-23T02:33:52.349015"
+        },
+        "quality_orchestrator": {
+          "orchestrator": {
+            "status": "active",
+            "quality_threshold": 0.9,
+            "max_revision_attempts": 3,
+            "auto_improve": true
+          },
+          "agents": {
+            "task_analyzer": "ready",
+            "meeting_analyzer": "ready",
+            "weekly_reports": "ready",
+            "quality_validator": "ready"
+          },
+          "last_runs": {
+            "daily_analysis": {
+              "last_file": ".processing_tracker.json",
+              "last_run": "2026-04-22T18:41:23.531840"
+            },
+            "weekly_report": {
+              "last_file": "weekly_report_2026-04-20.json",
+              "last_run": "2026-04-23T02:30:12.162600"
+            }
+          },
+          "timestamp": "2026-04-23T02:33:52.348427"
+        },
+        "scheduler": {
+          "status": "stopped",
+          "total_jobs": 0,
+          "active_jobs": 0,
+          "uptime": 0
+        },
+        "overall_status": "degraded",
+        "timestamp": "2026-04-23T02:33:52.349734"
+      },
+      "timestamp": "2026-04-23T02:33:52.350543"
+    },
+    "api_connectivity": {
+      "success": true,
+      "jira": {
+        "configured": false,
+        "config_valid": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "configured_fields": [
+            "base_url",
+            "username",
+            "api_token",
+            "project_key"
+          ],
+          "status": "valid"
+        },
+        "base_url": "https://jira.mts.ru",
+        "username": "sa0000openbdrnd"
+      },
+      "llm": {
+        "connected": false,
+        "error": "'dict' object has no attribute 'model'",
+        "model": "glm-4.6-357b",
+        "base_url": "https://devx-copilot.tech/v1"
+      },
+      "timestamp": "2026-04-23T02:33:52.379468"
+    },
+    "jira_analysis": {
+      "success": false,
+      "execution_time_seconds": 0.027425,
+      "result": {
+        "success": false,
+        "error": "No tasks from Jira",
+        "attempts": 1,
+        "workflow_duration": 0.025663
+      },
+      "timestamp": "2026-04-23T02:33:52.415853"
+    },
+    "meeting_analysis": {
+      "success": false,
+      "execution_time_seconds": 41.843455,
+      "result": {
+        "success": false,
+        "error": "Comprehensive analysis failed",
+        "attempts": 4,
+        "workflow_duration": 41.839341
+      },
+      "timestamp": "2026-04-23T02:34:34.273418"
+    },
+    "weekly_report": {
+      "success": false,
+      "execution_time_seconds": 0.383281,
+      "result": {
+        "success": false,
+        "error": "Weekly report generated but quality check failed",
+        "attempts": 4,
+        "workflow_duration": 0.38125
+      },
+      "timestamp": "2026-04-23T02:34:34.677144"
+    }
+  },
+  "errors": [],
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 2,
+    "failed_tests": 3,
+    "success_rate": "40.0%",
+    "end_time": "2026-04-23T02:34:34.683037"
+  }
+}

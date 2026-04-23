@@ -1,0 +1,102 @@
+{
+  "start_time": "2026-04-23T02:30:08.246594",
+  "tests": {
+    "system_status": {
+      "success": true,
+      "status": {
+        "orchestrator": {
+          "status": "running",
+          "scheduling": {
+            "daily_task_time": "22:55",
+            "daily_meeting_time": "22:57",
+            "weekly_report_time": "22:58",
+            "weekly_report_day": "sunday"
+          },
+          "last_check": "2026-04-23T02:30:08.714147"
+        },
+        "quality_orchestrator": {
+          "orchestrator": {
+            "status": "active",
+            "quality_threshold": 0.9,
+            "max_revision_attempts": 3,
+            "auto_improve": true
+          },
+          "agents": {
+            "task_analyzer": "ready",
+            "meeting_analyzer": "ready",
+            "weekly_reports": "ready",
+            "quality_validator": "ready"
+          },
+          "last_runs": {
+            "daily_analysis": {
+              "last_file": ".processing_tracker.json",
+              "last_run": "2026-04-22T18:41:23.531840"
+            },
+            "weekly_report": {
+              "last_file": "weekly_report_2026-04-20.json",
+              "last_run": "2026-04-23T01:25:23.194722"
+            }
+          },
+          "timestamp": "2026-04-23T02:30:08.713118"
+        },
+        "scheduler": {
+          "status": "stopped",
+          "total_jobs": 0,
+          "active_jobs": 0,
+          "uptime": 0
+        },
+        "overall_status": "degraded",
+        "timestamp": "2026-04-23T02:30:08.714882"
+      },
+      "timestamp": "2026-04-23T02:30:08.715979"
+    },
+    "api_connectivity": {
+      "success": false,
+      "error": "No module named 'core'",
+      "timestamp": "2026-04-23T02:30:08.732578"
+    },
+    "jira_analysis": {
+      "success": false,
+      "execution_time_seconds": 0.026233,
+      "result": {
+        "success": false,
+        "error": "No tasks from Jira",
+        "attempts": 1,
+        "workflow_duration": 0.024891
+      },
+      "timestamp": "2026-04-23T02:30:08.769236"
+    },
+    "meeting_analysis": {
+      "success": false,
+      "execution_time_seconds": 3.0419,
+      "result": {
+        "success": false,
+        "error": "'ImprovedMeetingAnalyzerAgent' object has no attribute 'scan_protocols_directory'",
+        "attempts": 4,
+        "workflow_duration": 3.038622
+      },
+      "timestamp": "2026-04-23T02:30:11.827654"
+    },
+    "weekly_report": {
+      "success": false,
+      "execution_time_seconds": 0.305755,
+      "result": {
+        "success": false,
+        "error": "Weekly report generated but quality check failed",
+        "attempts": 4,
+        "workflow_duration": 0.303835
+      },
+      "timestamp": "2026-04-23T02:30:12.170942"
+    }
+  },
+  "errors": [
+    "API connectivity error: No module named 'core'"
+  ],
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 1,
+    "failed_tests": 4,
+    "success_rate": "20.0%",
+    "end_time": "2026-04-23T02:30:12.175954"
+  }
+}

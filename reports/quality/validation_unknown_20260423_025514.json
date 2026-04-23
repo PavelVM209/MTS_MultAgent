@@ -1,0 +1,96 @@
+{
+  "validation_timestamp": "2026-04-23T02:55:14.041823",
+  "validator_agent": "QualityValidatorAgent",
+  "analysis_type": "unknown",
+  "analysis_id": "analysis_20260423_025514",
+  "validation_status": "revision_required",
+  "overall_score": 0.7187500000000001,
+  "rule_results": {
+    "employee_data_completeness": {
+      "score": 1.0,
+      "threshold": 0.8,
+      "passed": true,
+      "weight": 0.2,
+      "issues": [],
+      "recommendations": []
+    },
+    "data_consistency": {
+      "score": 1.0,
+      "threshold": 0.85,
+      "passed": true,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": []
+    },
+    "performance_accuracy": {
+      "score": 1.0,
+      "threshold": 0.9,
+      "passed": true,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": []
+    },
+    "insight_quality": {
+      "score": 0.25,
+      "threshold": 0.75,
+      "passed": false,
+      "weight": 0.2,
+      "issues": [],
+      "recommendations": [
+        "Include specific metrics and data in insights",
+        "Make insights more actionable and practical",
+        "Ensure insights are relevant to employee monitoring"
+      ]
+    },
+    "data_integrity": {
+      "score": 1.0,
+      "threshold": 0.95,
+      "passed": true,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": []
+    },
+    "recommendation_relevance": {
+      "score": 0.125,
+      "threshold": 0.8,
+      "passed": false,
+      "weight": 0.15,
+      "issues": [],
+      "recommendations": [
+        "Start recommendations with clear action verbs",
+        "Ensure recommendations are relevant to employee monitoring",
+        "Make recommendations more practical and feasible"
+      ]
+    }
+  },
+  "issues_found": [],
+  "recommendations": [
+    "Include specific metrics and data in insights",
+    "Make insights more actionable and practical",
+    "Ensure insights are relevant to employee monitoring",
+    "Start recommendations with clear action verbs",
+    "Ensure recommendations are relevant to employee monitoring",
+    "Make recommendations more practical and feasible"
+  ],
+  "revision_suggestions": {
+    "llm_insights": "LLM validation insights would be added here",
+    "automated_improvements": [
+      "Consider adding more specific metrics to insights",
+      "Review recommendation actionability",
+      "Enhance data visualization suggestions"
+    ]
+  },
+  "quality_metrics": {
+    "completeness_score": 1.0,
+    "accuracy_score": 1.0,
+    "consistency_score": 1.0,
+    "insight_quality_score": 0.25,
+    "data_integrity_score": 1.0,
+    "overall_quality_score": 0.7625000000000001
+  },
+  "analysis_summary": {
+    "employees_analyzed": 12,
+    "insights_generated": 5,
+    "recommendations_generated": 4
+  }
+}

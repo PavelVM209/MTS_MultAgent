@@ -34,10 +34,25 @@ from ..core.hash_utils import md5_file
 from ..core.processing_index import ProcessingIndex, ProcessingRecord, ProcessingRecordKey
 from ..core.run_file_manager import RunFileManager
 
+# Safety limits for Stage2 prompt size (can be overridden by env)
+MEETING_STAGE2_MAX_PROTOCOLS = int(os.getenv("MEETING_STAGE2_MAX_PROTOCOLS", "5"))
+MEETING_STAGE2_MAX_CHARS_PROTOCOL = int(os.getenv("MEETING_STAGE2_MAX_CHARS_PROTOCOL", "40000"))
+MEETING_STAGE2_MAX_CHARS_TASKS = int(os.getenv("MEETING_STAGE2_MAX_CHARS_TASKS", "20000"))
+
 # Load .env file
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    if not text or max_chars <= 0:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    head = text[: max_chars // 2]
+    tail = text[-(max_chars - len(head)) :]
+    return f"{head}\n\n[... Обрезано: исходный размер {len(text)} символов ...]\n\n{tail}"
 
 
 @dataclass
@@ -441,11 +456,17 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 logger.error("Task Analyzer TXT file not found or empty")
                 return None
             
-            # Комбинируем все очищенные протоколы
-            combined_protocols = "\n\n".join([
-                f"=== ПРОТОКОЛ: {p['filename']} ===\n{p['cleaned_content']}"
-                for p in cleaned_protocols
-            ])
+            # Комбинируем очищенные протоколы (ограничиваем объем для Stage2)
+            protocols_sorted = sorted(cleaned_protocols, key=lambda x: x.get("file_date") or datetime.min, reverse=True)
+            protocols_selected = protocols_sorted[:MEETING_STAGE2_MAX_PROTOCOLS]
+
+            combined_protocols = "\n\n".join(
+                [
+                    f"=== ПРОТОКОЛ: {p['filename']} ===\n"
+                    f"{_truncate_text(p['cleaned_content'], MEETING_STAGE2_MAX_CHARS_PROTOCOL)}"
+                    for p in protocols_selected
+                ]
+            )
             
             # Проводим комплексный анализ
             comprehensive_result = await self._analyze_comprehensive_data(combined_protocols, task_analyzer_content)
@@ -565,6 +586,9 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             # Форматируем Role Context для промпта
             role_context_text = self._format_role_context_for_prompt(role_context_data)
             
+            protocols_content = _truncate_text(protocols_content, MEETING_STAGE2_MAX_PROTOCOLS * MEETING_STAGE2_MAX_CHARS_PROTOCOL)
+            task_analyzer_content = _truncate_text(task_analyzer_content, MEETING_STAGE2_MAX_CHARS_TASKS)
+
             prompt = f"""
 Ты - СТАРШИЙ АНАЛИТИК КОМАНДЫ для комплексного анализа. Проанализируй данные из двух источников и предоставь детальный анализ НА РУССКОМ ЯЗЫКЕ.
 

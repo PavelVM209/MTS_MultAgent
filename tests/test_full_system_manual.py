@@ -234,8 +234,8 @@ class ManualSystemTester:
         logger.info("🔄 Тестирование подключения к API...")
         
         try:
-            from core.jira_client import JiraClient
-            from core.llm_client import LLMClient
+            from src.core.jira_client import JiraClient
+            from src.core.llm_client import LLMClient
             
             # Тест Jira API
             jira_client = JiraClient()
@@ -251,7 +251,7 @@ class ManualSystemTester:
             if jira_result['configured'] and jira_result['config_valid']:
                 logger.info("✅ Jira API настроен корректно")
             else:
-                logger.warning("⚠️ Jira API требует настройки")
+                logger.warning("⚠️ Jira API требует настройки или сейчас недоступен")
             
             # Тест LLM API
             llm_client = LLMClient()

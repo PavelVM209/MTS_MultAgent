@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
-from ..core.llm_client import LLMClient
+from ..core.llm_client import LLMClient, LLMRequest
 from ..core.json_memory_store import JSONMemoryStore
 from ..core.quality_metrics import QualityMetrics
 from ..core.config import get_employee_monitoring_config
@@ -849,22 +849,26 @@ class WeeklyReportsAgentComplete(BaseAgent):
             }}
             """
             
-            response = await self.llm_client.generate_response(prompt)
-            
-            if response:
+            llm_request = LLMRequest(
+                prompt=prompt,
+                system_prompt="Ты - аналитик производительности. Верни только валидный JSON без markdown.",
+                max_tokens=1200,
+                temperature=0.2,
+            )
+            response = await self.llm_client.generate_response(llm_request)
+
+            if response and getattr(response, "content", None):
                 # Парсим JSON ответ
                 try:
-                    import json
-                    insights_data = json.loads(response)
-                    
-                    summary.key_achievements = insights_data.get('key_achievements', [])
-                    summary.areas_for_improvement = insights_data.get('areas_for_improvement', [])
-                    summary.overall_performance_score = insights_data.get('overall_performance_score', 5.0)
-                    summary.llm_insights = insights_data.get('insights_comment', '')
-                    
+                    insights_data = json.loads(response.content)
+
+                    summary.key_achievements = insights_data.get("key_achievements", [])
+                    summary.areas_for_improvement = insights_data.get("areas_for_improvement", [])
+                    summary.overall_performance_score = insights_data.get("overall_performance_score", 5.0)
+                    summary.llm_insights = insights_data.get("insights_comment", "")
+
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to parse LLM response for {summary.employee_name}")
-                    # Используем базовую логику
                     summary.overall_performance_score = min(10, summary.task_completion_rate * 10)
             
         except Exception as e:

@@ -272,6 +272,27 @@ class EmployeeRoleManager:
             "activity_level": context.employee.activity_level.value,
             "specializations": context.employee.specializations
         }
+
+    def enhance_meeting_analysis(self, participant_names: List[str]) -> Dict[str, Any]:
+        """
+        Обогатить анализ совещаний контекстом ролей участников.
+        
+        Args:
+            participant_names: Список участников (displayName из протокола/анализа)
+            
+        Returns:
+            Данные для вставки в промпт/отчет (без изменения исходного текста протокола)
+        """
+        team_data = self.enhance_team_analysis(participant_names)
+
+        llm_context_blocks = []
+        for name in team_data["identified_employees"]:
+            ctx = self.get_employee_context(name)
+            if ctx:
+                llm_context_blocks.append(ctx.get_llm_context())
+
+        team_data["llm_role_context"] = "\n\n".join(llm_context_blocks)
+        return team_data
     
     def get_role_based_prompts(self, role_type: RoleType) -> Dict[str, str]:
         """

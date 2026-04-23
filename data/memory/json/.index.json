@@ -13,7 +13,217 @@
         "file_id": "20ce6911-63d0-4584-b81c-51c691df7f55",
         "size_bytes": 1152
       }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:30:11.952831",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:30:11.949648",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "1c53397b-cda4-4263-9914-35585729634a",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:30:12.022707",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:30:12.019606",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "23b82d69-91be-47ae-bbcf-1e880c8460fc",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:30:12.088184",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:30:12.085445",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "108ca4ba-d253-41af-942c-56936f33314b",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:30:12.158331",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:30:12.155208",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "359c35d0-e129-4f12-bdb8-aff8cc70073a",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:34:34.407022",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:34:34.402398",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "9715646a-a068-47c9-b47c-7d04ba028df2",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:34:34.494370",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:34:34.490953",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "e702a868-b97b-43f7-9868-c3f8f2b6f110",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:34:34.574234",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:34:34.571382",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "97fa65ef-41c8-43a9-a447-35b03e6dc3a8",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:34:34.659838",
+      "size": 1662,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:34:34.656697",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "f8c92179-166d-43c3-b512-ab656dd14d4e",
+        "size_bytes": 1152,
+        "quality_score": 0.0
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:57:30.304182",
+      "size": 15555,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:57:30.300034",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "60cc2d4a-d4bb-4ba5-9235-62f9ade023f0",
+        "size_bytes": 16502,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:57:35.831569",
+      "size": 15555,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:57:35.825181",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "b8529a36-bb2d-4cb0-8476-a17e4d4f9589",
+        "size_bytes": 16502,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:57:40.930468",
+      "size": 15555,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:57:40.923732",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "19728b43-4ce5-4214-b04c-ec5a4ad4225e",
+        "size_bytes": 16502,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T02:57:46.534573",
+      "size": 15555,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T02:57:46.529183",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "ff80bff6-200a-4b4b-b25f-cca6cea2cd70",
+        "size_bytes": 16502,
+        "quality_score": 0.4
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T09:31:05.500794",
+      "size": 16389,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T09:31:05.488106",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "c8b5b523-1e52-435e-9112-a34194d20d39",
+        "size_bytes": 17107,
+        "quality_score": 0.62
+      }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T09:38:15.545594",
+      "size": 15997,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T09:38:15.541332",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "debd126a-de76-4d60-9649-17a1f9c7cafe",
+        "size_bytes": 16780,
+        "quality_score": 0.6
+      }
     }
   ],
-  "last_updated": "2026-04-10T19:34:26.129886"
+  "last_updated": "2026-04-23T09:38:15.545615"
 }
