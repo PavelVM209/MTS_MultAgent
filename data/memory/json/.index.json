@@ -223,7 +223,22 @@
         "size_bytes": 16780,
         "quality_score": 0.6
       }
+    },
+    {
+      "path": "weekly_summary_data_2026-04-20.json",
+      "data_type": "weekly_summary_data",
+      "created_at": "2026-04-23T09:48:32.857952",
+      "size": 16213,
+      "metadata": {
+        "data_type": "weekly_summary_data",
+        "persisted_at": "2026-04-23T09:48:32.836666",
+        "persisted_by": "MTS_MultAgent_v3",
+        "version": "1.0.0",
+        "file_id": "ef4f5061-029d-4672-80f9-117bd2f9537b",
+        "size_bytes": 16953,
+        "quality_score": 0.8200000000000001
+      }
     }
   ],
-  "last_updated": "2026-04-23T09:38:15.545615"
+  "last_updated": "2026-04-23T09:48:32.865258"
 }
