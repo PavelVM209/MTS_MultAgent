@@ -193,3 +193,18 @@ class AnalysisIndexDB:
                 (start_date.date().isoformat(), end_date.date().isoformat()),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def get_latest_run_before(self, analysis_type: str, before_date: datetime) -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT run_id, analysis_type, created_at, artifact_path, metadata_json
+                FROM runs
+                WHERE analysis_type = ?
+                  AND created_at < ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (analysis_type, before_date.isoformat()),
+            ).fetchone()
+        return dict(row) if row else None

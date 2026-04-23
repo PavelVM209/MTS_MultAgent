@@ -10,6 +10,7 @@ import logging
 import json
 import aiohttp
 import re
+import hashlib
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
@@ -426,9 +427,10 @@ class WeeklyReportsAgentComplete(BaseAgent):
             
             week_start = input_data.get('week_start') or kwargs.get('week_start')
             week_end = input_data.get('week_end') or kwargs.get('week_end')
+            analysis_plan = input_data.get("analysis_plan") if input_data else None
             
             # Generate weekly report
-            report_result = await self.generate_weekly_report(week_start, week_end)
+            report_result = await self.generate_weekly_report(week_start, week_end, analysis_plan=analysis_plan)
             
             if report_result and report_result.quality_score >= self.quality_config.get('threshold', 0.8):
                 # Publish to Confluence if quality is good
@@ -467,7 +469,12 @@ class WeeklyReportsAgentComplete(BaseAgent):
                 data={'error': str(e)}
             )
     
-    async def generate_weekly_report(self, week_start: datetime = None, week_end: datetime = None) -> WeeklyReportResult:
+    async def generate_weekly_report(
+        self,
+        week_start: datetime = None,
+        week_end: datetime = None,
+        analysis_plan: Optional[Dict[str, Any]] = None,
+    ) -> WeeklyReportResult:
         """Генерация еженедельного отчета."""
         try:
             # Определяем период отчета
@@ -483,6 +490,13 @@ class WeeklyReportsAgentComplete(BaseAgent):
                 week_start = datetime.fromisoformat(week_start.replace('Z', '+00:00'))
             if isinstance(week_end, str):
                 week_end = datetime.fromisoformat(week_end.replace('Z', '+00:00'))
+
+            analysis_plan = analysis_plan or self.plan_incremental_strategy(week_start, week_end)
+            if analysis_plan["mode"] == "reuse":
+                cached_report = await self._load_cached_weekly_report(week_start, week_end)
+                if cached_report:
+                    logger.info("Weekly report reused from latest artifacts")
+                    return cached_report
             
             logger.info(f"Generating weekly report for period {week_start.date()} to {week_end.date()}")
             
@@ -501,6 +515,8 @@ class WeeklyReportsAgentComplete(BaseAgent):
                 task_evidence_runs=run_task_evidence,
                 employee_evidence_runs=run_employee_evidence,
             )
+            previous_period = self._get_previous_period(week_start, week_end)
+            previous_report = await self._load_cached_weekly_report(previous_period["start"], previous_period["end"])
             
             # Формируем статистику
             total_employees = len(employees_summaries)
@@ -518,44 +534,64 @@ class WeeklyReportsAgentComplete(BaseAgent):
             week_number = week_start.isocalendar()[1]
             period = f"W{week_number}-{week_start.year}"
             
+            employee_trends = self._build_employee_trends(employees_summaries, previous_report)
+            team_delta = self._build_team_delta(
+                current_total_tasks_completed=total_tasks_completed,
+                current_avg_performance=avg_performance_score,
+                previous_report=previous_report,
+            )
+            recurring_patterns = self._build_recurring_patterns(employees_summaries, previous_report)
+
             # Build aggregated metrics
             aggregated_metrics = {
                 'employee_performance': {
                     'average': round(avg_performance_score, 2),
                     'min': round(min(s.overall_performance_score for s in employees_summaries.values()), 2) if employees_summaries else 0,
                     'max': round(max(s.overall_performance_score for s in employees_summaries.values()), 2) if employees_summaries else 0,
-                    'trend': 'stable'  # Would be calculated from historical data
+                    'trend': team_delta['performance_trend'],
+                    'delta_vs_previous': round(team_delta['avg_performance_delta'], 2),
                 },
                 'project_health': {
                     'average': 7.5,  # Default value
                     'min': 6.0,
                     'max': 9.0,
-                    'trend': 'improving'
+                    'trend': team_delta['project_health_trend']
                 },
                 'productivity': {
                     'average': round(total_tasks_completed / max(total_employees, 1), 2),
                     'min': 0,
                     'max': round(max(s.completed_tasks for s in employees_summaries.values()), 2) if employees_summaries else 0,
-                    'trend': 'stable'
+                    'trend': team_delta['productivity_trend'],
+                    'delta_vs_previous': team_delta['tasks_completed_delta'],
                 }
             }
             
             # Build trend analysis
             trend_analysis = {
                 'employee_trends': {
-                    'trends': [
-                        {
-                            'employee': emp,
-                            'trend': 'stable',
-                            'change_percentage': 0.0
-                        } for emp in employees_summaries.keys()
-                    ]
+                    'trends': employee_trends
                 },
                 'project_trends': {
-                    'trends': []
+                    'trends': [
+                        {
+                            'metric': 'avg_performance_score',
+                            'trend': team_delta['performance_trend'],
+                            'delta': round(team_delta['avg_performance_delta'], 2),
+                        },
+                        {
+                            'metric': 'total_tasks_completed',
+                            'trend': team_delta['productivity_trend'],
+                            'delta': team_delta['tasks_completed_delta'],
+                        },
+                    ]
                 },
                 'productivity_trends': {
-                    'trends': []
+                    'trends': employee_trends
+                },
+                'recurring_patterns': {
+                    'risks': recurring_patterns['risks'],
+                    'strengths': recurring_patterns['strengths'],
+                    'blockers': recurring_patterns['blockers'],
                 }
             }
             
@@ -613,7 +649,16 @@ class WeeklyReportsAgentComplete(BaseAgent):
                 individual_recommendations=team_insights.get('individual_recommendations', {}),
                 team_recommendations=team_insights.get('team_recommendations', []),
                 quality_score=await self._calculate_report_quality(employees_summaries),
-                report_generated_at=datetime.now()
+                report_generated_at=datetime.now(),
+                metadata={
+                    "analysis_method": analysis_plan["mode"],
+                    "source_fingerprint": analysis_plan.get("source_fingerprint", ""),
+                    "source_inventory": analysis_plan.get("source_inventory", []),
+                    "previous_period_start": previous_period["start"].strftime('%Y-%m-%d'),
+                    "previous_period_end": previous_period["end"].strftime('%Y-%m-%d'),
+                    "historical_comparison_available": previous_report is not None,
+                    "recurring_patterns": recurring_patterns,
+                }
             )
             
             # Сохраняем отчет в хранилище
@@ -625,6 +670,252 @@ class WeeklyReportsAgentComplete(BaseAgent):
         except Exception as e:
             logger.error(f"Failed to generate weekly report: {e}")
             raise
+
+    def _get_previous_period(self, week_start: datetime, week_end: datetime) -> Dict[str, datetime]:
+        duration = week_end - week_start
+        previous_end = week_start - timedelta(days=1)
+        previous_start = previous_end - duration
+        return {"start": previous_start, "end": previous_end}
+
+    def _build_employee_trends(
+        self,
+        employees_summaries: Dict[str, EmployeeWeeklySummary],
+        previous_report: Optional[WeeklyReportResult],
+    ) -> List[Dict[str, Any]]:
+        previous_summaries = previous_report.employees_summaries if previous_report else {}
+        trends: List[Dict[str, Any]] = []
+        for employee_name, summary in employees_summaries.items():
+            previous_summary = previous_summaries.get(employee_name)
+            previous_score = previous_summary.overall_performance_score if previous_summary else 0.0
+            delta = summary.overall_performance_score - previous_score
+            if delta > 0.3:
+                trend = "improving"
+            elif delta < -0.3:
+                trend = "declining"
+            else:
+                trend = "stable"
+            change_percentage = 0.0 if previous_score == 0 else round((delta / previous_score) * 100, 2)
+            trends.append(
+                {
+                    "employee": employee_name,
+                    "trend": trend,
+                    "change_percentage": change_percentage,
+                    "delta": round(delta, 2),
+                }
+            )
+        return trends
+
+    def _build_team_delta(
+        self,
+        *,
+        current_total_tasks_completed: int,
+        current_avg_performance: float,
+        previous_report: Optional[WeeklyReportResult],
+    ) -> Dict[str, Any]:
+        if not previous_report:
+            return {
+                "avg_performance_delta": 0.0,
+                "tasks_completed_delta": 0,
+                "performance_trend": "stable",
+                "productivity_trend": "stable",
+                "project_health_trend": "stable",
+            }
+
+        performance_delta = current_avg_performance - previous_report.avg_performance_score
+        tasks_delta = current_total_tasks_completed - previous_report.total_tasks_completed
+
+        def classify(delta: float) -> str:
+            if delta > 0.3:
+                return "improving"
+            if delta < -0.3:
+                return "declining"
+            return "stable"
+
+        return {
+            "avg_performance_delta": performance_delta,
+            "tasks_completed_delta": tasks_delta,
+            "performance_trend": classify(performance_delta),
+            "productivity_trend": classify(float(tasks_delta)),
+            "project_health_trend": classify(performance_delta),
+        }
+
+    def _build_recurring_patterns(
+        self,
+        employees_summaries: Dict[str, EmployeeWeeklySummary],
+        previous_report: Optional[WeeklyReportResult],
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        previous_summaries = previous_report.employees_summaries if previous_report else {}
+
+        recurring_risks: List[Dict[str, Any]] = []
+        recurring_strengths: List[Dict[str, Any]] = []
+        recurring_blockers: List[Dict[str, Any]] = []
+
+        for employee_name, summary in employees_summaries.items():
+            previous_summary = previous_summaries.get(employee_name)
+            if not previous_summary:
+                continue
+
+            current_text = self._flatten_employee_evidence(summary).lower()
+            previous_text = self._flatten_employee_evidence(previous_summary).lower()
+
+            if any(word in current_text and word in previous_text for word in ["риск", "risk", "зависим", "dependency"]):
+                recurring_risks.append(
+                    {
+                        "employee": employee_name,
+                        "pattern": "recurring_risk_theme",
+                    }
+                )
+
+            if any(word in current_text and word in previous_text for word in ["блок", "blocker", "проблем", "issue"]):
+                recurring_blockers.append(
+                    {
+                        "employee": employee_name,
+                        "pattern": "recurring_blocker_theme",
+                    }
+                )
+
+            if summary.overall_performance_score >= 7.5 and previous_summary.overall_performance_score >= 7.5:
+                recurring_strengths.append(
+                    {
+                        "employee": employee_name,
+                        "pattern": "sustained_high_performance",
+                    }
+                )
+
+        return {
+            "risks": recurring_risks,
+            "strengths": recurring_strengths,
+            "blockers": recurring_blockers,
+        }
+
+    def _flatten_employee_evidence(self, summary: EmployeeWeeklySummary) -> str:
+        if hasattr(summary, "evidence_bundle") and isinstance(summary.evidence_bundle, dict):
+            return json.dumps(summary.evidence_bundle, ensure_ascii=False, default=str)
+        return json.dumps(summary.__dict__, ensure_ascii=False, default=str)
+
+    def plan_incremental_strategy(self, week_start: datetime, week_end: datetime) -> Dict[str, Any]:
+        """Plan weekly rebuild strategy from indexed run artifacts in the period."""
+        source_inventory: List[Dict[str, Any]] = []
+
+        for run in self.analysis_index_db.get_runs_in_period("task_analysis", week_start, week_end):
+            source_inventory.append(
+                {
+                    "type": "task_run",
+                    "run_id": run.get("run_id"),
+                    "artifact_path": run.get("artifact_path"),
+                    "created_at": run.get("created_at"),
+                }
+            )
+
+        for run in self.analysis_index_db.get_runs_in_period("meeting_analysis", week_start, week_end):
+            source_inventory.append(
+                {
+                    "type": "meeting_run",
+                    "run_id": run.get("run_id"),
+                    "artifact_path": run.get("artifact_path"),
+                    "created_at": run.get("created_at"),
+                }
+            )
+
+        for row in self.analysis_index_db.get_task_evidence_rows(week_start, week_end):
+            source_inventory.append(
+                {
+                    "type": "task_evidence",
+                    "run_id": row.get("run_id"),
+                    "employee_name": row.get("employee_name"),
+                    "artifact_path": row.get("artifact_path"),
+                    "created_at": row.get("created_at"),
+                }
+            )
+
+        for row in self.analysis_index_db.get_meeting_employee_evidence_rows(week_start, week_end):
+            source_inventory.append(
+                {
+                    "type": "meeting_employee_evidence",
+                    "run_id": row.get("run_id"),
+                    "employee_name": row.get("employee_name"),
+                    "artifact_path": row.get("artifact_path"),
+                    "created_at": row.get("created_at"),
+                }
+            )
+
+        source_fingerprint = hashlib.sha256(
+            json.dumps(sorted(source_inventory, key=lambda item: json.dumps(item, sort_keys=True)), ensure_ascii=False).encode("utf-8")
+        ).hexdigest()
+        previous_metadata = self._load_latest_weekly_metadata()
+
+        mode = "full"
+        if previous_metadata.get("week_start") == week_start.strftime("%Y-%m-%d") and previous_metadata.get("week_end") == week_end.strftime("%Y-%m-%d"):
+            if previous_metadata.get("source_fingerprint", "") == source_fingerprint:
+                mode = "reuse"
+
+        return {
+            "mode": mode,
+            "source_fingerprint": source_fingerprint,
+            "source_inventory": source_inventory,
+            "source_count": len(source_inventory),
+        }
+
+    def _load_latest_weekly_metadata(self) -> Dict[str, Any]:
+        try:
+            latest_candidates = sorted(self.weekly_reports_dir.glob("weekly_report_*.json"), key=lambda path: path.stat().st_mtime)
+            if latest_candidates:
+                payload = json.loads(latest_candidates[-1].read_text(encoding="utf-8"))
+                metadata = payload.get("metadata", {}) or {}
+                metadata["week_start"] = payload.get("week_start")
+                metadata["week_end"] = payload.get("week_end")
+                return metadata
+        except Exception as e:
+            logger.warning(f"Failed to load latest weekly metadata: {e}")
+        return {}
+
+    async def _load_cached_weekly_report(self, week_start: datetime, week_end: datetime) -> Optional[WeeklyReportResult]:
+        try:
+            target_file = self.weekly_reports_dir / f"weekly_report_{week_start.strftime('%Y-%m-%d')}.json"
+            if not target_file.exists():
+                return None
+            payload = json.loads(target_file.read_text(encoding="utf-8"))
+            if payload.get("week_start") != week_start.strftime("%Y-%m-%d") or payload.get("week_end") != week_end.strftime("%Y-%m-%d"):
+                return None
+
+            employees_summaries = {
+                name: EmployeeWeeklySummary(**summary)
+                for name, summary in payload.get("employees_summaries", {}).items()
+            }
+
+            return WeeklyReportResult(
+                week_start=payload.get("week_start"),
+                week_end=payload.get("week_end"),
+                period=payload.get("period"),
+                generated_at=datetime.fromisoformat(str(payload.get("generated_at")).replace("Z", "+00:00")),
+                aggregated_metrics=payload.get("aggregated_metrics", {}),
+                trend_analysis=payload.get("trend_analysis", {}),
+                strategic_insights=payload.get("strategic_insights", []),
+                system_metrics=payload.get("system_metrics", {}),
+                week_start_dt=week_start,
+                week_end_dt=week_end,
+                employees_summaries=employees_summaries,
+                total_employees=int(payload.get("total_employees", 0) or 0),
+                total_tasks_completed=int(payload.get("total_tasks_completed", 0) or 0),
+                total_story_points=int(payload.get("total_story_points", 0) or 0),
+                total_meetings=int(payload.get("total_meetings", 0) or 0),
+                avg_performance_score=float(payload.get("avg_performance_score", 0.0) or 0.0),
+                top_performers=payload.get("top_performers", []),
+                employees_needing_attention=payload.get("employees_needing_attention", []),
+                team_achievements=payload.get("team_achievements", []),
+                team_challenges=payload.get("team_challenges", []),
+                individual_recommendations=payload.get("individual_recommendations", {}),
+                team_recommendations=payload.get("team_recommendations", []),
+                quality_score=float(payload.get("quality_score", 0.0) or 0.0),
+                report_generated_at=datetime.fromisoformat(str(payload.get("report_generated_at")).replace("Z", "+00:00")),
+                metadata={
+                    **(payload.get("metadata", {}) or {}),
+                    "analysis_method": "reused_from_weekly_cache",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load cached weekly report: {e}")
+            return None
     
     async def _load_run_task_stage2_data(self, week_start: datetime, week_end: datetime) -> List[Dict[str, Any]]:
         """Загрузка stage2_task_result.json из reports/runs/* за период."""

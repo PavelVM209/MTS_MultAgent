@@ -38,11 +38,15 @@ tags:
 - Weekly Reports начал использовать SQLite-first read-path для run catalog, task evidence и meeting employee evidence с fallback на file scan
 - QualityOrchestrator weekly workflow теперь вызывает актуальный SQLite-first weekly path напрямую, без legacy collect-first ветки
 - QualityOrchestrator task workflow теперь явно работает по orchestration-driven incremental plan: `reuse / selective / full`
+- QualityOrchestrator meeting workflow тоже переведён на orchestration-driven incremental plan: `reuse / selective / full`
+- QualityOrchestrator weekly workflow тоже переведён на orchestration-driven incremental plan
+- Weekly Reports получил historical trend layer: сравнение текущего периода с предыдущим по сотрудникам и команде
+- Weekly Reports начал строить recurring blockers, risks и strengths между периодами на evidence-уровне
 
 ## Next 3-5 Steps
 
 1. Проверить selective rebuild на реальном повторном Jira run с частичными изменениями
-2. Расширить orchestration-driven incremental decisions дальше на meeting/weekly pre-aggregation, а не только на task workflow
+2. Углубить recurring-pattern synthesis: перейти от keyword heuristics к более содержательному clustering/normalization по evidence themes
 3. Добавить selective rebuild не только на employee layer, но и на evidence bundle / weekly pre-aggregation
 4. Решить, когда добавлять vector retrieval поверх meeting/task evidence
 5. Поддерживать [[testing-workflow]] и [[artifact-cleanup-workflow]] как source of truth

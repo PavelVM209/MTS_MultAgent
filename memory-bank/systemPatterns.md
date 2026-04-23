@@ -91,6 +91,10 @@ tags:
 - orchestration layer постепенно переводится на прямой вызов актуальных read-path, а не legacy collect-first веток
 - Weekly workflow уже использует SQLite-first pipeline напрямую
 - Task workflow уже принимает явное orchestration-решение `reuse / selective / full` перед запуском Task Analyzer
+- Meeting workflow уже принимает явное orchestration-решение `reuse / selective / full` на основе inventory протоколов и fingerprint task evidence
+- Weekly workflow уже принимает orchestration-driven incremental decision на основе source fingerprint входных run artifacts
+- Weekly workflow уже сравнивает текущий период с предыдущим и строит employee/team trend deltas
+- Weekly workflow уже выделяет recurring blockers, recurring risks и recurring strengths между периодами
 - это снижает риск расхождения между тем, что умеет агент, и тем, что реально вызывает оркестратор
 
 ### Evidence-Based Pipeline

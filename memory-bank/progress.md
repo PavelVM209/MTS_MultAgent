@@ -75,6 +75,10 @@ tags:
 - SQLite слой перестал быть только write-side каталогом и начал реально использоваться в read-path weekly aggregation
 - оркестратор weekly workflow переведён на актуальный SQLite-first weekly path
 - оркестратор task workflow переведён на явный incremental decision path с режимами `reuse`, `selective`, `full`
+- оркестратор meeting workflow переведён на явный incremental decision path с режимами `reuse`, `selective`, `full`
+- weekly workflow переведён на orchestration-driven incremental plan поверх SQLite/source fingerprint
+- weekly workflow начал строить historical comparison с предыдущим периодом по employee/team trends
+- weekly workflow начал строить recurring blockers/risks/strengths между периодами на evidence-уровне
 
 ## 2026-04-20 to 2026-04-22
 

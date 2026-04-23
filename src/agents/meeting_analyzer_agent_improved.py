@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from pathlib import Path
 from dotenv import load_dotenv
+import hashlib
 
 from ..core.base_agent import BaseAgent, AgentConfig, AgentResult
 from ..core.llm_client import LLMClient, LLMRequest
@@ -190,6 +191,13 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
         try:
             logger.info("Starting Improved Three-Stage Meeting Analysis")
             start_time = datetime.now()
+            analysis_plan = (input_data or {}).get("analysis_plan") or self.plan_incremental_strategy()
+
+            if analysis_plan["mode"] == "reuse":
+                cached_result = await self._load_cached_meeting_analysis_result()
+                if cached_result:
+                    logger.info("Meeting analysis reused from latest artifacts")
+                    return cached_result
             
             # ЭТАП 1: Переработка протоколов в читабельный вид
             logger.info("\n" + "="*80)
@@ -225,6 +233,16 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
             logger.info("="*80)
             
             final_analysis = await self.stage3_final_analysis(comprehensive_analysis)
+            final_analysis.metadata.update(
+                {
+                    "analysis_method": analysis_plan["mode"],
+                    "changed_protocols": analysis_plan.get("changed_protocols", []),
+                    "removed_protocols": analysis_plan.get("removed_protocols", []),
+                    "task_evidence_changed": analysis_plan.get("task_evidence_changed", False),
+                    "task_evidence_fingerprint": analysis_plan.get("task_evidence_fingerprint", ""),
+                    "protocol_inventory": analysis_plan.get("protocol_inventory", []),
+                }
+            )
             
             # Сохраняем результаты
             await self._save_comprehensive_analysis(final_analysis)
@@ -247,7 +265,10 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                     'protocols_analyzed': len(cleaned_protocols),
                     'employees_analyzed': len(final_analysis.employees_performance),
                     'quality_score': final_analysis.quality_score,
-                    'analysis_date': final_analysis.analysis_date.isoformat()
+                    'analysis_date': final_analysis.analysis_date.isoformat(),
+                    'analysis_method': analysis_plan["mode"],
+                    'changed_protocols': analysis_plan.get("changed_protocols", []),
+                    'task_evidence_changed': analysis_plan.get("task_evidence_changed", False),
                 }
             )
             
@@ -259,6 +280,127 @@ class ImprovedMeetingAnalyzerAgent(BaseAgent):
                 data={},
                 error=str(e)
             )
+
+    def plan_incremental_strategy(self) -> Dict[str, Any]:
+        """Plan meeting analysis strategy based on protocol set and task evidence fingerprint."""
+        protocol_files = sorted(self.protocols_dir.glob("*.txt"))
+        current_protocols = []
+        for protocol_file in protocol_files:
+            current_protocols.append(
+                {
+                    "filename": protocol_file.name,
+                    "hash": md5_file(protocol_file),
+                    "mtime": datetime.fromtimestamp(protocol_file.stat().st_mtime).isoformat(),
+                }
+            )
+
+        task_evidence_path = Path(__file__).resolve().parents[2] / "reports" / "latest" / "task-analysis" / "task_evidence.json"
+        task_evidence_fingerprint = ""
+        if task_evidence_path.exists():
+            task_evidence_fingerprint = hashlib.sha256(task_evidence_path.read_bytes()).hexdigest()
+
+        previous_metadata = self._load_latest_meeting_metadata()
+        previous_protocols = {
+            item.get("filename"): item.get("hash")
+            for item in previous_metadata.get("protocol_inventory", [])
+        }
+        current_protocol_map = {item["filename"]: item["hash"] for item in current_protocols}
+
+        changed_protocols = sorted(
+            filename
+            for filename, file_hash in current_protocol_map.items()
+            if previous_protocols.get(filename) != file_hash
+        )
+        removed_protocols = sorted(set(previous_protocols.keys()) - set(current_protocol_map.keys()))
+        task_evidence_changed = previous_metadata.get("task_evidence_fingerprint", "") != task_evidence_fingerprint
+
+        if previous_metadata and not changed_protocols and not removed_protocols and not task_evidence_changed:
+            mode = "reuse"
+        elif previous_metadata:
+            mode = "selective"
+        else:
+            mode = "full"
+
+        return {
+            "mode": mode,
+            "changed_protocols": changed_protocols,
+            "removed_protocols": removed_protocols,
+            "task_evidence_changed": task_evidence_changed,
+            "protocol_count": len(current_protocols),
+            "task_evidence_fingerprint": task_evidence_fingerprint,
+            "protocol_inventory": current_protocols,
+        }
+
+    def _load_latest_meeting_metadata(self) -> Dict[str, Any]:
+        try:
+            latest_meeting = Path(__file__).resolve().parents[2] / "reports" / "latest" / "meeting-analysis" / "meeting-analysis.json"
+            if latest_meeting.exists():
+                payload = json.loads(latest_meeting.read_text(encoding="utf-8"))
+                return payload.get("metadata", {}) or {}
+        except Exception as e:
+            logger.warning(f"Failed to load latest meeting metadata: {e}")
+        return {}
+
+    async def _load_cached_meeting_analysis_result(self) -> Optional[AgentResult]:
+        try:
+            latest_meeting = Path(__file__).resolve().parents[2] / "reports" / "latest" / "meeting-analysis" / "meeting-analysis.json"
+            if not latest_meeting.exists():
+                return None
+
+            payload = json.loads(latest_meeting.read_text(encoding="utf-8"))
+            analysis = ComprehensiveMeetingAnalysis(
+                analysis_date=datetime.fromisoformat(payload.get("analysis_date")),
+                employees_performance={
+                    employee_name: EmployeeMeetingPerformance(
+                        employee_name=employee_name,
+                        analysis_date=datetime.now(),
+                        speaking_turns=int(employee_data.get("speaking_turns", 0) or 0),
+                        questions_asked=int(employee_data.get("questions_asked", 0) or 0),
+                        suggestions_made=int(employee_data.get("suggestions_made", 0) or 0),
+                        action_items_assigned=int(employee_data.get("action_items_assigned", 0) or 0),
+                        engagement_level=employee_data.get("engagement_level", "medium"),
+                        leadership_indicators=employee_data.get("leadership_indicators", []),
+                        task_to_meeting_correlation=float(employee_data.get("task_to_meeting_correlation", 0.0) or 0.0),
+                        overall_consistency=float(employee_data.get("overall_consistency", 0.0) or 0.0),
+                        communication_effectiveness=float(employee_data.get("communication_effectiveness", 0.0) or 0.0),
+                        detailed_insights=employee_data.get("detailed_insights", ""),
+                        performance_rating=float(employee_data.get("performance_rating", 0.0) or 0.0),
+                    )
+                    for employee_name, employee_data in payload.get("employees_performance", {}).items()
+                },
+                total_employees=int(payload.get("total_employees", 0) or 0),
+                total_meetings_analyzed=int(payload.get("total_meetings_analyzed", 0) or 0),
+                total_tasks_analyzed=int(payload.get("total_tasks_analyzed", 0) or 0),
+                team_collaboration_score=float(payload.get("team_collaboration_score", 0.0) or 0.0),
+                task_meeting_alignment=float(payload.get("task_meeting_alignment", 0.0) or 0.0),
+                overall_team_health=float(payload.get("overall_team_health", 0.0) or 0.0),
+                team_insights=payload.get("team_insights", []),
+                personal_insights=payload.get("personal_insights", {}),
+                recommendations=payload.get("recommendations", []),
+                quality_score=float(payload.get("quality_score", 0.0) or 0.0),
+                analysis_duration=timedelta(seconds=float(payload.get("analysis_duration_seconds", 0.0) or 0.0)),
+                metadata={
+                    **(payload.get("metadata", {}) or {}),
+                    "analysis_method": "reused_from_meeting_cache",
+                    "reused_latest_artifact": str(latest_meeting),
+                },
+            )
+
+            return AgentResult(
+                success=True,
+                message="Reused latest meeting analysis because protocols and task evidence did not change",
+                data=analysis,
+                metadata={
+                    "execution_time": 0.0,
+                    "protocols_analyzed": payload.get("total_meetings_analyzed", 0),
+                    "employees_analyzed": payload.get("total_employees", 0),
+                    "quality_score": payload.get("quality_score", 0.0),
+                    "analysis_method": "reuse",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load cached meeting analysis result: {e}")
+            return None
     
     async def stage1_clean_protocols(self) -> List[Dict[str, Any]]:
         """

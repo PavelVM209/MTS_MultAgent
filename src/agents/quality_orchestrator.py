@@ -246,8 +246,17 @@ class QualityOrchestrator:
                         'workflow_duration': (datetime.now() - workflow_start).total_seconds()
                     }
 
+                analysis_plan = self.meeting_analyzer.plan_incremental_strategy()
+                logger.info(
+                    "Meeting analysis strategy: %s (changed_protocols=%s, removed_protocols=%s, task_evidence_changed=%s)",
+                    analysis_plan["mode"],
+                    len(analysis_plan.get("changed_protocols", [])),
+                    len(analysis_plan.get("removed_protocols", [])),
+                    analysis_plan.get("task_evidence_changed", False),
+                )
+
                 # 2. Запускаем анализ протоколов через execute(), который сам выполняет stage1/stage2/stage3
-                meeting_result = await self.meeting_analyzer.execute({})
+                meeting_result = await self.meeting_analyzer.execute({"analysis_plan": analysis_plan})
                 
                 if not meeting_result.success:
                     logger.error(f"Meeting analysis failed: {meeting_result.message}")
@@ -293,6 +302,8 @@ class QualityOrchestrator:
                         'quality_score': overall_score,
                         'attempts': attempt + 1,
                         'protocols_analyzed': len(protocol_files),
+                        'analysis_method': analysis_plan["mode"],
+                        'changed_protocols': analysis_plan.get("changed_protocols", []),
                         'workflow_duration': workflow_duration
                     }
                 
@@ -313,6 +324,8 @@ class QualityOrchestrator:
                     'quality_score': overall_score,
                     'attempts': attempt + 1,
                     'protocols_analyzed': len(protocol_files),
+                    'analysis_method': analysis_plan["mode"],
+                    'changed_protocols': analysis_plan.get("changed_protocols", []),
                     'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
                     'warning': 'Saved with quality issues'
                 }
@@ -353,12 +366,22 @@ class QualityOrchestrator:
                 # 1. Определяем период недели
                 report_period_end = datetime.now()
                 report_period_start = report_period_end - timedelta(days=7)
+                analysis_plan = self.weekly_reports.plan_incremental_strategy(
+                    report_period_start,
+                    report_period_end,
+                )
+                logger.info(
+                    "Weekly analysis strategy: %s (source_count=%s)",
+                    analysis_plan["mode"],
+                    analysis_plan.get("source_count", 0),
+                )
 
                 # 2. Генерируем отчет напрямую через актуальный SQLite-first/read-path workflow
                 weekly_result = await self.weekly_reports.execute(
                     {
                         "week_start": report_period_start,
                         "week_end": report_period_end,
+                        "analysis_plan": analysis_plan,
                     }
                 )
                 
@@ -404,6 +427,8 @@ class QualityOrchestrator:
                         'success': True,
                         'quality_score': overall_score,
                         'attempts': attempt + 1,
+                        'analysis_method': analysis_plan["mode"],
+                        'source_count': analysis_plan.get("source_count", 0),
                         'published_to_confluence': confluence_result.get('success', False),
                         'confluence_url': confluence_result.get('url'),
                         'workflow_duration': workflow_duration
@@ -425,6 +450,8 @@ class QualityOrchestrator:
                     'success': False,
                     'quality_score': overall_score,
                     'attempts': attempt + 1,
+                    'analysis_method': analysis_plan["mode"],
+                    'source_count': analysis_plan.get("source_count", 0),
                     'published_to_confluence': confluence_result.get('success', False),
                     'confluence_url': confluence_result.get('url'),
                     'workflow_duration': (datetime.now() - workflow_start).total_seconds(),
